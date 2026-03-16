@@ -135,13 +135,22 @@ async function syncLocalDataToCloud() {
                 // Se c'è un file base64 non ancora caricato
                 if (inv.fileData && !fileCloudUrl) {
                     let ext = "jpg";
-                    if (inv.fileName) ext = inv.fileName.split('.').pop();
-                    else if (inv.fileType === "application/pdf") ext = "pdf";
-                    else if (inv.fileType && inv.fileType.startsWith("video/")) ext = "mp4";
+                    if (inv.fileName) {
+                        ext = inv.fileName.split('.').pop();
+                    } else if (inv.fileType === "application/pdf") {
+                        ext = "pdf";
+                    } else if (inv.fileType && inv.fileType.startsWith("video/")) {
+                        ext = "mp4";
+                    }
                     
-                    const storageRef = ref(storage, `allegati/${inv.id}_sync.${ext}`);
-                    await uploadString(storageRef, inv.fileData, 'data_url');
-                    fileCloudUrl = await getDownloadURL(storageRef);
+                    try {
+                        const storageRef = ref(storage, `allegati/${inv.id}_sync.${ext}`);
+                        await uploadString(storageRef, inv.fileData, 'data_url');
+                        fileCloudUrl = await getDownloadURL(storageRef);
+                    } catch(uploadErr) {
+                        console.error("Errore upload allegato in auto-sync", uploadErr);
+                        // Continuiamo comunque a salvare i dati testuali dell'intervento
+                    }
                 }
                 
                 await addDoc(collection(db, "interventi"), {
@@ -173,11 +182,14 @@ async function syncLocalDataToCloud() {
             
         } catch (err) {
             console.error("Errore auto-sync in background per " + inv.paziente, err);
-            // La prossima volta ci riproverà in caso di errore di rete
+            alert(`Impossibile sincronizzare l'intervento di ${inv.paziente}. Errore: ${err.message}`);
         }
     }
     
-    if (dbUpdated) saveState();
+    if (dbUpdated) {
+        saveState();
+        updateInterventiCount();
+    }
 }
 
 function saveState() {
