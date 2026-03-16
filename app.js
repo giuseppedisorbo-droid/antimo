@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, serverTimestamp, enableIndexedDbPersistence, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
 // ====== CONFIGURAZIONE FIREBASE ======
@@ -21,6 +21,12 @@ if (isFirebaseConfigured) {
     try {
         app = initializeApp(firebaseConfig);
         db = getFirestore(app);
+        
+        // Abilita la persistenza offline (cache locale di Firebase)
+        enableIndexedDbPersistence(db).catch((err) => {
+            console.warn("Firebase Persistence offline error: ", err.code);
+        });
+
         storage = getStorage(app);
         console.log("Firebase Inizializzato con successo.");
     } catch(e) {
@@ -98,6 +104,79 @@ function initApp() {
     updateUI();
     updateInterventiCount();
     if(activeIntervention) startTimerDisplay();
+    
+    // Proviamo a sincronizzare i dati locali vecchi/offline non ancora sul cloud
+    setTimeout(syncLocalDataToCloud, 2000);
+}
+
+// Funzione per sincronizzare i vecchi interventi salvati solo in localStorage verso Firebase
+async function syncLocalDataToCloud() {
+    if (!isFirebaseConfigured) return;
+    
+    // Cerchiamo gli interventi locali senza flag cloudSynced
+    let daSincronizzare = completedInterventions.filter(inv => !inv.cloudSynced);
+    if (daSincronizzare.length === 0) return;
+    
+    console.log(`Trovati ${daSincronizzare.length} interventi locali non sincronizzati. Avvio sincronizzazione in background...`);
+    
+    let dbUpdated = false;
+    
+    for (let inv of daSincronizzare) {
+        try {
+            // Verifica se esiste già su Firestore col suo ID
+            const q = query(collection(db, "interventi"), where("id", "==", inv.id));
+            const snap = await getDocs(q);
+            
+            if (snap.empty) {
+                // Non c'è su Firestore, dobbiamo inviarlo
+                let fileCloudUrl = inv.fileUrl || null;
+                
+                // Se c'è un file base64 non ancora caricato
+                if (inv.fileData && !fileCloudUrl) {
+                    let ext = "jpg";
+                    if (inv.fileName) ext = inv.fileName.split('.').pop();
+                    else if (inv.fileType === "application/pdf") ext = "pdf";
+                    else if (inv.fileType && inv.fileType.startsWith("video/")) ext = "mp4";
+                    
+                    const storageRef = ref(storage, `allegati/${inv.id}_sync.${ext}`);
+                    await uploadString(storageRef, inv.fileData, 'data_url');
+                    fileCloudUrl = await getDownloadURL(storageRef);
+                }
+                
+                await addDoc(collection(db, "interventi"), {
+                    timestamp: serverTimestamp(),
+                    id: inv.id,
+                    tipo: inv.tipo,
+                    paziente: inv.paziente,
+                    destinazione: inv.destinazione,
+                    dispositivi: inv.dispositivi,
+                    note: inv.note,
+                    startTime: inv.startTime,
+                    endTime: inv.endTime,
+                    kmPercorsi: inv.kmPercorsi || "0",
+                    fileUrl: fileCloudUrl,
+                    haAllegato: !!(inv.fileData || fileCloudUrl),
+                    fileType: inv.fileType || null
+                });
+                
+                console.log("Intervento offline sincronizzato con successo:", inv.paziente);
+                inv.fileUrl = fileCloudUrl;
+            } else {
+                console.log("Intervento già presente su Firestore, aggiorno lo stato locale:", inv.paziente);
+            }
+            
+            // In ogni caso marchiamolo come sincronizzato
+            inv.cloudSynced = true;
+            delete inv.fileData; // Puliamo dal pesante base64 se presente
+            dbUpdated = true;
+            
+        } catch (err) {
+            console.error("Errore auto-sync in background per " + inv.paziente, err);
+            // La prossima volta ci riproverà in caso di errore di rete
+        }
+    }
+    
+    if (dbUpdated) saveState();
 }
 
 function saveState() {
@@ -397,6 +476,9 @@ btnStopIntervention.addEventListener('click', async () => {
                 haAllegato: !!activeIntervention.fileData,
                 fileType: activeIntervention.fileType || null
             });
+            activeIntervention.cloudSynced = true;
+        } else {
+            activeIntervention.cloudSynced = false;
         }
         
         // Pulizia base64
