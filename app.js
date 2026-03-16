@@ -116,7 +116,11 @@ async function syncLocalDataToCloud() {
     
     // Cerchiamo gli interventi locali senza flag cloudSynced
     let daSincronizzare = completedInterventions.filter(inv => !inv.cloudSynced);
-    if (daSincronizzare.length === 0) return;
+    if (daSincronizzare.length === 0) {
+        // Avvisa l'utente se ha cliccato manualmente e non c'è niente
+        if (typeof console !== 'undefined') console.log("Nessun intervento da sincronizzare.");
+        return 0; // ritorna 0 per indicare che non c'erano elementi
+    }
     
     console.log(`Trovati ${daSincronizzare.length} interventi locali non sincronizzati. Avvio sincronizzazione in background...`);
     
@@ -124,56 +128,50 @@ async function syncLocalDataToCloud() {
     
     for (let inv of daSincronizzare) {
         try {
-            // Verifica se esiste già su Firestore col suo ID
-            const q = query(collection(db, "interventi"), where("id", "==", inv.id));
-            const snap = await getDocs(q);
+            // Saltiamo la query complessa che potrebbe dare errore di indici su Firestore.
+            // Scriviamo direttamente l'intervento su Firestore (potrebbe creare un duplicato se disinstallano e reinstallano, ma garantisce che i dati salgano)
             
-            if (snap.empty) {
-                // Non c'è su Firestore, dobbiamo inviarlo
-                let fileCloudUrl = inv.fileUrl || null;
-                
-                // Se c'è un file base64 non ancora caricato
-                if (inv.fileData && !fileCloudUrl) {
-                    let ext = "jpg";
-                    if (inv.fileName) {
-                        ext = inv.fileName.split('.').pop();
-                    } else if (inv.fileType === "application/pdf") {
-                        ext = "pdf";
-                    } else if (inv.fileType && inv.fileType.startsWith("video/")) {
-                        ext = "mp4";
-                    }
-                    
-                    try {
-                        const storageRef = ref(storage, `allegati/${inv.id}_sync.${ext}`);
-                        await uploadString(storageRef, inv.fileData, 'data_url');
-                        fileCloudUrl = await getDownloadURL(storageRef);
-                    } catch(uploadErr) {
-                        console.error("Errore upload allegato in auto-sync", uploadErr);
-                        // Continuiamo comunque a salvare i dati testuali dell'intervento
-                    }
+            let fileCloudUrl = inv.fileUrl || null;
+            
+            // Se c'è un file base64 non ancora caricato
+            if (inv.fileData && !fileCloudUrl) {
+                let ext = "jpg";
+                if (inv.fileName) {
+                    ext = inv.fileName.split('.').pop();
+                } else if (inv.fileType === "application/pdf") {
+                    ext = "pdf";
+                } else if (inv.fileType && inv.fileType.startsWith("video/")) {
+                    ext = "mp4";
                 }
                 
-                await addDoc(collection(db, "interventi"), {
-                    timestamp: serverTimestamp(),
-                    id: inv.id,
-                    tipo: inv.tipo,
-                    paziente: inv.paziente,
-                    destinazione: inv.destinazione,
-                    dispositivi: inv.dispositivi,
-                    note: inv.note,
-                    startTime: inv.startTime,
-                    endTime: inv.endTime,
-                    kmPercorsi: inv.kmPercorsi || "0",
-                    fileUrl: fileCloudUrl,
-                    haAllegato: !!(inv.fileData || fileCloudUrl),
-                    fileType: inv.fileType || null
-                });
-                
-                console.log("Intervento offline sincronizzato con successo:", inv.paziente);
-                inv.fileUrl = fileCloudUrl;
-            } else {
-                console.log("Intervento già presente su Firestore, aggiorno lo stato locale:", inv.paziente);
+                try {
+                    const storageRef = ref(storage, `allegati/${inv.id}_sync.${ext}`);
+                    await uploadString(storageRef, inv.fileData, 'data_url');
+                    fileCloudUrl = await getDownloadURL(storageRef);
+                } catch(uploadErr) {
+                    console.error("Errore upload allegato in auto-sync", uploadErr);
+                    // Continuiamo comunque
+                }
             }
+                
+            await addDoc(collection(db, "interventi"), {
+                timestamp: serverTimestamp(),
+                id: inv.id || Date.now().toString(),
+                tipo: inv.tipo || "Non specificato",
+                paziente: inv.paziente || "Sconosciuto",
+                destinazione: inv.destinazione || "",
+                dispositivi: inv.dispositivi || "",
+                note: inv.note || "",
+                startTime: inv.startTime || Date.now(),
+                endTime: inv.endTime || Date.now(),
+                kmPercorsi: inv.kmPercorsi || "0",
+                fileUrl: fileCloudUrl,
+                haAllegato: !!(inv.fileData || fileCloudUrl),
+                fileType: inv.fileType || null
+            });
+            
+            console.log("Intervento offline sincronizzato con successo:", inv.paziente);
+            inv.fileUrl = fileCloudUrl;
             
             // In ogni caso marchiamolo come sincronizzato
             inv.cloudSynced = true;
@@ -190,6 +188,8 @@ async function syncLocalDataToCloud() {
         saveState();
         updateInterventiCount();
     }
+    
+    return daSincronizzare.length;
 }
 
 function saveState() {
@@ -518,13 +518,25 @@ if(btnManualSyncMobile) {
     btnManualSyncMobile.addEventListener('click', async () => {
         const oldHtml = btnManualSyncMobile.innerHTML;
         try {
-            btnManualSyncMobile.innerHTML = `<span class="btn-icon">⏳</span> SINCRONIZZANDO...`;
+            btnManualSyncMobile.innerHTML = `<span class="btn-icon">⏳</span> RISOLUZIONE...`;
             btnManualSyncMobile.disabled = true;
-            await syncLocalDataToCloud();
-            alert("Sincronizzazione completata dal dispositivo al Cloud!");
-            // Refresh counts/list maybe not needed if it just pushes, but doesn't hurt.
+            
+            // Forziamo il controllo della configurazione
+            if (!isFirebaseConfigured) {
+                alert("Errore: Firebase risulta non configurato in questo momento. Aspetta qualche secondo che si colleghi alla rete.");
+                return;
+            }
+            
+            const count = await syncLocalDataToCloud();
+            
+            if (count === 0) {
+                alert("Ottimo! Non ci sono dati bloccati sul tuo telefono. Tutto quello che hai registrato risulta già sincronizzato (oppure è stato perso dalla cache precedentemente).");
+            } else {
+                alert(`Perfetto! ${count} interventi bloccati sono stati salvati forzatamente nel Cloud!`);
+            }
+            
         } catch(e) {
-            alert("Errore durante la sincronizzazione: " + e.message);
+            alert("ERRORE DI RETE o PERMESSI FIREBASE: " + e.message);
         } finally {
             btnManualSyncMobile.innerHTML = oldHtml;
             btnManualSyncMobile.disabled = false;
