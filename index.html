@@ -2,7 +2,10 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
     <title>Gestione Attività Esterne</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -70,30 +73,33 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="fotoMatricola">Foto Codice a Barre / Matricola (Opzionale)</label>
-                    <input type="file" id="fotoMatricola" accept="image/*" capture="environment">
-                    <div id="fotoPreviewContainer" class="hidden" style="margin-top: 10px; text-align: center;">
-                        <img id="fotoPreview" src="" alt="Anteprima Matricola" style="max-width: 100%; border-radius: 8px; border: 2px solid var(--blue-light); max-height: 200px; object-fit: contain;">
-                        <button type="button" class="btn btn-danger" id="btnRimuoviFoto" style="margin-top: 10px; padding: 0.5rem;">Rimuovi Foto</button>
+                    <label for="allegatoFile">Allegato (Foto Matricola, PDF, o Video)</label>
+                    <input type="file" id="allegatoFile" accept="image/*,video/*,application/pdf">
+                    <div id="filePreviewContainer" class="hidden" style="margin-top: 10px; text-align: center;">
+                        <img id="fotoPreview" src="" alt="Anteprima Immagine" style="max-width: 100%; border-radius: 8px; border: 2px solid var(--blue-light); max-height: 200px; object-fit: contain; display: none;">
+                        <p id="filePreviewName" style="font-size: 0.9rem; margin-bottom: 5px; font-weight: 600; color: var(--blue-primary); display: none;"></p>
+                        <button type="button" class="btn btn-danger" id="btnRimuoviFile" style="margin-top: 10px; padding: 0.5rem;">Rimuovi Allegato</button>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label for="dispositivi">Dispositivi</label>
-                    <input list="dispositiviList" id="dispositivi" placeholder="Seleziona o scrivi...">
-                    <datalist id="dispositiviList">
-                        <option value="D3">
-                        <option value="DPad / DPad Max">
-                        <option value="Matrix">
-                        <option value="Aspiratore">
-                        <option value="PrismaVENT">
-                        <option value="O2 (Bombola/Concentratore)">
-                        <option value="Stativo">
-                        <option value="Comunicatore Dinamico">
-                        <option value="Stabilizzatore di Corrente">
-                        <option value="CPAP / AutoCPAP">
-                        <option value="Nessuno">
-                    </datalist>
+                    <label for="dispositiviSelect">Dispositivi</label>
+                    <select id="dispositiviSelect">
+                        <option value="" disabled selected>Seleziona dispositivo...</option>
+                        <option value="D3">D3</option>
+                        <option value="DPad / DPad Max">DPad / DPad Max</option>
+                        <option value="Matrix">Matrix</option>
+                        <option value="Aspiratore">Aspiratore</option>
+                        <option value="PrismaVENT">PrismaVENT</option>
+                        <option value="O2 (Bombola/Concentratore)">O2 (Bombola/Concentratore)</option>
+                        <option value="Stativo">Stativo</option>
+                        <option value="Comunicatore Dinamico">Comunicatore Dinamico</option>
+                        <option value="Stabilizzatore di Corrente">Stabilizzatore di Corrente</option>
+                        <option value="CPAP / AutoCPAP">CPAP / AutoCPAP</option>
+                        <option value="Nessuno">Nessuno</option>
+                        <option value="_AZI_NUOVO_">➕ Aggiungi Nuovo...</option>
+                    </select>
+                    <input type="text" id="nuovoDispositivo" class="hidden" placeholder="Scrivi il nuovo dispositivo..." style="margin-top: 8px;">
                 </div>
 
                 <div class="form-group">
@@ -136,6 +142,9 @@
                 <button class="btn btn-secondary" id="btnExportCSV">
                      <span class="btn-icon">📥</span> SCARICA EXCEL (CSV)
                 </button>
+                <button class="btn btn-primary btn-blue" id="btnShareCSV">
+                     <span class="btn-icon">📤</span> INVIA / CONDIVIDI
+                </button>
                 <button class="btn btn-danger" id="btnClearData">
                      <span class="btn-icon">🗑</span> Svuota Dati
                 </button>
@@ -144,5 +153,14 @@
 
     </main>
     <script type="module" src="app.js"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('Service Worker registrato:', reg.scope))
+            .catch(err => console.error('Errore SW:', err));
+        });
+      }
+    </script>
 </body>
 </html>

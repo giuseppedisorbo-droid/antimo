@@ -43,7 +43,9 @@ let activeIntervention = JSON.parse(localStorage.getItem('antimo_activeIntervent
 let completedInterventions = JSON.parse(localStorage.getItem('antimo_interventions')) || [];
 
 let timerInterval;
-let currentFotoBase64 = null;
+let currentFileBase64 = null;
+let currentFileType = null;
+let currentFileName = null;
 
 // DOM Elements
 const dayStatusBadge = document.getElementById('dayStatusBadge');
@@ -68,7 +70,8 @@ const inputKmFinali = document.getElementById('kmFinali');
 const iTipo = document.getElementById('tipoAttivita');
 const iPaziente = document.getElementById('paziente');
 const iDestinazione = document.getElementById('destinazione');
-const iDispositivi = document.getElementById('dispositivi');
+const iDispositiviSelect = document.getElementById('dispositiviSelect');
+const iNuovoDispositivo = document.getElementById('nuovoDispositivo');
 const iNote = document.getElementById('note');
 const iKmPercorsi = document.getElementById('kmPercorsi');
 const inputFotoMatricola = document.getElementById('fotoMatricola');
@@ -76,7 +79,15 @@ const fotoPreviewContainer = document.getElementById('fotoPreviewContainer');
 const fotoPreview = document.getElementById('fotoPreview');
 const btnRimuoviFoto = document.getElementById('btnRimuoviFoto');
 
+let customDevices = JSON.parse(localStorage.getItem('antimo_customDevices')) || [];
+
 function initApp() {
+    customDevices.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d; opt.textContent = d;
+        iDispositiviSelect.insertBefore(opt, iDispositiviSelect.lastElementChild);
+    });
+
     updateUI();
     updateInterventiCount();
     if(activeIntervention) startTimerDisplay();
@@ -86,6 +97,7 @@ function saveState() {
     localStorage.setItem('antimo_dayState', JSON.stringify(dayState));
     localStorage.setItem('antimo_activeIntervention', JSON.stringify(activeIntervention));
     localStorage.setItem('antimo_interventions', JSON.stringify(completedInterventions));
+    localStorage.setItem('antimo_customDevices', JSON.stringify(customDevices));
 }
 
 function updateUI() {
@@ -153,41 +165,95 @@ btnEndDay.addEventListener('click', () => {
     saveState(); updateUI();
 });
 
-inputFotoMatricola.addEventListener('change', (e) => {
+inputAllegato.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
+        currentFileType = file.type;
+        currentFileName = file.name;
+        
         const reader = new FileReader();
         reader.onload = function(event) {
-            currentFotoBase64 = event.target.result;
-            fotoPreview.src = currentFotoBase64;
-            fotoPreviewContainer.classList.remove('hidden');
+            currentFileBase64 = event.target.result;
+            
+            // UI Update basato sul tipo
+            filePreviewContainer.classList.remove('hidden');
+            if(currentFileType.startsWith('image/')) {
+                fotoPreview.src = currentFileBase64;
+                fotoPreview.style.display = 'block';
+                filePreviewName.style.display = 'none';
+            } else {
+                fotoPreview.style.display = 'none';
+                filePreviewName.textContent = "📎 " + file.name;
+                filePreviewName.style.display = 'block';
+            }
         };
         reader.readAsDataURL(file);
     }
 });
 
-btnRimuoviFoto.addEventListener('click', () => {
-    inputFotoMatricola.value = ""; currentFotoBase64 = null;
-    fotoPreview.src = ""; fotoPreviewContainer.classList.add('hidden');
+btnRimuoviFile.addEventListener('click', () => {
+    inputAllegato.value = ""; 
+    currentFileBase64 = null;
+    currentFileType = null;
+    currentFileName = null;
+    fotoPreview.src = ""; 
+    fotoPreview.style.display = 'none';
+    filePreviewName.style.display = 'none';
+    filePreviewContainer.classList.add('hidden');
+});
+
+iDispositiviSelect.addEventListener('change', (e) => {
+    if(e.target.value === "_AZI_NUOVO_") {
+        iNuovoDispositivo.classList.remove('hidden');
+        iNuovoDispositivo.focus();
+    } else {
+        iNuovoDispositivo.classList.add('hidden');
+    }
 });
 
 newInterventionForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    
+    let dispFinale = iDispositiviSelect.value;
+    if(dispFinale === "_AZI_NUOVO_") {
+        dispFinale = iNuovoDispositivo.value.trim();
+        if(!dispFinale) return alert("Scrivi il nome del nuovo dispositivo!");
+        if(!customDevices.includes(dispFinale)) {
+            customDevices.push(dispFinale);
+            const opt = document.createElement('option');
+            opt.value = dispFinale; opt.textContent = dispFinale;
+            iDispositiviSelect.insertBefore(opt, iDispositiviSelect.lastElementChild);
+        }
+    } else if(!dispFinale) {
+        return alert("Seleziona un dispositivo!");
+    }
+
     activeIntervention = {
         id: Date.now().toString(),
         dataObj: new Date().getTime(),
         tipo: iTipo.value,
         paziente: iPaziente.value,
         destinazione: iDestinazione.value,
-        dispositivi: iDispositivi.value,
+        dispositivi: dispFinale,
         note: iNote.value,
-        fotoMatricola: currentFotoBase64,
+        fileData: currentFileBase64,
+        fileType: currentFileType,
+        fileName: currentFileName,
         startTime: new Date().getTime()
     };
     saveState(); updateUI(); startTimerDisplay();
     iKmPercorsi.value = ""; 
-    inputFotoMatricola.value = ""; currentFotoBase64 = null;
-    fotoPreview.src = ""; fotoPreviewContainer.classList.add('hidden');
+    iDispositiviSelect.value = "";
+    iNuovoDispositivo.classList.add('hidden');
+    iNuovoDispositivo.value = "";
+    inputAllegato.value = ""; 
+    currentFileBase64 = null;
+    currentFileType = null;
+    currentFileName = null;
+    fotoPreview.src = ""; 
+    fotoPreview.style.display = 'none';
+    filePreviewName.style.display = 'none';
+    filePreviewContainer.classList.add('hidden');
 });
 
 btnStopIntervention.addEventListener('click', async () => {
@@ -202,17 +268,26 @@ btnStopIntervention.addEventListener('click', async () => {
         activeIntervention.endTime = new Date().getTime();
         activeIntervention.kmPercorsi = iKmPercorsi.value || "0";
         
-        let photoCloudUrl = null;
+        let fileCloudUrl = null;
         
         // Salvataggio Firebase
-        if(isFirebaseConfigured) {
-            // Upload Storage
-            if(activeIntervention.fotoMatricola) {
-                const storageRef = ref(storage, 'matricole/' + activeIntervention.id + '.jpg');
-                const uploadResult = await uploadString(storageRef, activeIntervention.fotoMatricola, 'data_url');
-                photoCloudUrl = await getDownloadURL(storageRef);
+        if(isFirebaseConfigured && activeIntervention.fileData) {
+            // Estrapoliamo estensione originale
+            let ext = "jpg";
+            if(activeIntervention.fileName) {
+                ext = activeIntervention.fileName.split('.').pop();
+            } else if(activeIntervention.fileType === "application/pdf") {
+                ext = "pdf";
+            } else if(activeIntervention.fileType && activeIntervention.fileType.startsWith("video/")) {
+                ext = "mp4";
             }
+
+            const storageRef = ref(storage, `allegati/${activeIntervention.id}.${ext}`);
+            const uploadResult = await uploadString(storageRef, activeIntervention.fileData, 'data_url');
+            fileCloudUrl = await getDownloadURL(storageRef);
+        }
             
+        if(isFirebaseConfigured) {
             // Upload Firestore
             await addDoc(collection(db, "interventi"), {
                 timestamp: serverTimestamp(),
@@ -225,16 +300,16 @@ btnStopIntervention.addEventListener('click', async () => {
                 startTime: activeIntervention.startTime,
                 endTime: activeIntervention.endTime,
                 kmPercorsi: activeIntervention.kmPercorsi,
-                fotoUrl: photoCloudUrl,
-                haFoto: !!activeIntervention.fotoMatricola
+                fileUrl: fileCloudUrl,
+                haAllegato: !!activeIntervention.fileData,
+                fileType: activeIntervention.fileType || null
             });
         }
         
-        // Pulizia base64 locale pesante per non intasare l'excel export e lo storage locale 
-        // L'app offline sà solo se c'è o non c'è una foto ("SI"/"NO")
-        activeIntervention.fotoUrl = photoCloudUrl;
-        activeIntervention.haFoto = !!activeIntervention.fotoMatricola;
-        delete activeIntervention.fotoMatricola; 
+        // Pulizia base64
+        activeIntervention.fileUrl = fileCloudUrl;
+        activeIntervention.haAllegato = !!activeIntervention.fileData;
+        delete activeIntervention.fileData; 
 
         completedInterventions.push(activeIntervention);
         activeIntervention = null;
@@ -278,7 +353,7 @@ btnExportCSV.addEventListener('click', async () => {
 
     if(interventiDaEsportare.length === 0) return alert("Nessun intervento registrato da esportare.");
 
-    let header = ["Data", "Partenza", "Destinazione", "Tipo attivita", "Paziente / Ente", "Km A/R", "Dispositivi", "Note", "Ora Inizio", "Ora Fine", "HaFoto", "URL_Foto_Cloud"];
+    let header = ["Data", "Partenza", "Destinazione", "Tipo attivita", "Paziente / Ente", "Km A/R", "Dispositivi", "Note", "Ora Inizio", "Ora Fine", "Ha_Allegato", "URL_Allegato_Cloud"];
     let csvContent = header.join(";") + "\n";
 
     interventiDaEsportare.forEach(inv => {
@@ -288,14 +363,14 @@ btnExportCSV.addEventListener('click', async () => {
         let startStr = `${padZ(d.getHours())}:${padZ(d.getMinutes())}`;
         let endStr = `${padZ(e.getHours())}:${padZ(e.getMinutes())}`;
         let descStr = `${inv.tipo} ${inv.dispositivi} ${inv.paziente} - ${inv.destinazione}`.trim();
-        let fUrl = inv.fotoUrl || "";
+        let fUrl = inv.fileUrl || "";
 
         let row = [
             `"${dateStr}"`, `"${inv.tipo}"`, `"${inv.destinazione.replace(/"/g, '""')}"`,
             `"${descStr.replace(/"/g, '""')}"`, `"${inv.paziente.replace(/"/g, '""')}"`,
             `"${inv.kmPercorsi}"`, `"${inv.dispositivi.replace(/"/g, '""')}"`,
             `"${inv.note.replace(/"/g, '""')}"`, `"${startStr}"`, `"${endStr}"`,
-            `"${inv.haFoto ? 'SI' : 'NO'}"`, `"${fUrl}"`
+            `"${inv.haAllegato ? 'SI' : 'NO'}"`, `"${fUrl}"`
         ];
         csvContent += row.join(";") + "\n";
     });
@@ -308,6 +383,67 @@ btnExportCSV.addEventListener('click', async () => {
         a.download = `Attivita_Esterne_Cloud_${formatDateDMY(new Date())}.csv`;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
     } catch(err) { alert("Errore export."); console.error(err); }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const btnShareCSV = document.getElementById('btnShareCSV');
+    if(btnShareCSV) {
+        btnShareCSV.addEventListener('click', async () => {
+             // Generiamo CSV come nell'export
+            let interventiDaEsportare = completedInterventions;
+            if(isFirebaseConfigured) {
+                try {
+                    btnShareCSV.innerHTML = `<span class="btn-icon">⏳</span> PREPARO...`;
+                    const snap = await getDocs(collection(db, "interventi"));
+                    const fetched = [];
+                    snap.forEach(doc => fetched.push(doc.data()));
+                    if(fetched.length > 0) {
+                        fetched.sort((a,b) => a.startTime - b.startTime);
+                        interventiDaEsportare = fetched;
+                    }
+                } catch(e) { console.error("Cloud fetch share err", e); }
+            }
+            
+            if(interventiDaEsportare.length === 0) {
+                btnShareCSV.innerHTML = `<span class="btn-icon">📤</span> INVIA / CONDIVIDI`;
+                return alert("Nessun intervento da condividere.");
+            }
+
+            let header = ["Data", "Partenza", "Destinazione", "Tipo attivita", "Paziente / Ente", "Km A/R", "Dispositivi", "Note", "Ora Inizio", "Ora Fine", "Ha_Allegato", "URL_Allegato_Cloud"];
+            let csvContent = header.join(";") + "\n";
+            interventiDaEsportare.forEach(inv => {
+                let d = new Date(inv.startTime), e = new Date(inv.endTime);
+                let row = [
+                    `"${formatDateDMY(d)}"`, `"${inv.tipo}"`, `"${inv.destinazione.replace(/"/g, '""')}"`,
+                    `"${(inv.tipo + ' ' + inv.dispositivi + ' ' + inv.paziente + ' ' + inv.destinazione).trim().replace(/"/g, '""')}"`,
+                    `"${inv.paziente.replace(/"/g, '""')}"`, `"${inv.kmPercorsi}"`, `"${inv.dispositivi.replace(/"/g, '""')}"`,
+                    `"${inv.note.replace(/"/g, '""')}"`, `"${padZ(d.getHours())}:${padZ(d.getMinutes())}"`, `"${padZ(e.getHours())}:${padZ(e.getMinutes())}"`,
+                    `"${inv.haAllegato ? 'SI' : 'NO'}"`, `"${inv.fileUrl || ""}"`
+                ];
+                csvContent += row.join(";") + "\n";
+            });
+
+            try {
+                const blob = new Blob(["\uFEFF"+csvContent], { type: 'text/csv;charset=utf-8;' });
+                const fileName = `Attivita_Esterne_${formatDateDMY(new Date())}.csv`;
+                const file = new File([blob], fileName, { type: 'text/csv' });
+                
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Attività Giornata',
+                        text: 'Ecco le mie attività della giornata.'
+                    });
+                } else {
+                    alert('La condivisione diretta di file non è supportata dal tuo browser attuale. Usa il tasto SCARICA e poi condividilo a mano.');
+                }
+            } catch(err) {
+                 console.error(err);
+            } finally {
+                btnShareCSV.innerHTML = `<span class="btn-icon">📤</span> INVIA / CONDIVIDI`;
+            }
+        });
+    }
 });
 
 btnClearData.addEventListener('click', () => {
