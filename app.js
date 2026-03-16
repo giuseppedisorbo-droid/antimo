@@ -5,13 +5,13 @@ import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstat
 // ====== CONFIGURAZIONE FIREBASE ======
 // INSERISCI QUI I DATI DEL TUO PROGETTO FIREBASE. LI TROVI NELLE IMPOSTAZIONI DI FIREBASE CONSOLE.
 const firebaseConfig = {
-  apiKey: "AIzaSyC9XTi3OxsBd1ZgLlpMRm9nymrkRCfuLgY",
-  authDomain: "antimo-app.firebaseapp.com",
-  projectId: "antimo-app",
-  storageBucket: "antimo-app.firebasestorage.app",
-  messagingSenderId: "535167949374",
-  appId: "1:535167949374:web:01b4487c8abbdf82aacf6f",
-  measurementId: "G-494F166FDJ"
+  apiKey: "AIzaSyB6CLQZHPG60LqsIKHAlS_Wt5OFXqfwqkw",
+  authDomain: "antimo-6a86b.firebaseapp.com",
+  projectId: "antimo-6a86b",
+  storageBucket: "antimo-6a86b.firebasestorage.app",
+  messagingSenderId: "671676764068",
+  appId: "1:671676764068:web:95027e0babe3f30042fb31",
+  measurementId: "G-WTWNH23PLS"
 };
 
 let app, db, storage;
@@ -114,23 +114,49 @@ function initApp() {
 async function syncLocalDataToCloud() {
     if (!isFirebaseConfigured) return;
     
-    // Cerchiamo gli interventi locali senza flag cloudSynced
-    let daSincronizzare = completedInterventions.filter(inv => !inv.cloudSynced);
-    if (daSincronizzare.length === 0) {
-        // Avvisa l'utente se ha cliccato manualmente e non c'è niente
-        if (typeof console !== 'undefined') console.log("Nessun intervento da sincronizzare.");
-        return 0; // ritorna 0 per indicare che non c'erano elementi
+    // Invece di fidarci del flag locale "cloudSynced" (che potrebbe essersi buggato
+    // con il vecchio DB errato), guardiamo TUTTO quello che abbiamo in locale.
+    let tuttiIFilePath = completedInterventions;
+    if (tuttiIFilePath.length === 0) {
+        if (typeof console !== 'undefined') console.log("Nessun intervento in locale.");
+        return 0; 
     }
     
-    console.log(`Trovati ${daSincronizzare.length} interventi locali non sincronizzati. Avvio sincronizzazione in background...`);
+    // 1. Peschiamo tutti gli ID già presenti sul CLOUD VERO (antimo-6a86b)
+    let cloudIds = [];
+    try {
+        const snap = await getDocs(collection(db, "interventi"));
+        snap.forEach(doc => {
+            const data = doc.data();
+            if(data.id) cloudIds.push(data.id);
+        });
+    } catch(e) {
+        console.error("Impossibile leggere il cloud per il check", e);
+        throw new Error("Impossibile leggere dal Cloud per verificare i doppioni. Controlla i permessi o la connessione.");
+    }
+    
+    // 2. Filtriamo solo quelli locali che MANGANo dal cloud
+    let daSincronizzare = tuttiIFilePath.filter(inv => !cloudIds.includes(inv.id));
+    
+    if (daSincronizzare.length === 0) {
+        // Se tutti quelli locali sono già sul cloud VERO:
+        // Assicuriamoci che tutti abbiano la spunta cloudSynced per il futuro
+        let dbUpdatedFilter = false;
+        tuttiIFilePath.forEach(i => {
+            if(!i.cloudSynced) { i.cloudSynced = true; dbUpdatedFilter = true; }
+        });
+        if(dbUpdatedFilter) saveState();
+        
+        return 0; // Niente di bloccato
+    }
+    
+    console.log(`Trovati ${daSincronizzare.length} interventi locali MANGANTI dal cloud. Li carico forzatamente...`);
     
     let dbUpdated = false;
     
     for (let inv of daSincronizzare) {
         try {
-            // Saltiamo la query complessa che potrebbe dare errore di indici su Firestore.
-            // Scriviamo direttamente l'intervento su Firestore (potrebbe creare un duplicato se disinstallano e reinstallano, ma garantisce che i dati salgano)
-            
+            // Inviamo l'intervento su Firestore in modo sicuro
             let fileCloudUrl = inv.fileUrl || null;
             
             // Se c'è un file base64 non ancora caricato
