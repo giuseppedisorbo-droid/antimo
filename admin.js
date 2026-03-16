@@ -61,18 +61,22 @@ async function loadData() {
 
 async function loadNonEseguiti() {
     try {
-        const q = query(collection(db, "programmati"), where("status", "==", "justified_not_executed"));
-        const snap = await getDocs(q);
+        // Al posto di usare una query() con where() che potrebbe richiedere un Indice Composto su Firestore,
+        // scarichiamo semplicemente tutti i 'programmati' e filtriamo in locale per sicurezza e robustezza.
+        const snap = await getDocs(collection(db, "programmati"));
         
         const data = [];
         snap.forEach(d => {
-            data.push({ fbId: d.id, ...d.data() });
+            const val = d.data();
+            if(val.status === "justified_not_executed") {
+                data.push({ fbId: d.id, ...val });
+            }
         });
         
         renderNonEseguitiTable(data);
     } catch(e) {
         console.error("Errore fetch non eseguiti:", e);
-        nonEseguitiTableBody.innerHTML = `<tr><td colspan="6" style="color:red; text-align:center;">Errore: ${e.message}</td></tr>`;
+        nonEseguitiTableBody.innerHTML = `<tr><td colspan="6" style="color:red; text-align:center;">Errore interno caricamento Non Eseguiti: ${e.message}</td></tr>`;
     }
 }
 

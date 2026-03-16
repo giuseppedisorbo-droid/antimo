@@ -1,11 +1,10 @@
-const CACHE_NAME = 'antimo-attivita-v12';
+const CACHE_NAME = 'antimo-attivita-v13';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './style.css',
   './app.js',
-  './manifest.json',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap'
+  './manifest.json'
 ];
 
 self.addEventListener('install', event => {
@@ -41,34 +40,29 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Strategia Network-First per HTML (Per aggiornare la PWA velocemente)
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-           return caches.open(CACHE_NAME).then(cache => {
-             cache.put(event.request, response.clone());
-             return response;
-           });
-        })
-        .catch(() => {
-           return caches.match('./index.html'); // Offline Fallback
-        })
-    );
-    return;
-  }
-
-  // Risorse statiche (JS, CSS, Immagini) -> Cache-First
+  // Strategia globale NETWORK-FIRST per aggirare la cache aggressiva di iOS
+  // Prima proviamo sempre a scaricare da internet, se fallisce (offline) usiamo la cache.
   event.respondWith(
-    caches.match(event.request)
+    fetch(event.request)
       .then(response => {
-        return response || fetch(event.request).then(fetchRes => {
-          return caches.open(CACHE_NAME).then(cache => {
-            if(event.request.method === "GET" && !event.request.url.startsWith('chrome-extension')) {
-              cache.put(event.request.url, fetchRes.clone());
+        // Se la rete risponde, salviamo la nuova versione in cache e la ritorniamo
+        return caches.open(CACHE_NAME).then(cache => {
+          if (event.request.method === "GET" && !event.request.url.startsWith('chrome-extension')) {
+            cache.put(event.request, response.clone());
+          }
+          return response;
+        });
+      })
+      .catch(() => {
+        // Se siamo offline (o c'è un errore di rete), peschiamo dalla cache
+        return caches.match(event.request).then(cachedResponse => {
+            if (cachedResponse) {
+                return cachedResponse;
             }
-            return fetchRes;
-          });
+            // Fallback base se manca anche dalla cache (es. appena installata e offline)
+            if (event.request.mode === 'navigate') {
+                return caches.match('./index.html');
+            }
         });
       })
   );
