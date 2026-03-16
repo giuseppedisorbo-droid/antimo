@@ -427,18 +427,26 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             try {
-                const blob = new Blob(["\uFEFF"+csvContent], { type: 'text/csv;charset=utf-8;' });
-                const fileName = `Attivita_Esterne_${formatDateDMY(new Date())}.csv`;
-                const file = new File([blob], fileName, { type: 'text/csv' });
-                
-                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                // Su Android/PWA a volte i blob CSV generati a runtime vengono bloccati dalle policy di sicurezza.
+                // Proviamo a condividere direttamente il testo ben formattato a WhatsApp/Telegram
+                let textShare = "📝 *REPORT ATTIVITÀ:*\n\n";
+                interventiDaEsportare.forEach(inv => {
+                    let d = new Date(inv.startTime), e = new Date(inv.endTime);
+                    textShare += `🔹 *${inv.paziente}* (${inv.destinazione})\n` +
+                                 `   ⌚ ${padZ(d.getHours())}:${padZ(d.getMinutes())} - ${padZ(e.getHours())}:${padZ(e.getMinutes())} | Km: ${inv.kmPercorsi}\n` +
+                                 `   📌 ${inv.tipo} (${inv.dispositivi})\n`;
+                    if(inv.fileUrl) textShare += `   📎 Link: ${inv.fileUrl}\n`;
+                    if(inv.note) textShare += `   📝 Note: ${inv.note}\n`;
+                    textShare += "\n";
+                });
+
+                if (navigator.share) {
                     await navigator.share({
-                        files: [file],
                         title: 'Attività Giornata',
-                        text: 'Ecco le mie attività della giornata.'
+                        text: textShare
                     });
                 } else {
-                    alert('La condivisione diretta di file non è supportata dal tuo browser attuale. Usa il tasto SCARICA e poi condividilo a mano.');
+                    alert('La condivisione diretta non è supportata dal tuo browser. Usa il tasto SCARICA EXCEL.');
                 }
             } catch(err) {
                  console.error(err);
