@@ -71,6 +71,7 @@ const btnPlanIntervention = document.getElementById('btnPlanIntervention');
 const btnStopIntervention = document.getElementById('btnStopIntervention');
 const btnViewActivities = document.getElementById('btnViewActivities');
 const btnShareCSV = document.getElementById('btnShareCSV');
+const btnManualSyncMobile = document.getElementById('btnManualSyncMobile');
 const activitiesListContainer = document.getElementById('activitiesListContainer');
 const activitiesList = document.getElementById('activitiesList');
 const plannedInterventionsSection = document.getElementById('plannedInterventionsSection');
@@ -493,13 +494,31 @@ btnStopIntervention.addEventListener('click', async () => {
         newInterventionForm.reset();
 
     } catch (error) {
-        alert("Errore durante il salvataggio su Cloud: " + error.message + ". Riprovare.");
+        alert("Errore durante il salvataggio su Cloud: " + error.message + ". Riprovare (l'app riproverà in automatico o puoi premere Sincronizza).");
         console.error(error);
     } finally {
         btnStopIntervention.innerHTML = oldBtnText;
         btnStopIntervention.disabled = false;
     }
 });
+
+if(btnManualSyncMobile) {
+    btnManualSyncMobile.addEventListener('click', async () => {
+        const oldHtml = btnManualSyncMobile.innerHTML;
+        try {
+            btnManualSyncMobile.innerHTML = `<span class="btn-icon">⏳</span> SINCRONIZZANDO...`;
+            btnManualSyncMobile.disabled = true;
+            await syncLocalDataToCloud();
+            alert("Sincronizzazione completata dal dispositivo al Cloud!");
+            // Refresh counts/list maybe not needed if it just pushes, but doesn't hurt.
+        } catch(e) {
+            alert("Errore durante la sincronizzazione: " + e.message);
+        } finally {
+            btnManualSyncMobile.innerHTML = oldHtml;
+            btnManualSyncMobile.disabled = false;
+        }
+    });
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     if(btnShareCSV) {

@@ -21,6 +21,7 @@ const tableBody = document.getElementById('tableBody');
 const btnExportExcel = document.getElementById('btnExportExcel');
 const btnApplyFilters = document.getElementById('btnApplyFilters');
 const btnResetFilters = document.getElementById('btnResetFilters');
+const btnManualSync = document.getElementById('btnManualSync');
 
 const filterDateStart = document.getElementById('filterDateStart');
 const filterDateEnd = document.getElementById('filterDateEnd');
@@ -171,6 +172,23 @@ btnResetFilters.addEventListener('click', () => {
     renderTable(tuttiGliInterventi);
 });
 btnExportExcel.addEventListener('click', esporterCSV);
+
+if(btnManualSync) {
+    btnManualSync.addEventListener('click', async () => {
+        const oldText = btnManualSync.innerHTML;
+        try {
+            btnManualSync.innerHTML = "🔄 Sincronizzazione in corso...";
+            btnManualSync.disabled = true;
+            await loadData();
+            alert("Dati sincronizzati con successo dal Cloud!");
+        } catch(e) {
+            alert("Errore di sincronizzazione: " + e.message);
+        } finally {
+            btnManualSync.innerHTML = oldText;
+            btnManualSync.disabled = false;
+        }
+    });
+}
 
 // Inizializza caricando i dati al boot
 loadData();
