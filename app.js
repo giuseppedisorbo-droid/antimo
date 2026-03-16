@@ -5,12 +5,13 @@ import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstat
 // ====== CONFIGURAZIONE FIREBASE ======
 // INSERISCI QUI I DATI DEL TUO PROGETTO FIREBASE. LI TROVI NELLE IMPOSTAZIONI DI FIREBASE CONSOLE.
 const firebaseConfig = {
-  apiKey: "INSERISCI_QUI_API_KEY",
-  authDomain: "INSERISCI_QUI_AUTH_DOMAIN",
-  projectId: "INSERISCI_QUI_PROJECT_ID",
-  storageBucket: "INSERISCI_QUI_STORAGE_BUCKET",
-  messagingSenderId: "INSERISCI_QUI_MESSAGING_SENDER_ID",
-  appId: "INSERISCI_QUI_APP_ID"
+  apiKey: "AIzaSyB6CLQZHPG60LqsIKHAlS_Wt5OFXqfwqkw",
+  authDomain: "antimo-6a86b.firebaseapp.com",
+  projectId: "antimo-6a86b",
+  storageBucket: "antimo-6a86b.firebasestorage.app",
+  messagingSenderId: "671676764068",
+  appId: "1:671676764068:web:95027e0babe3f30042fb31",
+  measurementId: "G-WTWNH23PLS"
 };
 
 let app, db, storage;
