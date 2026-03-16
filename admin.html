@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Office Dashboard - Antimo Attività</title>
+    <!-- Riusiamo lo stesso CSS base ma aggiungiamo stili specifici per desktop -->
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            display: block; /* Overrides mobile app centering */
+        }
+        .admin-header {
+            background: linear-gradient(135deg, var(--blue-primary) 0%, var(--blue-dark) 100%);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .admin-container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .controls-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            align-items: flex-end;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .control-group label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--blue-dark);
+            text-transform: uppercase;
+        }
+        .control-group input, .control-group select {
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: inherit;
+        }
+        
+        /* Tabella Desktop */
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+        th, td {
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background-color: #f8fafc;
+            color: var(--blue-dark);
+            font-weight: 600;
+            font-size: 0.9rem;
+            position: sticky;
+            top: 0;
+        }
+        tbody tr:hover {
+            background-color: #f1f5f9;
+        }
+        .badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-success { background: #dcfce7; color: #166534; }
+        .badge-warning { background: #fef08a; color: #854d0e; }
+        .attachment-link {
+            color: var(--blue-primary);
+            text-decoration: none;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .attachment-link:hover { text-decoration: underline; }
+
+        .btn-sm {
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+        }
+        
+        .loading-spinner {
+            text-align: center;
+            padding: 3rem;
+            color: var(--blue-primary);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="admin-header">
+        <div>
+            <h1 style="margin: 0; font-size: 1.5rem;">Antimo - Dashboard Ufficio</h1>
+            <p style="margin: 0; font-size: 0.85rem; opacity: 0.8;">Gestione Remota Interventi</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-primary" id="btnExportExcel" style="margin: 0;">⬇ ESporta Excel (CSV)</button>
+        </div>
+    </header>
+
+    <main class="admin-container">
+        
+        <div class="controls-card">
+            <div class="control-group">
+                <label for="filterDateStart">Da Data</label>
+                <input type="date" id="filterDateStart">
+            </div>
+            <div class="control-group">
+                <label for="filterDateEnd">A Data</label>
+                <input type="date" id="filterDateEnd">
+            </div>
+            <div class="control-group">
+                <label for="filterSearch">Cerca (Paziente/Città)</label>
+                <input type="text" id="filterSearch" placeholder="Es. Mario Rossi...">
+            </div>
+            <div class="control-group" style="flex-grow: 1; text-align: right;">
+                <button class="btn btn-primary btn-orange btn-sm" id="btnApplyFilters">Applicare Filtri</button>
+                <button class="btn btn-danger btn-sm" id="btnResetFilters" style="margin-left: 10px;">Reset</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table id="interventiTable">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Orario (Inizio - Fine)</th>
+                        <th>Paziente</th>
+                        <th>Città / Destinazione</th>
+                        <th>Tipo Intervento</th>
+                        <th>Dispositivi</th>
+                        <th>Km</th>
+                        <th>Allegato</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr><td colspan="8" class="loading-spinner">Caricamento dati da Firebase... ⏳</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script type="module" src="admin.js"></script>
+</body>
+</html>

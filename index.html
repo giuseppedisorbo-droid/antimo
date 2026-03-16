@@ -47,6 +47,14 @@
             </div>
         </section>
 
+        <!-- SEZIONE INTERVENTI PROGRAMMATI (visibile se ci sono bozze) -->
+        <section class="card glass-card hidden" id="plannedInterventionsSection" style="margin-bottom: 20px; border-left: 4px solid var(--orange);">
+            <h2 style="color: var(--orange);"><span class="btn-icon">📅</span> Interventi Programmati</h2>
+            <div id="plannedList" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+                <!-- Gli interventi programmati verranno creati qui da app.js -->
+            </div>
+        </section>
+
         <!-- SEZIONE INSERIMENTO INTERVENTO (visibile solo a giornata iniziata) -->
         <section class="card glass-card hidden" id="interventionSection">
             <h2>Nuovo Intervento</h2>
@@ -113,9 +121,14 @@
                     <textarea id="note" rows="2" placeholder="Note sull'intervento..."></textarea>
                 </div>
 
-                <button type="submit" class="btn btn-primary btn-orange btn-large" id="btnStartIntervention">
-                     <span class="btn-icon">⚡</span> INIZIA INTERVENTO
-                </button>
+                <div style="display: flex; gap: 10px; flex-direction: column;">
+                    <button type="submit" class="btn btn-primary btn-orange btn-large" id="btnStartIntervention">
+                         <span class="btn-icon">⚡</span> INIZIA INTERVENTO
+                    </button>
+                    <button type="button" class="btn" id="btnPlanIntervention" style="background-color: #e2e8f0; color: var(--blue-dark); font-weight: 600; padding: 12px; border: 1px solid #cbd5e1;">
+                         <span class="btn-icon">📅</span> SALVA IN PROGRAMMATI (Per dopo)
+                    </button>
+                </div>
             </form>
         </section>
 
@@ -157,6 +170,10 @@
                 <div id="activitiesList" style="max-height: 300px; overflow-y: auto; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px;">
                     <!-- I task vengono inseriti qui da app.js -->
                 </div>
+            </div>
+            
+            <div style="margin-top: 20px; text-align: center; font-size: 0.85rem;">
+                <a href="admin.html" style="color: var(--blue-primary); text-decoration: none; font-weight: 600;">💻 Apri Dashboard Ufficio (PC)</a>
             </div>
         </section>
 
