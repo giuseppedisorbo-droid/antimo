@@ -260,36 +260,20 @@ function saveState() {
 }
 
 function updateUI() {
-    if (dayState.isActive) {
-        dayStatusBadge.textContent = "Giornata Attiva";
-        dayStatusBadge.classList.add('active');
-        startDayForm.classList.add('hidden');
-        endDayForm.classList.remove('hidden');
-        
-        const d = new Date(dayState.startTime);
-        giornataInfo.textContent = `Giornata iniziata alle ${padZ(d.getHours())}:${padZ(d.getMinutes())} (Km: ${dayState.startKm})`;
-        
-        if (activeIntervention) {
-            interventionSection.classList.add('hidden');
-            activeInterventionSection.classList.remove('hidden');
-            document.getElementById('activePaziente').textContent = activeIntervention.paziente;
-            document.getElementById('activeDestinazione').textContent = activeIntervention.destinazione;
-            const sTime = new Date(activeIntervention.startTime);
-            document.getElementById('activeStartTime').textContent = `${padZ(sTime.getHours())}:${padZ(sTime.getMinutes())}`;
-        } else {
-            interventionSection.classList.remove('hidden');
-            activeInterventionSection.classList.add('hidden');
-        }
-    } else {
-        dayStatusBadge.textContent = "Giornata NON Iniziata";
-        dayStatusBadge.classList.remove('active');
-        startDayForm.classList.remove('hidden');
-        endDayForm.classList.add('hidden');
+    // Gestione Vista Intervento Attivo vs Nuovi Interventi
+    if (activeIntervention) {
         interventionSection.classList.add('hidden');
+        activeInterventionSection.classList.remove('hidden');
+        document.getElementById('activePaziente').textContent = activeIntervention.paziente;
+        document.getElementById('activeDestinazione').textContent = activeIntervention.destinazione;
+        const sTime = new Date(activeIntervention.startTime);
+        document.getElementById('activeStartTime').textContent = `${padZ(sTime.getHours())}:${padZ(sTime.getMinutes())}`;
+    } else {
+        interventionSection.classList.remove('hidden');
         activeInterventionSection.classList.add('hidden');
     }
 
-    // Le attività programmate si vedono sempre, anche a giornata non iniziata
+    // Le attività programmate si vedono sempre
     if(plannedInterventions.length > 0) {
         plannedInterventionsSection.classList.remove('hidden');
         renderPlannedInterventions();
