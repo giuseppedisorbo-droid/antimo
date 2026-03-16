@@ -62,6 +62,9 @@ const newInterventionForm = document.getElementById('newInterventionForm');
 const btnStartIntervention = document.getElementById('btnStartIntervention');
 const btnStopIntervention = document.getElementById('btnStopIntervention');
 const btnExportCSV = document.getElementById('btnExportCSV');
+const btnViewActivities = document.getElementById('btnViewActivities');
+const activitiesListContainer = document.getElementById('activitiesListContainer');
+const activitiesList = document.getElementById('activitiesList');
 const btnClearData = document.getElementById('btnClearData');
 
 // Form Inputs
@@ -445,6 +448,50 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+if(btnViewActivities) {
+    btnViewActivities.addEventListener('click', () => {
+        if(activitiesListContainer.classList.contains('hidden')) {
+            activitiesListContainer.classList.remove('hidden');
+            renderActivitiesList();
+            btnViewActivities.innerHTML = `<span class="btn-icon">🙈</span> NASCONDI ATTIVITÀ`;
+        } else {
+            activitiesListContainer.classList.add('hidden');
+            btnViewActivities.innerHTML = `<span class="btn-icon">👁</span> VISUALIZZA ATTIVITÀ`;
+        }
+    });
+}
+
+function renderActivitiesList() {
+    activitiesList.innerHTML = '';
+    if(completedInterventions.length === 0) {
+        activitiesList.innerHTML = '<p style="text-align:center; color:gray; font-size:0.9rem;">Nessuna attività registrata in memoria.</p>';
+        return;
+    }
+    
+    // Mostriamo dalla più recente alla più vecchia
+    const revList = [...completedInterventions].reverse();
+    
+    revList.forEach(inv => {
+        const d = new Date(inv.startTime);
+        const div = document.createElement('div');
+        div.style.cssText = "background:white; padding:10px; margin-bottom:10px; border-radius:6px; border-left:4px solid var(--blue-primary); box-shadow:0 1px 3px rgba(0,0,0,0.1);";
+        
+        let fileBadget = inv.haAllegato ? `<span style="font-size:0.8rem; background:var(--blue-light); padding:2px 5px; border-radius:4px; margin-left:5px;">📎 Allegato</span>` : '';
+        
+        div.innerHTML = `
+            <div style="font-size:0.85rem; color:gray; margin-bottom:4px;">
+                ${formatDateDMY(d)} - ${padZ(d.getHours())}:${padZ(d.getMinutes())}
+                ${fileBadget}
+            </div>
+            <div style="font-weight:600; color:#333;">${inv.tipo}</div>
+            <div style="font-size:0.95rem; margin:3px 0;"><strong>Paz/Ente:</strong> ${inv.paziente}</div>
+            <div style="font-size:0.9rem;"><strong>Disp:</strong> ${inv.dispositivi}</div>
+            <div style="font-size:0.85rem; color:#666; margin-top:5px;">${inv.destinazione}</div>
+        `;
+        activitiesList.appendChild(div);
+    });
+}
 
 btnClearData.addEventListener('click', () => {
     if(confirm("ATTENZIONE: vuoi cancellare la memoria STORICA locale dal dispositivo (I dati su Cloud NON verranno cancellati se già salvati)?")) {
