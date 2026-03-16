@@ -77,10 +77,14 @@ const iDispositiviSelect = document.getElementById('dispositiviSelect');
 const iNuovoDispositivo = document.getElementById('nuovoDispositivo');
 const iNote = document.getElementById('note');
 const iKmPercorsi = document.getElementById('kmPercorsi');
-const inputFotoMatricola = document.getElementById('fotoMatricola');
+const inputFotoMatricola = document.getElementById('fotoMatricola'); // OBSOLETO
+const inputAllegato = document.getElementById('allegatoFile');
 const fotoPreviewContainer = document.getElementById('fotoPreviewContainer');
+const filePreviewContainer = document.getElementById('filePreviewContainer');
 const fotoPreview = document.getElementById('fotoPreview');
-const btnRimuoviFoto = document.getElementById('btnRimuoviFoto');
+const filePreviewName = document.getElementById('filePreviewName');
+const btnRimuoviFoto = document.getElementById('btnRimuoviFoto'); // OBSOLETO
+const btnRimuoviFile = document.getElementById('btnRimuoviFile');
 
 let customDevices = JSON.parse(localStorage.getItem('antimo_customDevices')) || [];
 
