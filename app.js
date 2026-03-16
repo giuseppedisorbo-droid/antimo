@@ -41,6 +41,7 @@ if (isFirebaseConfigured) {
 let dayState = JSON.parse(localStorage.getItem('antimo_dayState')) || { isActive: false, startTime: null, startKm: null };
 let activeIntervention = JSON.parse(localStorage.getItem('antimo_activeIntervention')) || null;
 let completedInterventions = JSON.parse(localStorage.getItem('antimo_interventions')) || [];
+let plannedInterventions = JSON.parse(localStorage.getItem('antimo_plannedInterventions')) || [];
 
 let timerInterval;
 let currentFileBase64 = null;
@@ -60,11 +61,14 @@ const btnStartDay = document.getElementById('btnStartDay');
 const btnEndDay = document.getElementById('btnEndDay');
 const newInterventionForm = document.getElementById('newInterventionForm');
 const btnStartIntervention = document.getElementById('btnStartIntervention');
+const btnPlanIntervention = document.getElementById('btnPlanIntervention');
 const btnStopIntervention = document.getElementById('btnStopIntervention');
 const btnViewActivities = document.getElementById('btnViewActivities');
 const btnShareCSV = document.getElementById('btnShareCSV');
 const activitiesListContainer = document.getElementById('activitiesListContainer');
 const activitiesList = document.getElementById('activitiesList');
+const plannedInterventionsSection = document.getElementById('plannedInterventionsSection');
+const plannedList = document.getElementById('plannedList');
 
 // Form Inputs
 const inputKmIniziali = document.getElementById('kmIniziali');
@@ -100,6 +104,7 @@ function saveState() {
     localStorage.setItem('antimo_dayState', JSON.stringify(dayState));
     localStorage.setItem('antimo_activeIntervention', JSON.stringify(activeIntervention));
     localStorage.setItem('antimo_interventions', JSON.stringify(completedInterventions));
+    localStorage.setItem('antimo_plannedInterventions', JSON.stringify(plannedInterventions));
     localStorage.setItem('antimo_customDevices', JSON.stringify(customDevices));
 }
 
@@ -115,6 +120,7 @@ function updateUI() {
         
         if (activeIntervention) {
             interventionSection.classList.add('hidden');
+            plannedInterventionsSection.classList.add('hidden');
             activeInterventionSection.classList.remove('hidden');
             document.getElementById('activePaziente').textContent = activeIntervention.paziente;
             document.getElementById('activeDestinazione').textContent = activeIntervention.destinazione;
@@ -123,6 +129,12 @@ function updateUI() {
         } else {
             interventionSection.classList.remove('hidden');
             activeInterventionSection.classList.add('hidden');
+            if(plannedInterventions.length > 0) {
+                plannedInterventionsSection.classList.remove('hidden');
+                renderPlannedInterventions();
+            } else {
+                plannedInterventionsSection.classList.add('hidden');
+            }
         }
     } else {
         dayStatusBadge.textContent = "Giornata NON Iniziata";
@@ -130,6 +142,7 @@ function updateUI() {
         startDayForm.classList.remove('hidden');
         endDayForm.classList.add('hidden');
         interventionSection.classList.add('hidden');
+        plannedInterventionsSection.classList.add('hidden');
         activeInterventionSection.classList.add('hidden');
     }
 }
@@ -142,6 +155,47 @@ function formatTime(ms) {
 }
 
 function updateInterventiCount() { interventiCount.textContent = completedInterventions.length; }
+
+function renderPlannedInterventions() {
+    plannedList.innerHTML = '';
+    plannedInterventions.forEach((p, index) => {
+        const div = document.createElement('div');
+        div.style.cssText = "background:white; padding:12px; border-radius:8px; border:1px solid #ddd; display:flex; justify-content:space-between; align-items:center;";
+        div.innerHTML = `
+            <div>
+                <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${p.paziente}</div>
+                <div style="font-size:0.85rem; color:#555;">📍 ${p.destinazione} | 🔧 ${p.tipo}</div>
+            </div>
+            <button class="btn btn-primary btn-orange btn-sm" style="padding:8px 12px; font-size:0.85rem;" data-index="${index}">▶ Avvia</button>
+        `;
+        div.querySelector('button').addEventListener('click', (e) => {
+            const idx = e.target.getAttribute('data-index');
+            const dataToLoad = plannedInterventions[idx];
+            
+            // Popoliamo il form
+            iTipo.value = dataToLoad.tipo;
+            iPaziente.value = dataToLoad.paziente;
+            iDestinazione.value = dataToLoad.destinazione;
+            if(customDevices.includes(dataToLoad.dispositivi) || Array.from(iDispositiviSelect.options).some(o=>o.value===dataToLoad.dispositivi)) {
+                iDispositiviSelect.value = dataToLoad.dispositivi;
+                iNuovoDispositivo.classList.add('hidden');
+            } else {
+                iDispositiviSelect.value = "_AZI_NUOVO_";
+                iNuovoDispositivo.classList.remove('hidden');
+                iNuovoDispositivo.value = dataToLoad.dispositivi;
+            }
+            iNote.value = dataToLoad.note;
+
+            // Rimuoviamo dalla lista programmati
+            plannedInterventions.splice(idx, 1);
+            saveState();
+            updateUI();
+            
+            interventionSection.scrollIntoView({ behavior: 'smooth' });
+        });
+        plannedList.appendChild(div);
+    });
+}
 
 function startTimerDisplay() {
     clearInterval(timerInterval);
@@ -212,6 +266,38 @@ iDispositiviSelect.addEventListener('change', (e) => {
     } else {
         iNuovoDispositivo.classList.add('hidden');
     }
+});
+
+btnPlanIntervention.addEventListener('click', () => {
+    if(!iTipo.value || !iPaziente.value || !iDestinazione.value) {
+        return alert("Compila almeno Tipo, Paziente e Destinazione per salvare l'intervento programmato!");
+    }
+    
+    let dispFinale = iDispositiviSelect.value;
+    if(dispFinale === "_AZI_NUOVO_") dispFinale = iNuovoDispositivo.value.trim();
+    if(!dispFinale) dispFinale = "Nessuno";
+
+    const planned = {
+        id: "plan_" + Date.now().toString(),
+        tipo: iTipo.value,
+        paziente: iPaziente.value,
+        destinazione: iDestinazione.value,
+        dispositivi: dispFinale,
+        note: iNote.value
+    };
+
+    plannedInterventions.push(planned);
+    saveState();
+    
+    // Reset form
+    newInterventionForm.reset();
+    iDispositiviSelect.value = "";
+    iNuovoDispositivo.classList.add('hidden');
+    inputAllegato.value = ""; 
+    currentFileBase64 = null; currentFileType = null; currentFileName = null;
+    fotoPreview.style.display = 'none'; filePreviewName.style.display = 'none'; filePreviewContainer.classList.add('hidden');
+    
+    updateUI();
 });
 
 newInterventionForm.addEventListener('submit', (e) => {
