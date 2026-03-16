@@ -1,4 +1,4 @@
-const CACHE_NAME = 'antimo-attivita-v2';
+const CACHE_NAME = 'antimo-attivita-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -9,9 +9,10 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', event => {
+  self.skipWaiting(); // Forza il nuovo SW a prendere subito il controllo
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      console.log('Cache aperta');
+      console.log('Cache aperta:', CACHE_NAME);
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
@@ -28,36 +29,47 @@ self.addEventListener('activate', event => {
           }
         })
       );
-    })
+    }).then(() => self.clients.claim()) // Prende il controllo delle pagine aperte
   );
 });
 
 self.addEventListener('fetch', event => {
-  // Ignoriamo le richieste a firebase (Firestore/Storage) per farle gestire dal loro SDK che ha già l'offline integrato
+  // Ignora le richieste a Firebase
   if (event.request.url.includes('firestore.googleapis.com') || 
       event.request.url.includes('firebasestorage.googleapis.com') ||
       event.request.url.includes('identitytoolkit.googleapis.com')) {
     return;
   }
 
+  // Strategia Network-First per HTML (Per aggiornare la PWA velocemente)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+           return caches.open(CACHE_NAME).then(cache => {
+             cache.put(event.request, response.clone());
+             return response;
+           });
+        })
+        .catch(() => {
+           return caches.match('./index.html'); // Offline Fallback
+        })
+    );
+    return;
+  }
+
+  // Risorse statiche (JS, CSS, Immagini) -> Cache-First
   event.respondWith(
     caches.match(event.request)
       .then(response => {
-        // Ritorna la risorsa dalla cache se c'è, altrimenti fai la fetch sulla rete
         return response || fetch(event.request).then(fetchRes => {
           return caches.open(CACHE_NAME).then(cache => {
-            // Mettiamo in cache la nuova risorsa per i futuri offline
-            if(event.request.method === "GET") {
+            if(event.request.method === "GET" && !event.request.url.startsWith('chrome-extension')) {
               cache.put(event.request.url, fetchRes.clone());
             }
             return fetchRes;
           });
         });
-      }).catch(() => {
-        // Se non c'è rete e la risorsa non è in cache (fallback utile)
-        if(event.request.destination === 'document') {
-            return caches.match('./index.html');
-        }
       })
   );
 });
