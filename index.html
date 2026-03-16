@@ -13,7 +13,7 @@
 <body>
     <header class="top-nav" style="display: flex; justify-content: space-between; align-items: center;">
         <div>
-            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.7); margin-top: 4px;" id="appVersionStamp">v14.0 - Aggiornato Rete</div>
+            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.7); margin-top: 4px;" id="appVersionStamp">v17.0 - Aggiunto Matricola</div>
         </div>
         <div style="display: flex; gap: 10px;">
             <div style="background: rgba(255,165,0,0.2); padding: 8px 12px; border-radius: 8px; text-align: center; color: white;">
@@ -98,13 +98,18 @@
                 </div>
 
                 <div class="form-group">
+                    <label for="matricola">Matricola Dispositivo / Seriale (Opzionale)</label>
+                    <input type="text" id="matricola" placeholder="Es. SN123456789">
+                </div>
+
+                <div class="form-group">
                     <label for="note">Eventuali Note</label>
                     <textarea id="note" rows="2" placeholder="Note sull'intervento..."></textarea>
                 </div>
 
                 <div style="display: flex; gap: 10px; flex-direction: column;">
                     <button type="submit" class="btn btn-primary btn-orange btn-large" id="btnStartIntervention">
-                         <span class="btn-icon">⚡</span> INIZIA ORA
+                         <span class="btn-icon">⚡</span> INIZIA INTERVENTO
                     </button>
                     
                     <div style="border-top: 1px dashed #ccc; margin-top: 10px; padding-top: 10px;">
@@ -135,7 +140,7 @@
             </div>
 
             <button class="btn btn-primary btn-blue btn-large" id="btnStopIntervention">
-                <span class="btn-icon">✓</span> TERMINA INTERVENTO
+                <span class="btn-icon">✓</span> CHIUDI INTERVENTO
             </button>
         </section>
 
@@ -180,7 +185,7 @@
         </div>
 
     </main>
-    <script type="module" src="app.js"></script>
+    <script type="module" src="app.js?v=17"></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {

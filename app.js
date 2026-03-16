@@ -79,6 +79,7 @@ const iDispositiviSelect = document.getElementById('dispositiviSelect');
 const iNuovoDispositivo = document.getElementById('nuovoDispositivo');
 const iNote = document.getElementById('note');
 const inputKmPercorsi = document.getElementById('kmPercorsi');
+const inputMatricola = document.getElementById('matricola');
 const inputAllegato = document.getElementById('allegatoFile');
 const filePreviewContainer = document.getElementById('filePreviewContainer');
 const fotoPreview = document.getElementById('fotoPreview');
@@ -220,6 +221,7 @@ async function syncLocalDataToCloud() {
                 paziente: inv.paziente || "Sconosciuto",
                 destinazione: inv.destinazione || "",
                 dispositivi: inv.dispositivi || "",
+                matricola: inv.matricola || "",
                 note: inv.note || "",
                 startTime: inv.startTime || Date.now(),
                 endTime: inv.endTime || Date.now(),
@@ -619,6 +621,7 @@ newInterventionForm.addEventListener('submit', (e) => {
         paziente: iPaziente.value,
         destinazione: iDestinazione.value,
         dispositivi: dispFinale,
+        matricola: inputMatricola.value.trim(),
         note: iNote.value,
         fileData: currentFileBase64,
         fileType: currentFileType,
@@ -628,6 +631,7 @@ newInterventionForm.addEventListener('submit', (e) => {
     saveState(); updateUI(); startTimerDisplay();
     inputKmPercorsi.value = ""; 
     iDispositiviSelect.value = "";
+    inputMatricola.value = "";
     iNuovoDispositivo.classList.add('hidden');
     iNuovoDispositivo.value = "";
     inputAllegato.value = ""; 
@@ -680,6 +684,7 @@ btnStopIntervention.addEventListener('click', async () => {
                 paziente: activeIntervention.paziente,
                 destinazione: activeIntervention.destinazione,
                 dispositivi: activeIntervention.dispositivi,
+                matricola: activeIntervention.matricola || "",
                 note: activeIntervention.note,
                 startTime: activeIntervention.startTime,
                 endTime: activeIntervention.endTime,
@@ -770,14 +775,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 return alert("Nessun intervento da condividere.");
             }
 
-            let header = ["Data", "Partenza", "Destinazione", "Tipo attivita", "Paziente / Ente", "Km A/R", "Dispositivi", "Note", "Ora Inizio", "Ora Fine", "Ha_Allegato", "URL_Allegato_Cloud"];
+            let header = ["Data", "Partenza", "Destinazione", "Tipo attivita", "Paziente / Ente", "Km A/R", "Dispositivi", "Matricola", "Note", "Ora Inizio", "Ora Fine", "Ha_Allegato", "URL_Allegato_Cloud"];
             let csvContent = header.join(";") + "\n";
             interventiDaEsportare.forEach(inv => {
                 let d = new Date(inv.startTime), e = new Date(inv.endTime);
                 let row = [
                     `"${formatDateDMY(d)}"`, `"${inv.tipo}"`, `"${inv.destinazione.replace(/"/g, '""')}"`,
                     `"${(inv.tipo + ' ' + inv.dispositivi + ' ' + inv.paziente + ' ' + inv.destinazione).trim().replace(/"/g, '""')}"`,
-                    `"${inv.paziente.replace(/"/g, '""')}"`, `"${inv.kmPercorsi}"`, `"${inv.dispositivi.replace(/"/g, '""')}"`,
+                    `"${inv.paziente.replace(/"/g, '""')}"`, `"${inv.kmPercorsi}"`, `"${inv.dispositivi.replace(/"/g, '""')}"`, `"${inv.matricola ? inv.matricola.replace(/"/g, '""') : ''}"`,
                     `"${inv.note.replace(/"/g, '""')}"`, `"${padZ(d.getHours())}:${padZ(d.getMinutes())}"`, `"${padZ(e.getHours())}:${padZ(e.getMinutes())}"`,
                     `"${inv.haAllegato ? 'SI' : 'NO'}"`, `"${inv.fileUrl || ""}"`
                 ];

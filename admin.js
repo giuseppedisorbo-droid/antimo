@@ -108,7 +108,7 @@ function renderTable(dataArray) {
             <td>${inv.paziente}</td>
             <td>${inv.destinazione}</td>
             <td><span class="badge badge-success">${inv.tipo}</span><br><small style="color:gray;">${inv.note || ''}</small></td>
-            <td>${inv.dispositivi}</td>
+            <td>${inv.dispositivi}<br><small style="color:gray;">${inv.matricola ? 'SN: ' + inv.matricola : ''}</small></td>
             <td>${inv.kmPercorsi ? inv.kmPercorsi + ' km' : '-'}</td>
             <td>${fileHtml}</td>
         `;
@@ -133,7 +133,7 @@ function renderNonEseguitiTable(dataArray) {
             <td><strong>${dateStr}</strong></td>
             <td style="font-weight: 600;">${inv.paziente}</td>
             <td>${inv.destinazione}</td>
-            <td><span class="badge badge-warning">${inv.tipo}</span><br><small style="color:gray;">${inv.dispositivi}</small></td>
+            <td><span class="badge badge-warning">${inv.tipo}</span><br><small style="color:gray;">${inv.dispositivi} ${inv.matricola ? `(SN: ${inv.matricola})` : ''}</small></td>
             <td style="color:#b45309; font-weight:600; font-style: italic;">"${inv.motivazione || 'Nessuna'}"</td>
             <td><button class="btn btn-primary btn-sm btn-chiudi" data-fbid="${inv.fbId}" style="background-color: var(--blue-dark);">Archivia (Chiudi)</button></td>
         `;
@@ -209,14 +209,14 @@ function esporterCSV() {
         return alert("Nessun dato da esportare con questi filtri.");
     }
 
-    let header = ["Data", "Orario Inizio", "Orario Fine", "Paziente / Ente", "Citta / Destinazione", "Tipo Intervento", "Dispositivi", "Km Extra", "Note", "Link Allegato"];
+    let header = ["Data", "Orario Inizio", "Orario Fine", "Paziente / Ente", "Citta / Destinazione", "Tipo Intervento", "Dispositivi", "Matricola", "Km Extra", "Note", "Link Allegato"];
     let csvContent = header.join(";") + "\n";
     
     currentData.forEach(inv => {
         let rs = [
             `"${formatDateDMY(new Date(inv.startTime))}"`, `"${formatTime(inv.startTime)}"`, `"${formatTime(inv.endTime)}"`,
             `"${inv.paziente.replace(/"/g, '""')}"`, `"${inv.destinazione.replace(/"/g, '""')}"`,
-            `"${inv.tipo}"`, `"${inv.dispositivi.replace(/"/g, '""')}"`, `"${inv.kmPercorsi}"`,
+            `"${inv.tipo}"`, `"${inv.dispositivi.replace(/"/g, '""')}"`, `"${inv.matricola ? inv.matricola.replace(/"/g, '""') : ''}"`, `"${inv.kmPercorsi}"`,
             `"${inv.note ? inv.note.replace(/"/g, '""') : ''}"`, `"${inv.fileUrl || ''}"`
         ];
         csvContent += rs.join(";") + "\n";
