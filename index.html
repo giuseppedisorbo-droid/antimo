@@ -14,8 +14,7 @@
     <header class="top-nav" style="display: flex; justify-content: space-between; align-items: center;">
         <div>
             <h1>Attività Esterna</h1>
-            <div class="status-badge" id="dayStatusBadge" style="margin-top: 5px;">Giornata non iniziata</div>
-            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.7); margin-top: 4px;" id="appVersionStamp">v8.1 - Agg: 16 Mar 23:10</div>
+            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.7); margin-top: 4px;" id="appVersionStamp">v11.0 - Aggiornato</div>
         </div>
         <div style="display: flex; gap: 10px;">
             <div style="background: rgba(255,165,0,0.2); padding: 8px 12px; border-radius: 8px; text-align: center; color: white;">
@@ -30,40 +29,16 @@
     </header>
 
     <main class="container">
-        <!-- SEZIONE GESTIONE GIORNATA -->
-        <section class="card glass-card" id="dayManagerSection">
-            <h2 id="dayManagerTitle">Inizio Giornata</h2>
-            
-            <div id="startDayForm" class="form-group">
-                <label for="kmIniziali">Km Iniziali</label>
-                <input type="number" id="kmIniziali" placeholder="Es. 45000">
-                <button class="btn btn-primary btn-orange" id="btnStartDay">
-                    <span class="btn-icon">▶</span>
-                    INIZIA GIORNATA
-                </button>
-            </div>
-
-            <div id="endDayForm" class="form-group hidden">
-                <p class="summary-text" id="giornataInfo">Giornata iniziata alle --:--</p>
-                <label for="kmFinali">Km Finali (Opzionale)</label>
-                <input type="number" id="kmFinali" placeholder="Es. 45150">
-                <button class="btn btn-primary btn-blue" id="btnEndDay">
-                    <span class="btn-icon">⏹</span>
-                    TERMINA GIORNATA
-                </button>
-            </div>
-        </section>
-
-        <!-- SEZIONE INTERVENTI PROGRAMMATI (visibile se ci sono bozze) -->
+        <!-- SEZIONE INTERVENTI PROGRAMMATI (sempre visibile se ci sono) -->
         <section class="card glass-card hidden" id="plannedInterventionsSection" style="margin-bottom: 20px; border-left: 4px solid var(--orange);">
-            <h2 style="color: var(--orange);"><span class="btn-icon">📅</span> Interventi Programmati</h2>
+            <h2 style="color: var(--orange);"><span class="btn-icon">📅</span> Interventi Programmati (Da Fare)</h2>
             <div id="plannedList" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
                 <!-- Gli interventi programmati verranno creati qui da app.js -->
             </div>
         </section>
 
-        <!-- SEZIONE INSERIMENTO INTERVENTO (visibile solo a giornata iniziata) -->
-        <section class="card glass-card hidden" id="interventionSection">
+        <!-- SEZIONE INSERIMENTO INTERVENTO (sempre visibile) -->
+        <section class="card glass-card" id="interventionSection">
             <h2>Nuovo Intervento</h2>
             <form id="newInterventionForm">
                 <div class="form-group">
@@ -130,11 +105,16 @@
 
                 <div style="display: flex; gap: 10px; flex-direction: column;">
                     <button type="submit" class="btn btn-primary btn-orange btn-large" id="btnStartIntervention">
-                         <span class="btn-icon">⚡</span> INIZIA INTERVENTO
+                         <span class="btn-icon">⚡</span> INIZIA ORA
                     </button>
-                    <button type="button" class="btn" id="btnPlanIntervention" style="background-color: #e2e8f0; color: var(--blue-dark); font-weight: 600; padding: 12px; border: 1px solid #cbd5e1;">
-                         <span class="btn-icon">📅</span> SALVA IN PROGRAMMATI (Per dopo)
-                    </button>
+                    
+                    <div style="border-top: 1px dashed #ccc; margin-top: 10px; padding-top: 10px;">
+                        <label for="dataProgrammata"><strong>Data Programmazione (Opzionale)</strong></label>
+                        <input type="date" id="dataProgrammata" style="margin-bottom: 10px;">
+                        <button type="button" class="btn" id="btnPlanIntervention" style="background-color: #e2e8f0; color: var(--blue-dark); font-weight: 600; padding: 12px; border: 1px solid #cbd5e1; width: 100%;">
+                             <span class="btn-icon">📅</span> SALVA IN PROGRAMMATI
+                        </button>
+                    </div>
                 </div>
             </form>
         </section>
@@ -151,8 +131,8 @@
             </div>
             
             <div class="form-group mt-15">
-                <label for="kmPercorsi">Km A/R Percorsi per questo intervento (opzionale)</label>
-                <input type="number" id="kmPercorsi" placeholder="Es. 35">
+                <label for="kmPercorsi">Km A/R Percorsi per questo intervento (Obbligatorio)</label>
+                <input type="number" id="kmPercorsi" placeholder="Es. 35" required>
             </div>
 
             <button class="btn btn-primary btn-blue btn-large" id="btnStopIntervention">
@@ -186,6 +166,19 @@
                 <a href="admin.html" style="color: var(--blue-dark); text-decoration: none; font-weight: 800; border-bottom: 2px solid var(--blue-dark); padding-bottom: 2px;">💻 Apri Dashboard Ufficio (PC)</a>
             </div>
         </section>
+
+        <!-- MODAL MOTIVAZIONE NON ESEGUITO -->
+        <div id="justifyModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px;">
+                <h3 style="color: var(--blue-dark); margin-bottom: 10px;">Intervento Non Eseguito</h3>
+                <p style="font-size: 0.9rem; margin-bottom: 15px;">Inserisci una motivazione obbligatoria per segnalare questo intervento come NON eseguito.</p>
+                <textarea id="justifyReason" rows="3" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-family: inherit;" placeholder="Es. Paziente non in casa, strumento rotto..."></textarea>
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button id="btnCancelJustify" class="btn" style="background: #e2e8f0; color: #333; padding: 10px; flex: 1;">Annulla</button>
+                    <button id="btnConfirmJustify" class="btn btn-danger" style="padding: 10px; flex: 1;">Conferma</button>
+                </div>
+            </div>
+        </div>
 
     </main>
     <script type="module" src="app.js"></script>

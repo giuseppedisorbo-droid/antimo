@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // ====== CONFIGURAZIONE FIREBASE ======
 // Riusiamo le chiavi fornite dall'utente in app.js
@@ -18,6 +18,7 @@ const db = getFirestore(app);
 
 // DOM Elements
 const tableBody = document.getElementById('tableBody');
+const nonEseguitiTableBody = document.getElementById('nonEseguitiTableBody');
 const btnExportExcel = document.getElementById('btnExportExcel');
 const btnApplyFilters = document.getElementById('btnApplyFilters');
 const btnResetFilters = document.getElementById('btnResetFilters');
@@ -52,6 +53,26 @@ async function loadData() {
     } catch (e) {
         console.error("Errore download dati:", e);
         tableBody.innerHTML = `<tr><td colspan="8" style="color:red; text-align:center;">Errore di connessione a Firebase: ${e.message}</td></tr>`;
+    }
+    
+    // Carica anche la sezione Non Eseguiti
+    await loadNonEseguiti();
+}
+
+async function loadNonEseguiti() {
+    try {
+        const q = query(collection(db, "programmati"), where("status", "==", "justified_not_executed"));
+        const snap = await getDocs(q);
+        
+        const data = [];
+        snap.forEach(d => {
+            data.push({ fbId: d.id, ...d.data() });
+        });
+        
+        renderNonEseguitiTable(data);
+    } catch(e) {
+        console.error("Errore fetch non eseguiti:", e);
+        nonEseguitiTableBody.innerHTML = `<tr><td colspan="6" style="color:red; text-align:center;">Errore: ${e.message}</td></tr>`;
     }
 }
 
@@ -88,6 +109,47 @@ function renderTable(dataArray) {
             <td>${fileHtml}</td>
         `;
         tableBody.appendChild(tr);
+    });
+}
+
+function renderNonEseguitiTable(dataArray) {
+    if(dataArray.length === 0) {
+        nonEseguitiTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 2rem; color: #666;">🎉 Nessun intervento pendente da controllare.</td></tr>`;
+        return;
+    }
+    
+    nonEseguitiTableBody.innerHTML = '';
+    
+    dataArray.forEach(inv => {
+        const tr = document.createElement('tr');
+        
+        let dateStr = inv.dataPrevista ? inv.dataPrevista.split('-').reverse().join('/') : 'N/D';
+        
+        tr.innerHTML = `
+            <td><strong>${dateStr}</strong></td>
+            <td style="font-weight: 600;">${inv.paziente}</td>
+            <td>${inv.destinazione}</td>
+            <td><span class="badge badge-warning">${inv.tipo}</span><br><small style="color:gray;">${inv.dispositivi}</small></td>
+            <td style="color:#b45309; font-weight:600; font-style: italic;">"${inv.motivazione || 'Nessuna'}"</td>
+            <td><button class="btn btn-primary btn-sm btn-chiudi" data-fbid="${inv.fbId}" style="background-color: var(--blue-dark);">Archivia (Chiudi)</button></td>
+        `;
+        
+        tr.querySelector('.btn-chiudi').addEventListener('click', async (e) => {
+            if(!confirm("Vuoi archiviare definitivamente questo intervento non eseguito? Scomparirà dalla lista dell'ufficio.")) return;
+            const fbId = e.target.getAttribute('data-fbid');
+            try {
+                e.target.disabled = true;
+                e.target.textContent = "Chiusura...";
+                await updateDoc(doc(db, "programmati", fbId), { status: 'archived' });
+                await loadNonEseguiti();
+            } catch(err) {
+                alert("Errore durante l'archiviazione: " + err.message);
+                e.target.disabled = false;
+                e.target.textContent = "Archivia (Chiudi)";
+            }
+        });
+        
+        nonEseguitiTableBody.appendChild(tr);
     });
 }
 

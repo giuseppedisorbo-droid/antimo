@@ -43,8 +43,7 @@ if (isFirebaseConfigured) {
 }
 // =====================================
 
-// Stato App in locale come fallback / offline cache
-let dayState = JSON.parse(localStorage.getItem('antimo_dayState')) || { isActive: false, startTime: null, startKm: null };
+// Stato App (Rimosso dayState)
 let activeIntervention = JSON.parse(localStorage.getItem('antimo_activeIntervention')) || null;
 let completedInterventions = JSON.parse(localStorage.getItem('antimo_interventions')) || [];
 let plannedInterventions = JSON.parse(localStorage.getItem('antimo_plannedInterventions')) || [];
@@ -55,17 +54,11 @@ let currentFileType = null;
 let currentFileName = null;
 
 // DOM Elements
-const dayStatusBadge = document.getElementById('dayStatusBadge');
-const startDayForm = document.getElementById('startDayForm');
-const endDayForm = document.getElementById('endDayForm');
-const giornataInfo = document.getElementById('giornataInfo');
 const interventionSection = document.getElementById('interventionSection');
 const activeInterventionSection = document.getElementById('activeInterventionSection');
 const interventiCount = document.getElementById('interventiCount');
 const programmatiCount = document.getElementById('programmatiCount');
 
-const btnStartDay = document.getElementById('btnStartDay');
-const btnEndDay = document.getElementById('btnEndDay');
 const newInterventionForm = document.getElementById('newInterventionForm');
 const btnStartIntervention = document.getElementById('btnStartIntervention');
 const btnPlanIntervention = document.getElementById('btnPlanIntervention');
@@ -79,8 +72,6 @@ const plannedInterventionsSection = document.getElementById('plannedIntervention
 const plannedList = document.getElementById('plannedList');
 
 // Form Inputs
-const inputKmIniziali = document.getElementById('kmIniziali');
-const inputKmFinali = document.getElementById('kmFinali');
 const iTipo = document.getElementById('tipoAttivita');
 const iPaziente = document.getElementById('paziente');
 const iDestinazione = document.getElementById('destinazione');
@@ -93,6 +84,14 @@ const filePreviewContainer = document.getElementById('filePreviewContainer');
 const fotoPreview = document.getElementById('fotoPreview');
 const filePreviewName = document.getElementById('filePreviewName');
 const btnRimuoviFile = document.getElementById('btnRimuoviFile');
+const inputDataProgrammata = document.getElementById('dataProgrammata');
+
+const justifyModal = document.getElementById('justifyModal');
+const justifyReason = document.getElementById('justifyReason');
+const btnCancelJustify = document.getElementById('btnCancelJustify');
+const btnConfirmJustify = document.getElementById('btnConfirmJustify');
+
+let interventionToJustify = null; // Memorizza l'ID in fase di giustificazione
 
 let customDevices = JSON.parse(localStorage.getItem('antimo_customDevices')) || [];
 
@@ -115,10 +114,18 @@ function initApp() {
 async function syncPlannedInterventions() {
     if (!isFirebaseConfigured) return;
     try {
+        const { collection, getDocs, query, where } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        
+        // Vogliamo solo quelli che sono esplicitamente 'planned' (o senza status, legacy)
+        // Non possiamo usare un 'in' facile se non creiamo indice composto, quindi filtriamo dopo averli presi tutti se sono pochi, 
+        // oppure facciamo una query se il db lo permette. Per sicurezza prendiamo tutto e filtriamo per evitare indici mancanti.
         const snap = await getDocs(collection(db, "programmati"));
         let cloudPlanned = [];
         snap.forEach(doc => {
-            cloudPlanned.push({ id: doc.id, ...doc.data() });
+            const data = doc.data();
+            if (!data.status || data.status === 'planned') {
+                cloudPlanned.push({ id: doc.id, ...data });
+            }
         });
         
         // Ordiniamo per data teorica o per come arrivano
@@ -126,7 +133,7 @@ async function syncPlannedInterventions() {
         saveState();
         updateInterventiCount();
         updateUI();
-        console.log("Interventi programmati sincronizzati dal Cloud.");
+        console.log("Interventi programmati sincronizzati dal Cloud (filtrati 'da fare').");
     } catch(e) {
         console.error("Errore fetch programmati da Firebase:", e);
     }
@@ -246,7 +253,6 @@ async function syncLocalDataToCloud() {
 }
 
 function saveState() {
-    localStorage.setItem('antimo_dayState', JSON.stringify(dayState));
     localStorage.setItem('antimo_activeIntervention', JSON.stringify(activeIntervention));
     localStorage.setItem('antimo_interventions', JSON.stringify(completedInterventions));
     localStorage.setItem('antimo_plannedInterventions', JSON.stringify(plannedInterventions));
@@ -332,17 +338,32 @@ async function updateInterventiCount() {
 
 function renderPlannedInterventions() {
     plannedList.innerHTML = '';
-    plannedInterventions.forEach((p, index) => {
+    
+    // Filtra solo quelli non giustificati
+    const visibili = plannedInterventions.filter(p => !p.status || p.status === 'planned');
+    
+    visibili.forEach((p, indexOriginalArray) => {
+        // Cerchiamo l'indice reale nell'array globale
+        const index = plannedInterventions.indexOf(p);
+        
         const div = document.createElement('div');
-        div.style.cssText = "background:white; padding:12px; border-radius:8px; border:1px solid #ddd; display:flex; justify-content:space-between; align-items:center;";
+        div.style.cssText = "background:white; padding:12px; border-radius:8px; border:1px solid #ddd; display:flex; flex-direction:column; gap:10px;";
+        
+        let dateStr = p.dataPrevista ? p.dataPrevista.split('-').reverse().join('/') : 'N/D';
+
         div.innerHTML = `
             <div>
                 <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${p.paziente}</div>
                 <div style="font-size:0.85rem; color:#555;">📍 ${p.destinazione} | 🔧 ${p.tipo}</div>
+                <div style="font-size:0.80rem; color:var(--orange); font-weight:600; margin-top:4px;">🗓 Data Prevista: ${dateStr}</div>
             </div>
-            <button class="btn btn-primary btn-orange btn-sm" style="padding:8px 12px; font-size:0.85rem;" data-index="${index}">▶ Avvia</button>
+            <div style="display:flex; gap:10px;">
+                <button class="btn btn-danger btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="justify" data-index="${index}">✖ Non Eseguito</button>
+                <button class="btn btn-primary btn-orange btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="avvia" data-index="${index}">▶ Avvia</button>
+            </div>
         `;
-        div.querySelector('button').addEventListener('click', (e) => {
+        
+        div.querySelector('button[data-action="avvia"]').addEventListener('click', (e) => {
             const idx = e.target.getAttribute('data-index');
             const dataToLoad = plannedInterventions[idx];
             
@@ -360,16 +381,93 @@ function renderPlannedInterventions() {
             }
             iNote.value = dataToLoad.note;
 
-            // Rimuoviamo dalla lista programmati
             plannedInterventions.splice(idx, 1);
             saveState();
-            updateUI();
             
+            // Eliminiamo anche dal cloud (se si avvia, sparisce da programmati e diventerà intervento vero)
+            if (isFirebaseConfigured && dataToLoad.id) {
+                import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js").then(async ({ doc, deleteDoc }) => {
+                    try {
+                        // Supponendo che il doc id coincida oppure possiamo fare query, 
+                        // Ma per sicurezza lo lasciamo pendente, 
+                        // Oppure facciamo delete tramite query!
+                        const { collection, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                        const q = query(collection(db, "programmati"), where("id", "==", dataToLoad.id));
+                        const snaps = await getDocs(q);
+                        snaps.forEach(async d => await deleteDoc(doc(db, "programmati", d.id)));
+                    } catch(err) { console.error("Errore rimozione cloud programmato", err); }
+                });
+            }
+
+            updateUI();
             interventionSection.scrollIntoView({ behavior: 'smooth' });
         });
+        
+        div.querySelector('button[data-action="justify"]').addEventListener('click', (e) => {
+            const idx = e.target.getAttribute('data-index');
+            interventionToJustify = plannedInterventions[idx];
+            justifyReason.value = "";
+            justifyModal.classList.remove('hidden');
+        });
+
         plannedList.appendChild(div);
     });
 }
+
+// LOGICA MODALE GIUSTIFICAZIONE
+btnCancelJustify.addEventListener('click', () => {
+    justifyModal.classList.add('hidden');
+    interventionToJustify = null;
+});
+
+btnConfirmJustify.addEventListener('click', async () => {
+    const reason = justifyReason.value.trim();
+    if(!reason) return alert("Devi inserire una motivazione!");
+    
+    if(interventionToJustify) {
+        interventionToJustify.status = 'justified_not_executed';
+        interventionToJustify.motivazione = reason;
+        
+        if (isFirebaseConfigured && interventionToJustify.id) {
+            try {
+                const { doc, updateDoc, collection, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                const q = query(collection(db, "programmati"), where("id", "==", interventionToJustify.id));
+                const snaps = await getDocs(q);
+                
+                let updated = false;
+                snaps.forEach(async (d) => {
+                    await updateDoc(doc(db, "programmati", d.id), {
+                        status: 'justified_not_executed',
+                        motivazione: reason
+                    });
+                    updated = true;
+                });
+                
+                if(!updated && interventionToJustify.id.startsWith('plan_')) {
+                     // Fallback se per caso non era ancora salito
+                     const { addDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                     await addDoc(collection(db, "programmati"), interventionToJustify);
+                }
+            } catch(e) {
+                console.error("Errore giustificazione", e);
+            }
+        }
+        
+        // Rimuoviamolo dalla vista locale
+        plannedInterventions = plannedInterventions.filter(p => p.id !== interventionToJustify.id);
+        saveState();
+    }
+    
+    justifyModal.classList.add('hidden');
+    interventionToJustify = null;
+    
+    if(isFirebaseConfigured) {
+        syncPlannedInterventions(); // resetta Ui e conteggi
+    } else {
+        updateUI();
+        updateInterventiCount();
+    }
+});
 
 function startTimerDisplay() {
     clearInterval(timerInterval);
@@ -442,7 +540,7 @@ iDispositiviSelect.addEventListener('change', (e) => {
     }
 });
 
-btnPlanIntervention.addEventListener('click', () => {
+btnPlanIntervention.addEventListener('click', async () => {
     if(!iTipo.value || !iPaziente.value || !iDestinazione.value) {
         return alert("Compila almeno Tipo, Paziente e Destinazione per salvare l'intervento programmato!");
     }
@@ -451,17 +549,51 @@ btnPlanIntervention.addEventListener('click', () => {
     if(dispFinale === "_AZI_NUOVO_") dispFinale = iNuovoDispositivo.value.trim();
     if(!dispFinale) dispFinale = "Nessuno";
 
+    // Calcola data prevista (default: domani)
+    let dProgrammata = inputDataProgrammata.value;
+    if (!dProgrammata) {
+        let domani = new Date();
+        domani.setDate(domani.getDate() + 1);
+        dProgrammata = domani.toISOString().split('T')[0];
+    }
+
+    const plannedId = "plan_" + Date.now().toString();
     const planned = {
-        id: "plan_" + Date.now().toString(),
+        id: plannedId,
         tipo: iTipo.value,
         paziente: iPaziente.value,
         destinazione: iDestinazione.value,
         dispositivi: dispFinale,
-        note: iNote.value
+        note: iNote.value,
+        dataPrevista: dProgrammata,
+        status: 'planned',
+        timestamp: new Date().getTime()
     };
 
-    plannedInterventions.push(planned);
-    saveState();
+    // Salvataggio DIRETTO sul cloud VERO (Firestore programmati)
+    if (isFirebaseConfigured) {
+        try {
+            const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            // Usiamo l'id fisso per facilitare cancellazioni future
+            await addDoc(collection(db, "programmati"), planned);
+            console.log("Programmato salvato su Cloud");
+        } catch(e) {
+            console.error("Errore salvataggio programmato in Cloud", e);
+            alert("Errore salvataggio nel Cloud. Salvo solo in locale.");
+            plannedInterventions.push(planned);
+            saveState();
+        }
+    } else {
+        plannedInterventions.push(planned);
+        saveState();
+    }
+    
+    // Aggiorniamo la lista globale prendendola da Firestore
+    if(isFirebaseConfigured) {
+        await syncPlannedInterventions();
+    } else {
+        updateUI();
+    }
     
     // Reset form
     newInterventionForm.reset();
