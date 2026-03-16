@@ -114,7 +114,7 @@
                 </div>
 
                 <button type="submit" class="btn btn-primary btn-orange btn-large" id="btnStartIntervention">
-                     <span class="btn-icon">⚡</span> INIZIA ATTIVITÀ
+                     <span class="btn-icon">⚡</span> INIZIA INTERVENTO
                 </button>
             </form>
         </section>
@@ -136,7 +136,7 @@
             </div>
 
             <button class="btn btn-primary btn-blue btn-large" id="btnStopIntervention">
-                <span class="btn-icon">✓</span> TERMINA ATTIVITÀ
+                <span class="btn-icon">✓</span> TERMINA INTERVENTO
             </button>
         </section>
 
@@ -145,21 +145,15 @@
             <h2>Gestione Dati</h2>
             <div class="button-group">
                 <button class="btn btn-primary" id="btnViewActivities">
-                     <span class="btn-icon">👁</span> VISUALIZZA ATTIVITÀ
+                     <span class="btn-icon">👁</span> STORICO INTERVENTI
                 </button>
-                <button class="btn btn-secondary" id="btnExportCSV">
-                     <span class="btn-icon">📥</span> SCARICA EXCEL (CSV)
-                </button>
-                <button class="btn btn-primary btn-blue" id="btnShareCSV">
-                     <span class="btn-icon">📤</span> INVIA / CONDIVIDI
-                </button>
-                <button class="btn btn-danger" id="btnClearData">
-                     <span class="btn-icon">🗑</span> Svuota Dati
+                <button class="btn btn-primary btn-blue" id="btnShareCSV" style="width: 100%;">
+                     <span class="btn-icon">📤</span> ESTRAI & CONDIVIDI
                 </button>
             </div>
             
             <div id="activitiesListContainer" class="hidden" style="margin-top: 20px; text-align: left;">
-                <h3 style="margin-bottom: 10px; color: var(--blue-primary); border-bottom: 1px solid var(--blue-light); padding-bottom: 5px;">Storico Attività</h3>
+                <h3 style="margin-bottom: 10px; color: var(--blue-primary); border-bottom: 1px solid var(--blue-light); padding-bottom: 5px;">Storico Interventi</h3>
                 <div id="activitiesList" style="max-height: 300px; overflow-y: auto; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px;">
                     <!-- I task vengono inseriti qui da app.js -->
                 </div>

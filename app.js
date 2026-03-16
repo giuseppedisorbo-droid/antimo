@@ -61,11 +61,10 @@ const btnEndDay = document.getElementById('btnEndDay');
 const newInterventionForm = document.getElementById('newInterventionForm');
 const btnStartIntervention = document.getElementById('btnStartIntervention');
 const btnStopIntervention = document.getElementById('btnStopIntervention');
-const btnExportCSV = document.getElementById('btnExportCSV');
 const btnViewActivities = document.getElementById('btnViewActivities');
+const btnShareCSV = document.getElementById('btnShareCSV');
 const activitiesListContainer = document.getElementById('activitiesListContainer');
 const activitiesList = document.getElementById('activitiesList');
-const btnClearData = document.getElementById('btnClearData');
 
 // Form Inputs
 const inputKmIniziali = document.getElementById('kmIniziali');
@@ -337,67 +336,7 @@ btnStopIntervention.addEventListener('click', async () => {
     }
 });
 
-btnExportCSV.addEventListener('click', async () => {
-    // Se Firebase è configurato diamo priorità al cloud, altrimenti prendiamo dal locale
-    let interventiDaEsportare = completedInterventions;
-    
-    if(isFirebaseConfigured) {
-        try {
-            const btnOld = btnExportCSV.innerHTML;
-            btnExportCSV.innerHTML = `<span class="btn-icon">⏳</span> RECUPERO CLOUD...`;
-            
-            const querySnapshot = await getDocs(collection(db, "interventi"));
-            const fetched = [];
-            querySnapshot.forEach((doc) => fetched.push(doc.data()));
-            
-            if(fetched.length > 0) {
-                // Ordiniamo in base al tempo
-                fetched.sort((a,b) => a.startTime - b.startTime);
-                interventiDaEsportare = fetched;
-            }
-            btnExportCSV.innerHTML = btnOld;
-        } catch(e) {
-            console.error("Errore recupero da Cloud per CSV, uso i dat locali", e);
-            alert("Non è stato possibile caricare i dati dal Cloud, verrà esportata la copia locale.");
-        }
-    }
-
-    if(interventiDaEsportare.length === 0) return alert("Nessun intervento registrato da esportare.");
-
-    let header = ["Data", "Partenza", "Destinazione", "Tipo attivita", "Paziente / Ente", "Km A/R", "Dispositivi", "Note", "Ora Inizio", "Ora Fine", "Ha_Allegato", "URL_Allegato_Cloud"];
-    let csvContent = header.join(";") + "\n";
-
-    interventiDaEsportare.forEach(inv => {
-        let d = new Date(inv.startTime);
-        let e = new Date(inv.endTime);
-        let dateStr = formatDateDMY(d);
-        let startStr = `${padZ(d.getHours())}:${padZ(d.getMinutes())}`;
-        let endStr = `${padZ(e.getHours())}:${padZ(e.getMinutes())}`;
-        let descStr = `${inv.tipo} ${inv.dispositivi} ${inv.paziente} - ${inv.destinazione}`.trim();
-        let fUrl = inv.fileUrl || "";
-
-        let row = [
-            `"${dateStr}"`, `"${inv.tipo}"`, `"${inv.destinazione.replace(/"/g, '""')}"`,
-            `"${descStr.replace(/"/g, '""')}"`, `"${inv.paziente.replace(/"/g, '""')}"`,
-            `"${inv.kmPercorsi}"`, `"${inv.dispositivi.replace(/"/g, '""')}"`,
-            `"${inv.note.replace(/"/g, '""')}"`, `"${startStr}"`, `"${endStr}"`,
-            `"${inv.haAllegato ? 'SI' : 'NO'}"`, `"${fUrl}"`
-        ];
-        csvContent += row.join(";") + "\n";
-    });
-
-    try {
-        const blob = new Blob(["\uFEFF"+csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `Attivita_Esterne_Cloud_${formatDateDMY(new Date())}.csv`;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    } catch(err) { alert("Errore export."); console.error(err); }
-});
-
 document.addEventListener('DOMContentLoaded', () => {
-    const btnShareCSV = document.getElementById('btnShareCSV');
     if(btnShareCSV) {
         btnShareCSV.addEventListener('click', async () => {
              // Generiamo CSV come nell'export
@@ -416,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             if(interventiDaEsportare.length === 0) {
-                btnShareCSV.innerHTML = `<span class="btn-icon">📤</span> INVIA / CONDIVIDI`;
+                btnShareCSV.innerHTML = `<span class="btn-icon">📤</span> ESTRAI & CONDIVIDI`;
                 return alert("Nessun intervento da condividere.");
             }
 
@@ -454,12 +393,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         text: textShare
                     });
                 } else {
-                    alert('La condivisione diretta non è supportata dal tuo browser. Usa il tasto SCARICA EXCEL.');
+                    // Fallback
+                    const blob = new Blob(["\uFEFF"+csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `Attivita_Esterne_${formatDateDMY(new Date())}.csv`;
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
                 }
             } catch(err) {
                  console.error(err);
             } finally {
-                btnShareCSV.innerHTML = `<span class="btn-icon">📤</span> INVIA / CONDIVIDI`;
+                btnShareCSV.innerHTML = `<span class="btn-icon">📤</span> ESTRAI & CONDIVIDI`;
             }
         });
     }
@@ -508,11 +453,5 @@ function renderActivitiesList() {
         activitiesList.appendChild(div);
     });
 }
-
-btnClearData.addEventListener('click', () => {
-    if(confirm("ATTENZIONE: vuoi cancellare la memoria STORICA locale dal dispositivo (I dati su Cloud NON verranno cancellati se già salvati)?")) {
-        completedInterventions = []; saveState(); updateInterventiCount();
-    }
-});
 
 initApp();
