@@ -105,10 +105,31 @@ function initApp() {
 
     updateUI();
     updateInterventiCount();
-    if(activeIntervention) startTimerDisplay();
     
     // Proviamo a sincronizzare i dati locali vecchi/offline non ancora sul cloud
     setTimeout(syncLocalDataToCloud, 2000);
+    setTimeout(syncPlannedInterventions, 1000); // Pesca i programmati dal cloud
+}
+
+// Nuova funzione per scaricare gli interventi PROGRAMMATI dal Cloud a tutti i dispositivi
+async function syncPlannedInterventions() {
+    if (!isFirebaseConfigured) return;
+    try {
+        const snap = await getDocs(collection(db, "programmati"));
+        let cloudPlanned = [];
+        snap.forEach(doc => {
+            cloudPlanned.push({ id: doc.id, ...doc.data() });
+        });
+        
+        // Ordiniamo per data teorica o per come arrivano
+        plannedInterventions = cloudPlanned;
+        saveState();
+        updateInterventiCount();
+        updateUI();
+        console.log("Interventi programmati sincronizzati dal Cloud.");
+    } catch(e) {
+        console.error("Errore fetch programmati da Firebase:", e);
+    }
 }
 
 // Funzione per sincronizzare i vecchi interventi salvati solo in localStorage verso Firebase
@@ -244,7 +265,6 @@ function updateUI() {
         
         if (activeIntervention) {
             interventionSection.classList.add('hidden');
-            plannedInterventionsSection.classList.add('hidden');
             activeInterventionSection.classList.remove('hidden');
             document.getElementById('activePaziente').textContent = activeIntervention.paziente;
             document.getElementById('activeDestinazione').textContent = activeIntervention.destinazione;
@@ -253,12 +273,6 @@ function updateUI() {
         } else {
             interventionSection.classList.remove('hidden');
             activeInterventionSection.classList.add('hidden');
-            if(plannedInterventions.length > 0) {
-                plannedInterventionsSection.classList.remove('hidden');
-                renderPlannedInterventions();
-            } else {
-                plannedInterventionsSection.classList.add('hidden');
-            }
         }
     } else {
         dayStatusBadge.textContent = "Giornata NON Iniziata";
@@ -266,8 +280,15 @@ function updateUI() {
         startDayForm.classList.remove('hidden');
         endDayForm.classList.add('hidden');
         interventionSection.classList.add('hidden');
-        plannedInterventionsSection.classList.add('hidden');
         activeInterventionSection.classList.add('hidden');
+    }
+
+    // Le attività programmate si vedono sempre, anche a giornata non iniziata
+    if(plannedInterventions.length > 0) {
+        plannedInterventionsSection.classList.remove('hidden');
+        renderPlannedInterventions();
+    } else {
+        plannedInterventionsSection.classList.add('hidden');
     }
 }
 
