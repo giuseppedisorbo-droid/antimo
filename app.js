@@ -75,14 +75,11 @@ const iDestinazione = document.getElementById('destinazione');
 const iDispositiviSelect = document.getElementById('dispositiviSelect');
 const iNuovoDispositivo = document.getElementById('nuovoDispositivo');
 const iNote = document.getElementById('note');
-const iKmPercorsi = document.getElementById('kmPercorsi');
-const inputFotoMatricola = document.getElementById('fotoMatricola'); // OBSOLETO
+const inputKmPercorsi = document.getElementById('kmPercorsi');
 const inputAllegato = document.getElementById('allegatoFile');
-const fotoPreviewContainer = document.getElementById('fotoPreviewContainer');
 const filePreviewContainer = document.getElementById('filePreviewContainer');
 const fotoPreview = document.getElementById('fotoPreview');
 const filePreviewName = document.getElementById('filePreviewName');
-const btnRimuoviFoto = document.getElementById('btnRimuoviFoto'); // OBSOLETO
 const btnRimuoviFile = document.getElementById('btnRimuoviFile');
 
 let customDevices = JSON.parse(localStorage.getItem('antimo_customDevices')) || [];
@@ -252,7 +249,7 @@ newInterventionForm.addEventListener('submit', (e) => {
         startTime: new Date().getTime()
     };
     saveState(); updateUI(); startTimerDisplay();
-    iKmPercorsi.value = ""; 
+    inputKmPercorsi.value = ""; 
     iDispositiviSelect.value = "";
     iNuovoDispositivo.classList.add('hidden');
     iNuovoDispositivo.value = "";
@@ -276,7 +273,7 @@ btnStopIntervention.addEventListener('click', async () => {
 
     try {
         activeIntervention.endTime = new Date().getTime();
-        activeIntervention.kmPercorsi = iKmPercorsi.value || "0";
+        activeIntervention.kmPercorsi = inputKmPercorsi.value || "0";
         
         let fileCloudUrl = null;
         
