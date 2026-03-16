@@ -1,4 +1,4 @@
-const CACHE_NAME = 'antimo-attivita-v8';
+const CACHE_NAME = 'antimo-attivita-v9.1';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

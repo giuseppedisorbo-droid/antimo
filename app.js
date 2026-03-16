@@ -62,6 +62,7 @@ const giornataInfo = document.getElementById('giornataInfo');
 const interventionSection = document.getElementById('interventionSection');
 const activeInterventionSection = document.getElementById('activeInterventionSection');
 const interventiCount = document.getElementById('interventiCount');
+const programmatiCount = document.getElementById('programmatiCount');
 
 const btnStartDay = document.getElementById('btnStartDay');
 const btnEndDay = document.getElementById('btnEndDay');
@@ -277,7 +278,36 @@ function formatTime(ms) {
     return `${padZ(Math.floor(ts / 3600))}:${padZ(Math.floor((ts % 3600) / 60))}:${padZ(ts % 60)}`;
 }
 
-function updateInterventiCount() { interventiCount.textContent = completedInterventions.length; }
+async function updateInterventiCount() { 
+    // Aggiorna sempre il contatore locale dei "Da Fare" prima
+    if (programmatiCount) programmatiCount.textContent = plannedInterventions.length;
+    
+    if (!isFirebaseConfigured) {
+        interventiCount.textContent = completedInterventions.length; 
+        return;
+    }
+
+    try {
+        // Calcola l'inizio e la fine di oggi
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        
+        const q = query(
+            collection(db, "interventi"), 
+            where("startTime", ">=", startOfToday.getTime())
+        );
+        
+        const snap = await getDocs(q);
+        
+        // Contiamo quanti ne sono stati registrati oggi da chiunque
+        interventiCount.textContent = snap.size; 
+        
+    } catch(e) {
+        console.error("Errore fetch conteggi oggi", e);
+        // Fallback: mostra il numero locale in caso di errore
+        interventiCount.textContent = completedInterventions.length; 
+    }
+}
 
 function renderPlannedInterventions() {
     plannedList.innerHTML = '';
