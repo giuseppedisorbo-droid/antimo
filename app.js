@@ -138,6 +138,11 @@ async function syncLocalDataToCloud() {
     // 2. Filtriamo solo quelli locali che MANGANo dal cloud
     let daSincronizzare = tuttiIFilePath.filter(inv => !cloudIds.includes(inv.id));
     
+    // DEBUG MANUALE POTENTE PER L'UTENTE
+    if (typeof window !== 'undefined' && window._antimo_forcing_sync) {
+        alert(`DEBUG:\nMemoria Telefono: ${tuttiIFilePath.length} interventi\nTrovati sul Cloud VERO: ${cloudIds.length}\nQuelli che mancano sul Cloud: ${daSincronizzare.length}`);
+    }
+    
     if (daSincronizzare.length === 0) {
         // Se tutti quelli locali sono già sul cloud VERO:
         // Assicuriamoci che tutti abbiano la spunta cloudSynced per il futuro
@@ -553,7 +558,11 @@ if(btnManualSyncMobile) {
                 return;
             }
             
+            // Forziamo il flag per far scattare l'alert di debug in syncLocalDataToCloud
+            window._antimo_forcing_sync = true;
+            
             const count = await syncLocalDataToCloud();
+            window._antimo_forcing_sync = false;
             
             if (count === 0) {
                 alert("Ottimo! Non ci sono dati bloccati sul tuo telefono. Tutto quello che hai registrato risulta già sincronizzato (oppure è stato perso dalla cache precedentemente).");
