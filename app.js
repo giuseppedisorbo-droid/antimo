@@ -221,6 +221,10 @@ iDispositiviSelect.addEventListener('change', (e) => {
 newInterventionForm.addEventListener('submit', (e) => {
     e.preventDefault();
     
+    if(activeIntervention) {
+        return alert("ATTENZIONE: Hai già un'attività in corso! Devi prima cliccare su 'TERMINA ATTIVITÀ' prima di poterne iniziare una nuova.");
+    }
+    
     let dispFinale = iDispositiviSelect.value;
     if(dispFinale === "_AZI_NUOVO_") {
         dispFinale = iNuovoDispositivo.value.trim();

@@ -11,9 +11,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <header class="top-nav">
-        <h1>Attività Esterna</h1>
-        <div class="status-badge" id="dayStatusBadge">Giornata non iniziata</div>
+    <header class="top-nav" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h1>Attività Esterna</h1>
+            <div class="status-badge" id="dayStatusBadge" style="margin-top: 5px;">Giornata non iniziata</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.2); padding: 8px 12px; border-radius: 8px; text-align: center; color: white;">
+            <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Eseguiti</div>
+            <div style="font-size: 1.5rem; font-weight: 700; line-height: 1;"><strong id="interventiCount">0</strong></div>
+        </div>
     </header>
 
     <main class="container">
