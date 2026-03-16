@@ -213,8 +213,7 @@ async function syncLocalDataToCloud() {
                     // Continuiamo comunque
                 }
             }
-                
-            await addDoc(collection(db, "interventi"), {
+            const payloadToSave = {
                 timestamp: serverTimestamp(),
                 id: inv.id || Date.now().toString(),
                 tipo: inv.tipo || "Non specificato",
@@ -225,10 +224,12 @@ async function syncLocalDataToCloud() {
                 startTime: inv.startTime || Date.now(),
                 endTime: inv.endTime || Date.now(),
                 kmPercorsi: inv.kmPercorsi || "0",
-                fileUrl: fileCloudUrl,
+                fileUrl: fileCloudUrl || null,
                 haAllegato: !!(inv.fileData || fileCloudUrl),
                 fileType: inv.fileType || null
-            });
+            };
+
+            await addDoc(collection(db, "interventi"), payloadToSave);
             
             console.log("Intervento offline sincronizzato con successo:", inv.paziente);
             inv.fileUrl = fileCloudUrl;
