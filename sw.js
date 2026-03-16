@@ -1,9 +1,9 @@
-const CACHE_NAME = 'antimo-attivita-v16';
+const CACHE_NAME = 'antimo-attivita-v19';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './style.css',
-  './app.js',
+  './app.js?v=17',
   './manifest.json'
 ];
 
@@ -28,7 +28,15 @@ self.addEventListener('activate', event => {
           }
         })
       );
-    }).then(() => self.clients.claim()) // Prende il controllo delle pagine aperte
+    }).then(() => {
+        self.clients.claim();
+        // Forza l'aggiornamento immediato su tutte le finestre PWA aperte
+        self.clients.matchAll({ type: 'window' }).then(windowClients => {
+            windowClients.forEach(client => {
+                client.navigate(client.url); // Questo forza il refresh "duro" iOS style
+            });
+        });
+    }) 
   );
 });
 

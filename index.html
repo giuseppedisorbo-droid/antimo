@@ -12,8 +12,7 @@
 </head>
 <body>
     <header class="top-nav" style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.7); margin-top: 4px;" id="appVersionStamp">v17.0 - Aggiunto Matricola</div>
+            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.7); margin-top: 4px; cursor: pointer;" id="appVersionStamp" onclick="nukeCache()">v19.0 - Risoluzione Cache iOS</div>
         </div>
         <div style="display: flex; gap: 10px;">
             <div style="background: rgba(255,165,0,0.2); padding: 8px 12px; border-radius: 8px; text-align: center; color: white;">
@@ -189,10 +188,37 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('Service Worker registrato:', reg.scope))
-            .catch(err => console.error('Errore SW:', err));
+          navigator.serviceWorker.register('./sw.js').then(reg => {
+            console.log('SW registrato:', reg.scope);
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing;
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  console.log('Nuovo aggiornamento disponibile. Ricarico...');
+                  window.location.reload(true);
+                }
+              });
+            });
+          }).catch(err => console.error('Errore SW:', err));
         });
+
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload(true);
+          }
+        });
+      }
+
+      function nukeCache() {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) { registration.unregister(); }
+                alert("Cache App azzerata! Riavvio in corso...");
+                window.location.href = window.location.href.split('?')[0] + '?v=' + Date.now();
+            });
+        }
       }
     </script>
 </body>
