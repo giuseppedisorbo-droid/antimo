@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <title>Programmati - Gestione Attività</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- FullCalendar -->
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+    
+    <style>
+        .fc {
+            font-family: inherit;
+            background: white;
+            padding: 10px;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            font-size: 0.9rem;
+        }
+        .fc-toolbar-title {
+            font-size: 1.2rem !important;
+            font-weight: 700;
+            color: var(--blue-primary);
+        }
+        .fc-button-primary {
+            background-color: var(--blue-primary) !important;
+            border-color: var(--blue-primary) !important;
+            text-transform: capitalize;
+        }
+        .fc-event {
+            cursor: pointer;
+            border-radius: 4px;
+            padding: 2px 4px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+        #programmatiTable {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        #programmatiTable th {
+            background: var(--blue-primary);
+            color: white;
+            text-align: left;
+            padding: 12px;
+        }
+        #programmatiTable td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+            color: var(--text-main);
+        }
+    </style>
+</head>
+<body>
+    <header class="top-nav" style="display: flex; justify-content: space-between; align-items: center;">
+        <a href="index.html" style="background: rgba(255,255,255,0.2); padding: 8px 12px; border-radius: 8px; text-decoration: none; color: white; display: flex; align-items: center; gap: 5px; font-weight: 600;">
+            <span style="font-size: 1.2rem;">&larr;</span> Menu
+        </a>
+        <h1 style="margin: 0; font-size: 1.2rem;">Programmati</h1>
+        <div style="width: 70px;"></div> <!-- Spacer -->
+    </header>
+
+    <main class="container" style="max-width: 900px;">
+        
+        <!-- INSERIMENTO PROGRAMMATO -->
+        <section class="card glass-card">
+            <h2><span class="btn-icon">➕</span> Nuova Programmazione</h2>
+            <form id="newProgrammatoForm">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="paziente">Paziente / Ente *</label>
+                        <input type="text" id="paziente" placeholder="Nominativo" required>
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="destinazione">Destinazione *</label>
+                        <input type="text" id="destinazione" placeholder="Città / Indirizzo" required>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="tipoAttivita">Tipo Intervento</label>
+                        <select id="tipoAttivita">
+                            <option value="Sostituzione">Sostituzione</option>
+                            <option value="Installazione">Installazione</option>
+                            <option value="Visita">Visita</option>
+                            <option value="Controllo periodico">Controllo periodico</option>
+                            <option selected value="Valutazione">Valutazione</option>
+                            <option value="Consegna">Consegna</option>
+                            <option value="Ritiro">Ritiro</option>
+                            <option value="Formazione">Formazione</option>
+                            <option value="Altro">Altro</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="dataProgrammata">Data Prevista *</label>
+                        <input type="date" id="dataProgrammata" required>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 10px;">
+                    <label for="dispositivi">Dispositivi / Note</label>
+                    <input type="text" id="dispositivi" placeholder="Quali dispositivi o note aggiuntive...">
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-orange" style="margin-top: 10px;" id="btnPlanIntervention">
+                    <span class="btn-icon">📅</span> SALVA PROGRAMMAZIONE
+                </button>
+            </form>
+        </section>
+
+        <!-- CALENDARIO -->
+        <section class="card glass-card" style="padding: 1rem 0.5rem;">
+            <h2 style="padding: 0 1rem;"><span class="btn-icon">📆</span> Calendario</h2>
+            <div id="calendar"></div>
+        </section>
+
+        <!-- ELENCO TABELLA -->
+        <section class="card glass-card" style="padding: 1rem 0; overflow-x: auto;">
+            <h2 style="padding: 0 1rem;"><span class="btn-icon">📋</span> Elenco Programmati</h2>
+            <div style="margin: 0 1rem;">
+                <table id="programmatiTable">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Paziente</th>
+                            <th>Destinazione</th>
+                            <th>Tipo</th>
+                            <th>Dispositivi / Note</th>
+                        </tr>
+                    </thead>
+                    <tbody id="programmatiTableBody">
+                        <tr><td colspan="5" style="text-align: center; padding: 20px;">Caricamento...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <script type="module" src="programmati.js?v=1"></script>
+</body>
+</html>
