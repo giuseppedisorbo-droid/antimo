@@ -14,25 +14,69 @@
     <header class="top-nav" style="display: flex; justify-content: space-between; align-items: center;">
             <div style="font-size: 0.65rem; color: rgba(255,255,255,0.7); margin-top: 4px; cursor: pointer;" id="appVersionStamp" onclick="nukeCache()">v21.0 - Crash Risolto!</div>
         </div>
-        <div style="display: flex; gap: 10px;">
-            <a href="programmati.html" style="background: rgba(46,204,113,0.8); padding: 8px 15px; border-radius: 8px; text-align: center; color: white; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">P</a>
-            <div style="background: rgba(255,165,0,0.2); padding: 8px 12px; border-radius: 8px; text-align: center; color: white;">
-                <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">da fare</div>
-                <div style="font-size: 1.5rem; font-weight: 700; line-height: 1; color: var(--orange);"><strong id="programmatiCount">0</strong></div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+            <a href="programmati.html" style="background: rgba(46,204,113,0.8); padding: 5px 12px; border-radius: 8px; text-align: center; color: white; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">P</a>
+            <div id="btnMostraOggi" style="background: rgba(59,130,246,0.2); padding: 5px 8px; border-radius: 8px; text-align: center; color: white; cursor: pointer;">
+                <div style="font-size: 0.65rem; text-transform: uppercase;">Oggi</div>
+                <div style="font-size: 1.1rem; font-weight: 700; color: #3b82f6;"><strong id="oggiCount">0</strong></div>
             </div>
-            <div style="background: rgba(255,255,255,0.2); padding: 8px 12px; border-radius: 8px; text-align: center; color: white;">
-                <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Eseguiti</div>
-                <div style="font-size: 1.5rem; font-weight: 700; line-height: 1;"><strong id="interventiCount">0</strong></div>
+            <div id="btnMostraDomani" style="background: rgba(168,85,247,0.2); padding: 5px 8px; border-radius: 8px; text-align: center; color: white; cursor: pointer;">
+                <div style="font-size: 0.65rem; text-transform: uppercase;">Domani</div>
+                <div style="font-size: 1.1rem; font-weight: 700; color: #a855f7;"><strong id="domaniCount">0</strong></div>
+            </div>
+            <div id="btnMostraProgrammati" style="background: rgba(255,165,0,0.2); padding: 5px 8px; border-radius: 8px; text-align: center; color: white; cursor: pointer;">
+                <div style="font-size: 0.65rem; text-transform: uppercase;">Tutti</div>
+                <div style="font-size: 1.1rem; font-weight: 700; color: var(--orange);"><strong id="programmatiCount">0</strong></div>
+            </div>
+            <div id="btnMostraNP" style="background: rgba(220,38,38,0.2); padding: 5px 8px; border-radius: 8px; text-align: center; color: white; cursor: pointer;">
+                <div style="font-size: 0.65rem; text-transform: uppercase;">NP</div>
+                <div style="font-size: 1.1rem; font-weight: 700; color: #ef4444;"><strong id="npCount">0</strong></div>
+            </div>
+            <div style="background: rgba(255,255,255,0.2); padding: 5px 8px; border-radius: 8px; text-align: center; color: white;">
+                <div style="font-size: 0.65rem; text-transform: uppercase;">Eseg.</div>
+                <div style="font-size: 1.1rem; font-weight: 700;"><strong id="interventiCount">0</strong></div>
             </div>
         </div>
     </header>
 
     <main class="container">
-        <!-- SEZIONE INTERVENTI PROGRAMMATI (sempre visibile se ci sono) -->
+        <!-- SEZIONE INTERVENTI OGGI -->
+        <section class="card glass-card hidden" id="oggiInterventionsSection" style="margin-bottom: 20px; border-left: 4px solid #3b82f6;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="color: #3b82f6; margin:0;"><span class="btn-icon">📅</span> Interventi Oggi</h2>
+            </div>
+            <div id="oggiList" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+            </div>
+        </section>
+
+        <!-- SEZIONE INTERVENTI DOMANI -->
+        <section class="card glass-card hidden" id="domaniInterventionsSection" style="margin-bottom: 20px; border-left: 4px solid #a855f7;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="color: #a855f7; margin:0;"><span class="btn-icon">📅</span> Interventi Domani</h2>
+            </div>
+            <div id="domaniList" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+            </div>
+        </section>
+
+        <!-- SEZIONE INTERVENTI PROGRAMMATI (TUTTI) -->
         <section class="card glass-card hidden" id="plannedInterventionsSection" style="margin-bottom: 20px; border-left: 4px solid var(--orange);">
-            <h2 style="color: var(--orange);"><span class="btn-icon">📅</span> Interventi Programmati (Da Fare)</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="color: var(--orange); margin:0;"><span class="btn-icon">📅</span> Tutti i Programmati</h2>
+                <a href="programmati.html" style="font-size: 0.8rem; text-decoration: underline; color: var(--blue-primary); font-weight: 600;">Gestisci &rarr;</a>
+            </div>
             <div id="plannedList" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
                 <!-- Gli interventi programmati verranno creati qui da app.js -->
+            </div>
+        </section>
+
+        <!-- SEZIONE INTERVENTI NP - NON PROGRAMMATI (Nascondibile a Piacere) -->
+        <section class="card glass-card hidden" id="npInterventionsSection" style="margin-bottom: 20px; border-left: 4px solid #ef4444;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="color: #ef4444; margin:0;"><span class="btn-icon">⏳</span> Non Programmati (NP)</h2>
+                <a href="programmati.html" style="font-size: 0.8rem; text-decoration: underline; color: var(--blue-primary); font-weight: 600;">Gestisci &rarr;</a>
+            </div>
+            <div id="npList" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+                <!-- Gli interventi in attesa verranno creati qui da app.js -->
             </div>
         </section>
 

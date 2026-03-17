@@ -70,6 +70,32 @@ const activitiesListContainer = document.getElementById('activitiesListContainer
 const activitiesList = document.getElementById('activitiesList');
 const plannedInterventionsSection = document.getElementById('plannedInterventionsSection');
 const plannedList = document.getElementById('plannedList');
+const npInterventionsSection = document.getElementById('npInterventionsSection');
+const npList = document.getElementById('npList');
+const oggiInterventionsSection = document.getElementById('oggiInterventionsSection');
+const oggiList = document.getElementById('oggiList');
+const domaniInterventionsSection = document.getElementById('domaniInterventionsSection');
+const domaniList = document.getElementById('domaniList');
+
+// Buttons for Toggling Sections
+const btnMostraProgrammati = document.getElementById('btnMostraProgrammati');
+const btnMostraNP = document.getElementById('btnMostraNP');
+const npCount = document.getElementById('npCount');
+const btnMostraOggi = document.getElementById('btnMostraOggi');
+const btnMostraDomani = document.getElementById('btnMostraDomani');
+const oggiCount = document.getElementById('oggiCount');
+const domaniCount = document.getElementById('domaniCount');
+
+// Nuovi Toggles Logic
+let isPlannedVisible = false;
+let isNpVisible = false;
+let isOggiVisible = false;
+let isDomaniVisible = false;
+
+if(btnMostraOggi) { btnMostraOggi.addEventListener('click', () => { isOggiVisible = !isOggiVisible; updateUI(); }); }
+if(btnMostraDomani) { btnMostraDomani.addEventListener('click', () => { isDomaniVisible = !isDomaniVisible; updateUI(); }); }
+if(btnMostraProgrammati) { btnMostraProgrammati.addEventListener('click', () => { isPlannedVisible = !isPlannedVisible; updateUI(); }); }
+if(btnMostraNP) { btnMostraNP.addEventListener('click', () => { isNpVisible = !isNpVisible; updateUI(); }); }
 
 // Form Inputs
 const iTipo = document.getElementById('tipoAttivita');
@@ -124,7 +150,7 @@ async function syncPlannedInterventions() {
         let cloudPlanned = [];
         snap.forEach(doc => {
             const data = doc.data();
-            if (!data.status || data.status === 'planned') {
+            if (!data.status || data.status === 'planned' || data.status === 'in_attesa') {
                 cloudPlanned.push({ id: doc.id, ...data });
             }
         });
@@ -276,13 +302,35 @@ function updateUI() {
         activeInterventionSection.classList.add('hidden');
     }
 
-    // Le attività programmate si vedono sempre
-    if(plannedInterventions.length > 0) {
-        plannedInterventionsSection.classList.remove('hidden');
-        renderPlannedInterventions();
+    // Le attività programmate
+    const visibiliProg = plannedInterventions.filter(p => !p.status || p.status === 'planned');
+    
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+
+    if(visibiliProg.length > 0 && isPlannedVisible) plannedInterventionsSection.classList.remove('hidden');
+    else plannedInterventionsSection.classList.add('hidden');
+
+    const oggiProg = visibiliProg.filter(p => p.dataPrevista === todayStr);
+    if(oggiProg.length > 0 && isOggiVisible) oggiInterventionsSection.classList.remove('hidden');
+    else oggiInterventionsSection.classList.add('hidden');
+
+    const domaniProg = visibiliProg.filter(p => p.dataPrevista === tomorrowStr);
+    if(domaniProg.length > 0 && isDomaniVisible) domaniInterventionsSection.classList.remove('hidden');
+    else domaniInterventionsSection.classList.add('hidden');
+
+    renderPlannedInterventions(visibiliProg, oggiProg, domaniProg);
+
+    // NP (SE isNpVisible è true)
+    const visibiliNP = plannedInterventions.filter(p => p.status === 'in_attesa');
+    if(visibiliNP.length > 0 && isNpVisible) {
+        npInterventionsSection.classList.remove('hidden');
     } else {
-        plannedInterventionsSection.classList.add('hidden');
+        npInterventionsSection.classList.add('hidden');
     }
+    renderNpInterventions();
 }
 
 function padZ(num) { return num.toString().padStart(2, '0'); }
@@ -293,8 +341,25 @@ function formatTime(ms) {
 }
 
 async function updateInterventiCount() { 
-    // Aggiorna sempre il contatore locale dei "Da Fare" prima
-    if (programmatiCount) programmatiCount.textContent = plannedInterventions.length;
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+
+    // Aggiorna contatori
+    const soloPlanned = plannedInterventions.filter(p => !p.status || p.status === 'planned');
+    let cOggi = 0, cDomani = 0;
+    soloPlanned.forEach(p => {
+        if(p.dataPrevista === todayStr) cOggi++;
+        else if(p.dataPrevista === tomorrowStr) cDomani++;
+    });
+
+    const soloNP = plannedInterventions.filter(p => p.status === 'in_attesa').length;
+
+    if (programmatiCount) programmatiCount.textContent = soloPlanned.length;
+    if (oggiCount) oggiCount.textContent = cOggi;
+    if (domaniCount) domaniCount.textContent = cDomani;
+    if (npCount) npCount.textContent = soloNP;
     
     if (!isFirebaseConfigured) {
         interventiCount.textContent = completedInterventions.length; 
@@ -323,13 +388,11 @@ async function updateInterventiCount() {
     }
 }
 
-function renderPlannedInterventions() {
-    plannedList.innerHTML = '';
+function renderSpecialPlannedList(container, filteredData) {
+    if(!container) return;
+    container.innerHTML = '';
     
-    // Filtra solo quelli non giustificati
-    const visibili = plannedInterventions.filter(p => !p.status || p.status === 'planned');
-    
-    visibili.forEach((p, indexOriginalArray) => {
+    filteredData.forEach(p => {
         // Cerchiamo l'indice reale nell'array globale
         const index = plannedInterventions.indexOf(p);
         
@@ -346,7 +409,7 @@ function renderPlannedInterventions() {
             </div>
             <div style="display:flex; gap:10px;">
                 <button class="btn btn-danger btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="justify" data-index="${index}">✖ Non Eseguito</button>
-                <button class="btn btn-primary btn-orange btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="avvia" data-index="${index}">▶ Avvia</button>
+                <button class="btn btn-primary btn-orange btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="avvia" data-index="${index}">▶ INVIA</button>
             </div>
         `;
         
@@ -397,7 +460,83 @@ function renderPlannedInterventions() {
             justifyModal.classList.remove('hidden');
         });
 
-        plannedList.appendChild(div);
+        container.appendChild(div);
+    });
+}
+
+function renderPlannedInterventions(tuttiProg = [], oggiProg = [], domaniProg = []) {
+    if(plannedList) renderSpecialPlannedList(plannedList, tuttiProg);
+    if(oggiList) renderSpecialPlannedList(oggiList, oggiProg);
+    if(domaniList) renderSpecialPlannedList(domaniList, domaniProg);
+}
+
+function renderNpInterventions() {
+    if(!npList) return;
+    npList.innerHTML = '';
+    
+    // Filtra solo quelli in attesa
+    const visibili = plannedInterventions.filter(p => p.status === 'in_attesa');
+    
+    visibili.forEach((p, indexOriginalArray) => {
+        // Cerchiamo l'indice reale nell'array globale
+        const index = plannedInterventions.indexOf(p);
+        
+        const div = document.createElement('div');
+        div.style.cssText = "background:white; padding:12px; border-radius:8px; border:1px solid #ddd; display:flex; flex-direction:column; gap:10px;";
+        
+        let noteStr = p.note || p.dispositivi || 'Nessuna nota';
+
+        div.innerHTML = `
+            <div>
+                <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${p.paziente}</div>
+                <div style="font-size:0.85rem; color:#555;">📍 ${p.destinazione} | 🔧 ${p.tipo}</div>
+                <div style="font-size:0.80rem; color:#ef4444; font-weight:600; margin-top:4px;">⏳ Da Programmare</div>
+                <div style="font-size:0.75rem; color:#777; margin-top:4px;">${noteStr}</div>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button class="btn btn-primary btn-orange btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="avvia" data-index="${index}">▶ INVIA</button>
+            </div>
+        `;
+        
+        div.querySelector('button[data-action="avvia"]').addEventListener('click', (e) => {
+            const idx = e.target.getAttribute('data-index');
+            const dataToLoad = plannedInterventions[idx];
+            
+            // Popoliamo il form
+            iTipo.value = dataToLoad.tipo;
+            iPaziente.value = dataToLoad.paziente;
+            iDestinazione.value = dataToLoad.destinazione;
+            if(customDevices.includes(dataToLoad.dispositivi) || Array.from(iDispositiviSelect.options).some(o=>o.value===dataToLoad.dispositivi)) {
+                iDispositiviSelect.value = dataToLoad.dispositivi;
+                iNuovoDispositivo.classList.add('hidden');
+            } else {
+                iDispositiviSelect.value = "_AZI_NUOVO_";
+                iNuovoDispositivo.classList.remove('hidden');
+                iNuovoDispositivo.value = dataToLoad.dispositivi;
+            }
+            iNote.value = dataToLoad.note;
+
+            plannedInterventions.splice(idx, 1);
+            saveState();
+            
+            // Eliminiamo anche dal cloud (se si avvia, sparisce da programmati e diventerà intervento vero)
+            if (isFirebaseConfigured && dataToLoad.id) {
+                import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js").then(async ({ doc, deleteDoc }) => {
+                    try {
+                        const { collection, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                        const q = query(collection(db, "programmati"), where("id", "==", dataToLoad.id));
+                        const snaps = await getDocs(q);
+                        snaps.forEach(async d => await deleteDoc(doc(db, "programmati", d.id)));
+                    } catch(err) { console.error("Errore rimozione cloud np", err); }
+                });
+            }
+
+            updateUI();
+            updateInterventiCount();
+            interventionSection.scrollIntoView({ behavior: 'smooth' });
+        });
+
+        npList.appendChild(div);
     });
 }
 
