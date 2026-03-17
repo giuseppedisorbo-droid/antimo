@@ -112,12 +112,10 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="allegatoFile">Allegato (Foto Matricola, PDF, o Video)</label>
-                    <input type="file" id="allegatoFile" accept="image/*,video/*,application/pdf">
-                    <div id="filePreviewContainer" class="hidden" style="margin-top: 10px; text-align: center;">
-                        <img id="fotoPreview" src="" alt="Anteprima Immagine" style="max-width: 100%; border-radius: 8px; border: 2px solid var(--blue-light); max-height: 200px; object-fit: contain; display: none;">
-                        <p id="filePreviewName" style="font-size: 0.9rem; margin-bottom: 5px; font-weight: 600; color: var(--blue-primary); display: none;"></p>
-                        <button type="button" class="btn btn-danger" id="btnRimuoviFile" style="margin-top: 10px; padding: 0.5rem;">Rimuovi Allegato</button>
+                    <label for="allegatoFile">Allegato/i (Foto, PDF, o Video)</label>
+                    <input type="file" id="allegatoFile" accept="image/*,video/*,application/pdf" multiple>
+                    <div id="filePreviewContainer" class="hidden" style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: start; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px;">
+                        <!-- Le anteprime verranno inserite qui dinamicamente -->
                     </div>
                 </div>
 
@@ -225,6 +223,44 @@
                     <button id="btnCancelJustify" class="btn" style="background: #e2e8f0; color: #333; padding: 10px; flex: 1;">Annulla</button>
                     <button id="btnConfirmJustify" class="btn btn-danger" style="padding: 10px; flex: 1;">Conferma</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- MODAL MODIFICA ATTIVITA PROGRAMMATA -->
+        <div id="editInterventionModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
+                    <span><span class="btn-icon">✏️</span> Modifica Attività</span>
+                    <button id="btnCancelEdit" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                </h3>
+                <form id="editInterventionForm">
+                    <input type="hidden" id="editItemIndex">
+                    <div class="form-group">
+                        <label>Paziente / Ente</label>
+                        <input type="text" id="editPaziente" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Destinazione</label>
+                        <input type="text" id="editDestinazione">
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo Intervento</label>
+                        <input type="text" id="editTipo">
+                    </div>
+                    <div class="form-group">
+                        <label>Dispositivi</label>
+                        <input type="text" id="editDispositivi">
+                    </div>
+                    <div class="form-group">
+                        <label>Date (Vuoto = NP)</label>
+                        <input type="date" id="editDataPrevista">
+                    </div>
+                    <div class="form-group">
+                        <label>Note</label>
+                        <textarea id="editNote" rows="2"></textarea>
+                    </div>
+                    <button type="button" id="btnSaveEdit" class="btn btn-primary btn-large" style="width: 100%; margin-top: 10px;">SALVA MODIFICHE</button>
+                </form>
             </div>
         </div>
 

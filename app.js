@@ -49,9 +49,7 @@ let completedInterventions = JSON.parse(localStorage.getItem('antimo_interventio
 let plannedInterventions = JSON.parse(localStorage.getItem('antimo_plannedInterventions')) || [];
 
 let timerInterval;
-let currentFileBase64 = null;
-let currentFileType = null;
-let currentFileName = null;
+let currentAttachments = [];
 
 // DOM Elements
 const interventionSection = document.getElementById('interventionSection');
@@ -108,9 +106,6 @@ const inputKmPercorsi = document.getElementById('kmPercorsi');
 const inputMatricola = document.getElementById('matricola');
 const inputAllegato = document.getElementById('allegatoFile');
 const filePreviewContainer = document.getElementById('filePreviewContainer');
-const fotoPreview = document.getElementById('fotoPreview');
-const filePreviewName = document.getElementById('filePreviewName');
-const btnRimuoviFile = document.getElementById('btnRimuoviFile');
 const inputDataProgrammata = document.getElementById('dataProgrammata');
 
 const justifyModal = document.getElementById('justifyModal');
@@ -607,41 +602,68 @@ function stopTimerDisplay() { clearInterval(timerInterval); }
 
 
 
-inputAllegato.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        currentFileType = file.type;
-        currentFileName = file.name;
+function renderAttachmentsPreview() {
+    filePreviewContainer.innerHTML = '';
+    if(currentAttachments.length === 0) {
+        filePreviewContainer.classList.add('hidden');
+        return;
+    }
+    
+    filePreviewContainer.classList.remove('hidden');
+    currentAttachments.forEach((att, index) => {
+        const div = document.createElement('div');
+        div.style.cssText = "position: relative; border: 1px solid #ccc; border-radius: 8px; padding: 5px; text-align: center; width: 100px; display: flex; flex-direction: column; align-items: center; background: white;";
         
+        const removeBtn = document.createElement('button');
+        removeBtn.innerHTML = "&times;";
+        removeBtn.style.cssText = "position: absolute; top: -5px; right: -5px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-weight: bold;";
+        removeBtn.onclick = () => {
+            currentAttachments.splice(index, 1);
+            renderAttachmentsPreview();
+        };
+        
+        if (att.type.startsWith('image/')) {
+            const img = document.createElement('img');
+            img.src = att.data;
+            img.style.cssText = "width: 80px; height: 80px; object-fit: cover; border-radius: 4px;";
+            div.appendChild(img);
+        } else {
+            const icon = document.createElement('div');
+            icon.style.cssText = "width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; font-size: 2rem; background: #f1f5f9; border-radius: 4px;";
+            icon.innerText = "📎";
+            div.appendChild(icon);
+            const nameObj = document.createElement('div');
+            nameObj.style.cssText = "font-size: 0.6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; margin-top: 4px;";
+            nameObj.innerText = att.name;
+            div.appendChild(nameObj);
+        }
+        
+        div.appendChild(removeBtn);
+        filePreviewContainer.appendChild(div);
+    });
+}
+
+inputAllegato.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files);
+    if (!files || files.length === 0) return;
+    
+    files.forEach(file => {
         const reader = new FileReader();
         reader.onload = function(event) {
-            currentFileBase64 = event.target.result;
-            
-            // UI Update basato sul tipo
-            filePreviewContainer.classList.remove('hidden');
-            if(currentFileType.startsWith('image/')) {
-                fotoPreview.src = currentFileBase64;
-                fotoPreview.style.display = 'block';
-                filePreviewName.style.display = 'none';
-            } else {
-                fotoPreview.style.display = 'none';
-                filePreviewName.textContent = "📎 " + file.name;
-                filePreviewName.style.display = 'block';
-            }
+            currentAttachments.push({
+                data: event.target.result,
+                type: file.type,
+                name: file.name
+            });
+            renderAttachmentsPreview();
         };
         reader.readAsDataURL(file);
-    }
-});
-
-btnRimuoviFile.addEventListener('click', () => {
-    inputAllegato.value = ""; 
-    currentFileBase64 = null;
-    currentFileType = null;
-    currentFileName = null;
-    fotoPreview.src = ""; 
-    fotoPreview.style.display = 'none';
-    filePreviewName.style.display = 'none';
-    filePreviewContainer.classList.add('hidden');
+    });
+    
+    // Non azzeriamo l'input per permettere selezioni successive se desiderato,
+    // o lo azzeriamo per forzare il re-trigger a parità di file. È meglio azzerarlo
+    // dato che gestiamo l'array in JS.
+    inputAllegato.value = "";
 });
 
 iDispositiviSelect.addEventListener('change', (e) => {
@@ -713,8 +735,9 @@ btnPlanIntervention.addEventListener('click', async () => {
     iDispositiviSelect.value = "";
     iNuovoDispositivo.classList.add('hidden');
     inputAllegato.value = ""; 
-    currentFileBase64 = null; currentFileType = null; currentFileName = null;
-    fotoPreview.style.display = 'none'; filePreviewName.style.display = 'none'; filePreviewContainer.classList.add('hidden');
+    currentAttachments = [];
+    filePreviewContainer.innerHTML = '';
+    filePreviewContainer.classList.add('hidden');
     
     updateUI();
 });
@@ -749,9 +772,7 @@ newInterventionForm.addEventListener('submit', (e) => {
         dispositivi: dispFinale,
         matricola: inputMatricola.value.trim(),
         note: iNote.value,
-        fileData: currentFileBase64,
-        fileType: currentFileType,
-        fileName: currentFileName,
+        attachments: currentAttachments, // Array of structured attachment objects
         startTime: new Date().getTime()
     };
     saveState(); updateUI(); startTimerDisplay();
@@ -761,12 +782,8 @@ newInterventionForm.addEventListener('submit', (e) => {
     iNuovoDispositivo.classList.add('hidden');
     iNuovoDispositivo.value = "";
     inputAllegato.value = ""; 
-    currentFileBase64 = null;
-    currentFileType = null;
-    currentFileName = null;
-    fotoPreview.src = ""; 
-    fotoPreview.style.display = 'none';
-    filePreviewName.style.display = 'none';
+    currentAttachments = [];
+    filePreviewContainer.innerHTML = '';
     filePreviewContainer.classList.add('hidden');
 });
 
@@ -787,16 +804,33 @@ btnStopIntervention.addEventListener('click', async () => {
 
     try {
         if(isFirebaseConfigured) {
-            // Se c'è un file base64
-            if(activeIntervention.fileData) {
+            // Upload multiplo file
+            let uploadedUrls = [];
+            if(activeIntervention.attachments && activeIntervention.attachments.length > 0) {
+                for(let i = 0; i < activeIntervention.attachments.length; i++) {
+                    const att = activeIntervention.attachments[i];
+                    let ext = "jpg";
+                    if(att.name) ext = att.name.split('.').pop();
+                    else if(att.type === "application/pdf") ext = "pdf";
+                    else if(att.type && att.type.startsWith("video/")) ext = "mp4";
+
+                    const storageRef = ref(storage, `allegati/${activeIntervention.id}_${i}.${ext}`);
+                    await uploadString(storageRef, att.data, 'data_url');
+                    const url = await getDownloadURL(storageRef);
+                    uploadedUrls.push(url);
+                }
+            }
+
+            // Vecchia gestione salvataggio (se un intervento vecchio era in pending)
+            if(activeIntervention.fileData && uploadedUrls.length === 0) {
                 let ext = "jpg";
                 if(activeIntervention.fileName) ext = activeIntervention.fileName.split('.').pop();
                 else if(activeIntervention.fileType === "application/pdf") ext = "pdf";
-                else if(activeIntervention.fileType && activeIntervention.fileType.startsWith("video/")) ext = "mp4";
-
-                const storageRef = ref(storage, `allegati/${activeIntervention.id}.${ext}`);
+                
+                const storageRef = ref(storage, `allegati/${activeIntervention.id}.` + ext);
                 await uploadString(storageRef, activeIntervention.fileData, 'data_url');
-                fileCloudUrl = await getDownloadURL(storageRef);
+                const url = await getDownloadURL(storageRef);
+                uploadedUrls.push(url);
             }
 
             // Upload Firestore
@@ -812,9 +846,8 @@ btnStopIntervention.addEventListener('click', async () => {
                 startTime: activeIntervention.startTime || Date.now(),
                 endTime: activeIntervention.endTime || Date.now(),
                 kmPercorsi: activeIntervention.kmPercorsi || "0",
-                fileUrl: fileCloudUrl || null,
-                haAllegato: !!(activeIntervention.fileData || fileCloudUrl),
-                fileType: activeIntervention.fileType || null
+                fileUrls: uploadedUrls.length > 0 ? uploadedUrls : null, // Nuovo campo array
+                haAllegato: uploadedUrls.length > 0 // Mantenuto per compatibilità
             };
 
             // Rimuovo chiavi undefined per evitare alert silenziosi
@@ -831,10 +864,11 @@ btnStopIntervention.addEventListener('click', async () => {
 
     // Eseguo SEMPRE il passaggio logico locale
     activeIntervention.cloudSynced = cloudSaveSuccess;
-    activeIntervention.fileUrl = fileCloudUrl || activeIntervention.fileUrl || null;
-    activeIntervention.haAllegato = !!(activeIntervention.fileData || activeIntervention.fileUrl);
+    activeIntervention.fileUrls = (uploadedUrls && uploadedUrls.length > 0) ? uploadedUrls : (activeIntervention.fileUrls || null);
+    activeIntervention.haAllegato = !!(activeIntervention.attachments?.length > 0 || activeIntervention.fileUrls?.length > 0);
     
-    // Pulizia del pesantissimo base64 prima di salvare in mem
+    // Pulizia dei pesanti base64 prima di salvare in mem locale
+    delete activeIntervention.attachments; 
     delete activeIntervention.fileData; 
 
     completedInterventions.push(activeIntervention);
