@@ -23,6 +23,7 @@ try {
 
 // Stato Globale
 let plannedInterventions = [];
+let waitingInterventions = [];
 let calendar;
 
 // DOM
@@ -35,6 +36,11 @@ const iDispositivi = document.getElementById('dispositivi');
 const tableBody = document.getElementById('programmatiTableBody');
 const calendarEl = document.getElementById('calendar');
 
+const btnSaveWaiting = document.getElementById('btnSaveWaiting');
+const btnToggleWaiting = document.getElementById('btnToggleWaiting');
+const waitingContainer = document.getElementById('waitingContainer');
+const waitingTableBody = document.getElementById('waitingTableBody');
+
 // Format
 function padZ(num) { return num.toString().padStart(2, '0'); }
 
@@ -45,11 +51,18 @@ async function fetchProgrammati() {
         
         const snap = await getDocs(collection(db, "programmati"));
         const cloudPlanned = [];
+        const cloudWaiting = [];
         snap.forEach(doc => {
             const data = doc.data();
             // Consideriamo da mostrare quelli planned o vecchi senza stato
             if (!data.status || data.status === 'planned') {
-                cloudPlanned.push({ idFb: doc.id, ...data });
+                if (data.dataPrevista) {
+                    cloudPlanned.push({ idFb: doc.id, ...data });
+                } else {
+                    cloudWaiting.push({ idFb: doc.id, ...data });
+                }
+            } else if (data.status === 'in_attesa') {
+                cloudWaiting.push({ idFb: doc.id, ...data });
             }
         });
 
@@ -61,6 +74,7 @@ async function fetchProgrammati() {
         });
 
         plannedInterventions = cloudPlanned;
+        waitingInterventions = cloudWaiting;
         
         // Salvataggio nel fallback locale che usa app.js
         localStorage.setItem('antimo_plannedInterventions', JSON.stringify(plannedInterventions));
@@ -75,7 +89,32 @@ async function fetchProgrammati() {
 
 function renderTutto() {
     renderTable();
+    renderWaitingTable();
     renderCalendar();
+}
+
+function renderWaitingTable() {
+    waitingTableBody.innerHTML = '';
+    
+    if(waitingInterventions.length === 0) {
+        waitingTableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px;">Nessun intervento in attesa.</td></tr>';
+        return;
+    }
+
+    waitingInterventions.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="font-weight: bold;">${p.paziente}</td>
+            <td>${p.destinazione}</td>
+            <td>
+                <div style="display: flex; gap: 5px;">
+                    <input type="date" id="date_${p.idFb}" style="padding: 5px; border-radius: 6px; border: 1px solid #ccc;">
+                    <button class="btn btn-primary btn-sm" onclick="programmaAttesa('${p.idFb}')" style="padding: 5px 10px; font-size: 0.8rem; width: auto; text-transform: none;">Assegna</button>
+                </div>
+            </td>
+        `;
+        waitingTableBody.appendChild(tr);
+    });
 }
 
 function renderTable() {
@@ -157,7 +196,7 @@ form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     if(!iPaziente.value || !iDestinazione.value || !iData.value) {
-        return alert("Compila tutti i campi obbligatori!");
+        return alert("Compila tutti i campi obbligatori (inclusa la Data) per PROGRAMMARE! Altrimenti salva in attesa.");
     }
 
     const btn = document.getElementById('btnPlanIntervention');
@@ -202,6 +241,69 @@ form.addEventListener('submit', async (e) => {
         btn.disabled = false;
     }
 });
+
+// Toggle Waiting Container
+btnToggleWaiting.addEventListener('click', () => {
+    waitingContainer.classList.toggle('hidden');
+});
+
+// Submit Nuovo "In Attesa"
+btnSaveWaiting.addEventListener('click', async () => {
+    if(!iPaziente.value || !iDestinazione.value) {
+        return alert("Compila almeno Paziente e Destinazione per salvare l'intervento in attesa!");
+    }
+
+    const oldHtml = btnSaveWaiting.innerHTML;
+    btnSaveWaiting.innerHTML = `<span class="btn-icon">⏳</span> SALVATAGGIO...`;
+    btnSaveWaiting.disabled = true;
+
+    const plannedId = "plan_" + Date.now().toString();
+    const waitingEvent = {
+        id: plannedId,
+        tipo: iTipoAttivita.value,
+        paziente: iPaziente.value,
+        destinazione: iDestinazione.value,
+        dispositivi: iDispositivi.value,
+        dataPrevista: "",
+        status: 'in_attesa',
+        timestamp: new Date().getTime()
+    };
+
+    try {
+        if (db) {
+            await addDoc(collection(db, "programmati"), waitingEvent);
+        }
+        form.reset();
+        await fetchProgrammati();
+        waitingContainer.classList.remove('hidden'); // Apriamo per mostrare che è entrato in lista
+    } catch(err) {
+        console.error("Errore salvataggio in attesa", err);
+        alert("Errore salvataggio nel Cloud.");
+    } finally {
+        btnSaveWaiting.innerHTML = oldHtml;
+        btnSaveWaiting.disabled = false;
+    }
+});
+
+window.programmaAttesa = async function(idFb) {
+    const dateInput = document.getElementById('date_' + idFb);
+    const newDate = dateInput.value;
+    if(!newDate) {
+        return alert('Seleziona una data per assegnare l\'intervento!');
+    }
+    
+    try {
+        const docRef = doc(db, 'programmati', idFb);
+        await updateDoc(docRef, {
+            dataPrevista: newDate,
+            status: 'planned'
+        });
+        await fetchProgrammati(); // ricarica tutto e aggiorna calendario / tabella
+    } catch(e) {
+        console.error("Errore aggiornamento data", e);
+        alert('Errore di connessione o permessi aggiornando la data.');
+    }
+};
 
 // Init
 document.addEventListener('DOMContentLoaded', () => {

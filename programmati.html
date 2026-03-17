@@ -104,8 +104,8 @@
                     </div>
 
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label for="dataProgrammata">Data Prevista *</label>
-                        <input type="date" id="dataProgrammata" required>
+                        <label for="dataProgrammata">Data Prevista (Vuota = In Attesa)</label>
+                        <input type="date" id="dataProgrammata">
                     </div>
                 </div>
 
@@ -114,10 +114,37 @@
                     <input type="text" id="dispositivi" placeholder="Quali dispositivi o note aggiuntive...">
                 </div>
 
-                <button type="submit" class="btn btn-primary btn-orange" style="margin-top: 10px;" id="btnPlanIntervention">
-                    <span class="btn-icon">📅</span> SALVA PROGRAMMAZIONE
-                </button>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button type="submit" class="btn btn-primary btn-orange" style="flex: 1;" id="btnPlanIntervention">
+                        <span class="btn-icon">📅</span> SALVA PROGRAMMAZIONE
+                    </button>
+                    <button type="button" class="btn btn-secondary" style="flex: 1;" id="btnSaveWaiting">
+                        <span class="btn-icon">⏳</span> SALVA IN ATTESA
+                    </button>
+                </div>
             </form>
+        </section>
+
+        <!-- ELENCO DA PROGRAMMARE (IN ATTESA) -->
+        <section class="card glass-card" style="padding: 1rem 0; overflow-x: auto; margin-bottom: 20px;">
+            <div style="padding: 0 1rem; display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0;"><span class="btn-icon">⏳</span> Da Programmare (In Attesa)</h2>
+                <button id="btnToggleWaiting" class="btn btn-secondary" style="width: auto; padding: 5px 10px; font-size: 0.8rem; margin: 0;">Mostra / Nascondi</button>
+            </div>
+            <div id="waitingContainer" class="hidden" style="margin: 10px 1rem 0 1rem;">
+                <table id="waitingTable" style="width: 100%; border-collapse: collapse; font-size: 0.9rem; background: white; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow);">
+                    <thead>
+                        <tr>
+                            <th style="background: var(--blue-primary); color: white; padding: 12px; text-align: left;">Paziente</th>
+                            <th style="background: var(--blue-primary); color: white; padding: 12px; text-align: left;">Destinazione</th>
+                            <th style="background: var(--blue-primary); color: white; padding: 12px; text-align: left;">Programma Data</th>
+                        </tr>
+                    </thead>
+                    <tbody id="waitingTableBody">
+                        <tr><td colspan="3" style="text-align: center; padding: 20px;">Caricamento...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </section>
 
         <!-- CALENDARIO -->
