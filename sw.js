@@ -1,9 +1,9 @@
-const CACHE_NAME = 'antimo-attivita-v19';
+const CACHE_NAME = 'antimo-attivita-v20';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './style.css',
-  './app.js?v=17',
+  './app.js?v=20',
   './manifest.json'
 ];
 

@@ -652,70 +652,73 @@ btnStopIntervention.addEventListener('click', async () => {
     btnStopIntervention.innerHTML = `<span class="btn-icon">⏳</span> SALVATAGGIO IN CORSO...`;
     btnStopIntervention.disabled = true;
 
+    let fileCloudUrl = null;
+    let cloudSaveSuccess = false;
+
+    // Aggiorniamo i dati base per finalizzare
+    activeIntervention.endTime = new Date().getTime();
+    activeIntervention.kmPercorsi = inputKmPercorsi.value || "0";
+
     try {
-        activeIntervention.endTime = new Date().getTime();
-        activeIntervention.kmPercorsi = inputKmPercorsi.value || "0";
-        
-        let fileCloudUrl = null;
-        
-        // Salvataggio Firebase
-        if(isFirebaseConfigured && activeIntervention.fileData) {
-            // Estrapoliamo estensione originale
-            let ext = "jpg";
-            if(activeIntervention.fileName) {
-                ext = activeIntervention.fileName.split('.').pop();
-            } else if(activeIntervention.fileType === "application/pdf") {
-                ext = "pdf";
-            } else if(activeIntervention.fileType && activeIntervention.fileType.startsWith("video/")) {
-                ext = "mp4";
+        if(isFirebaseConfigured) {
+            // Se c'è un file base64
+            if(activeIntervention.fileData) {
+                let ext = "jpg";
+                if(activeIntervention.fileName) ext = activeIntervention.fileName.split('.').pop();
+                else if(activeIntervention.fileType === "application/pdf") ext = "pdf";
+                else if(activeIntervention.fileType && activeIntervention.fileType.startsWith("video/")) ext = "mp4";
+
+                const storageRef = ref(storage, `allegati/${activeIntervention.id}.${ext}`);
+                await uploadString(storageRef, activeIntervention.fileData, 'data_url');
+                fileCloudUrl = await getDownloadURL(storageRef);
             }
 
-            const storageRef = ref(storage, `allegati/${activeIntervention.id}.${ext}`);
-            const uploadResult = await uploadString(storageRef, activeIntervention.fileData, 'data_url');
-            fileCloudUrl = await getDownloadURL(storageRef);
-        }
-            
-        if(isFirebaseConfigured) {
             // Upload Firestore
-            await addDoc(collection(db, "interventi"), {
+            const payloadToSave = {
                 timestamp: serverTimestamp(),
                 id: activeIntervention.id,
-                tipo: activeIntervention.tipo,
-                paziente: activeIntervention.paziente,
-                destinazione: activeIntervention.destinazione,
-                dispositivi: activeIntervention.dispositivi,
+                tipo: activeIntervention.tipo || "Gen",
+                paziente: activeIntervention.paziente || "Sconosciuto",
+                destinazione: activeIntervention.destinazione || "",
+                dispositivi: activeIntervention.dispositivi || "",
                 matricola: activeIntervention.matricola || "",
-                note: activeIntervention.note,
-                startTime: activeIntervention.startTime,
-                endTime: activeIntervention.endTime,
-                kmPercorsi: activeIntervention.kmPercorsi,
-                fileUrl: fileCloudUrl,
-                haAllegato: !!activeIntervention.fileData,
+                note: activeIntervention.note || "",
+                startTime: activeIntervention.startTime || Date.now(),
+                endTime: activeIntervention.endTime || Date.now(),
+                kmPercorsi: activeIntervention.kmPercorsi || "0",
+                fileUrl: fileCloudUrl || null,
+                haAllegato: !!(activeIntervention.fileData || fileCloudUrl),
                 fileType: activeIntervention.fileType || null
-            });
-            activeIntervention.cloudSynced = true;
-        } else {
-            activeIntervention.cloudSynced = false;
+            };
+
+            // Rimuovo chiavi undefined per evitare alert silenziosi
+            Object.keys(payloadToSave).forEach(k => payloadToSave[k] === undefined && delete payloadToSave[k]);
+
+            await addDoc(collection(db, "interventi"), payloadToSave);
+            
+            cloudSaveSuccess = true;
         }
-        
-        // Pulizia base64
-        activeIntervention.fileUrl = fileCloudUrl;
-        activeIntervention.haAllegato = !!activeIntervention.fileData;
-        delete activeIntervention.fileData; 
-
-        completedInterventions.push(activeIntervention);
-        activeIntervention = null;
-        
-        stopTimerDisplay(); saveState(); updateUI(); updateInterventiCount();
-        newInterventionForm.reset();
-
     } catch (error) {
-        alert("Errore durante il salvataggio su Cloud: " + error.message + ". Riprovare (l'app riproverà in automatico o puoi premere Sincronizza).");
-        console.error(error);
-    } finally {
-        btnStopIntervention.innerHTML = oldBtnText;
-        btnStopIntervention.disabled = false;
+        console.error("Errore salvataggio Cloud, forzo modalità offline:", error);
+        alert("Rete instabile o errore Cloud. L'intervento è stato SALVATO IN LOCALE. Clicca poi su 'Sincronizza' appena la rete torna.");
     }
+
+    // Eseguo SEMPRE il passaggio logico locale
+    activeIntervention.cloudSynced = cloudSaveSuccess;
+    activeIntervention.fileUrl = fileCloudUrl || activeIntervention.fileUrl || null;
+    activeIntervention.haAllegato = !!(activeIntervention.fileData || activeIntervention.fileUrl);
+    
+    // Pulizia del pesantissimo base64 prima di salvare in mem
+    delete activeIntervention.fileData; 
+
+    completedInterventions.push(activeIntervention);
+    activeIntervention = null;
+    
+    stopTimerDisplay(); saveState(); updateUI(); updateInterventiCount();
+    newInterventionForm.reset();
+
+    btnStopIntervention.innerHTML = oldBtnText;
+    btnStopIntervention.disabled = false;
 });
 
 if(btnManualSyncMobile) {
