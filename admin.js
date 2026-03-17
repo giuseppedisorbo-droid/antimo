@@ -214,8 +214,8 @@ function renderNonEseguitiTable(dataArray) {
             <td><span class="badge badge-warning">${inv.tipo}</span><br><small style="color:gray;">${inv.dispositivi} ${inv.matricola ? `(SN: ${inv.matricola})` : ''}</small></td>
             <td style="color:#b45309; font-weight:600; font-style: italic;">"${inv.motivazione || 'Nessuna'}"</td>
             <td>
-                <button class="btn btn-primary btn-sm btn-chiudi" data-fbid="${inv.fbId}" style="background-color: var(--blue-dark); width: 100%; margin-bottom: 5px;">Archivia (Chiudi)</button>
-                ${isAdminLogged ? `<button class="btn btn-danger btn-sm btn-delete-prog" data-fbid="${inv.fbId}" style="width: 100%;">Elimina</button>` : ''}
+                <button class="btn btn-primary btn-sm btn-chiudi" data-fbid="${inv.fbId}" style="background-color: var(--blue-dark); color: white; width: 100%; margin-bottom: 5px;">Archivia (Chiudi)</button>
+                ${isAdminLogged ? `<button class="btn btn-danger btn-sm btn-delete-prog" data-fbid="${inv.fbId}" style="color: white; width: 100%;">Elimina</button>` : ''}
             </td>
         `;
         
