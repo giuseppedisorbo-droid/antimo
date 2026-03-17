@@ -183,6 +183,11 @@
                     </div>
                 </div>
 
+                <div id="kmContainer" class="form-group mt-15 hidden">
+                    <label for="kmPercorsi">Km A/R Percorsi per questo intervento (Obbligatorio se in Impostazioni)</label>
+                    <input type="number" id="kmPercorsi" placeholder="Es. 35">
+                </div>
+
                 <div style="display: flex; gap: 10px; flex-direction: column;">
                     <button type="submit" class="btn btn-primary btn-orange btn-large" id="btnStartIntervention">
                 <span class="btn-icon">⚡</span> TERMINA ATTIVITA'
@@ -199,34 +204,7 @@
             </form>
         </section>
 
-        <!-- SEZIONE INTERVENTO IN CORSO -->
-        <section class="card glass-card active-intervention hidden" id="activeInterventionSection">
-            <div class="pulse-ring"></div>
-            <h2>Intervento in Corso</h2>
-            <div class="details-box">
-                <p><strong>Paziente:</strong> <span id="activePaziente"></span></p>
-                <p><strong>Località:</strong> <span id="activeLocalita"></span></p>
-                <p><strong>Indirizzo:</strong> <span id="activeIndirizzo"></span></p>
-                <p id="activeTelefonoContainer"><strong>Telefono:</strong> <span id="activeTelefono"></span></p>
-                <p><strong>Iniziato alle:</strong> <span id="activeStartTime"></span></p>
-                <p><strong>Durata:</strong> <span id="activeDuration">00:00:00</span></p>
-            </div>
-            
-            <div id="activeExtraAttachmentsContainer" class="hidden" style="margin-bottom: 1rem;">
-                <h4 style="color: var(--orange-accent); margin-bottom: 5px; font-size: 0.9rem;">📎 Allegati Programmazione:</h4>
-                <div id="activeExtraAttachmentsList" style="display: flex; gap: 10px; flex-wrap: wrap;"></div>
-            </div>
-            
-            <div id="kmContainer" class="form-group mt-15 hidden">
-                <label for="kmPercorsi">Km A/R Percorsi per questo intervento (Obbligatorio)</label>
-                <input type="number" id="kmPercorsi" placeholder="Es. 35" required>
-            </div>
-
-            <button class="btn btn-primary btn-blue btn-large" id="btnStopIntervention">
-                <span class="btn-icon">✓</span> CHIUDI INTERVENTO
-            </button>
-        </section>
-
+        <!-- SEZIONE INTERVENTO IN CORSO RIMOSSA IN FAVORE DELLA COMPILAZIONE DIRETTA A FASE SINGOLA -->
         <!-- SEZIONE RIEPILOGO & EXPORT -->
         <section class="card glass-card" id="exportSection">
             <h2>Gestione Dati</h2>

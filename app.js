@@ -43,12 +43,10 @@ if (isFirebaseConfigured) {
 }
 // =====================================
 
-// Stato App (Rimosso dayState)
-let activeIntervention = JSON.parse(localStorage.getItem('antimo_activeIntervention')) || null;
+// Stato App
 let completedInterventions = JSON.parse(localStorage.getItem('antimo_interventions')) || [];
 let plannedInterventions = JSON.parse(localStorage.getItem('antimo_plannedInterventions')) || [];
 
-let timerInterval;
 let currentAttachments = [];
 let currentProgAttachments = []; // Novita: Array allegati per la programmazione
 let pendingFileUrlsProgrammati = []; // Trasferisce gli allegati dal programmato all'attivo
@@ -65,7 +63,6 @@ const programmatiCount = document.getElementById('programmatiCount');
 const newInterventionForm = document.getElementById('newInterventionForm');
 const btnStartIntervention = document.getElementById('btnStartIntervention');
 const btnPlanIntervention = document.getElementById('btnPlanIntervention');
-const btnStopIntervention = document.getElementById('btnStopIntervention');
 const btnViewActivities = document.getElementById('btnViewActivities');
 const btnShareCSV = document.getElementById('btnShareCSV');
 const btnManualSyncMobile = document.getElementById('btnManualSyncMobile');
@@ -298,54 +295,17 @@ async function syncLocalDataToCloud() {
 }
 
 function saveState() {
-    localStorage.setItem('antimo_activeIntervention', JSON.stringify(activeIntervention));
     localStorage.setItem('antimo_interventions', JSON.stringify(completedInterventions));
     localStorage.setItem('antimo_plannedInterventions', JSON.stringify(plannedInterventions));
     localStorage.setItem('antimo_customDevices', JSON.stringify(customDevices));
 }
 
 function updateUI() {
-    // Gestione Vista Intervento Attivo vs Nuovi Interventi
-    if (activeIntervention) {
-        interventionSection.classList.add('hidden');
-        activeInterventionSection.classList.remove('hidden');
-        document.getElementById('activePaziente').textContent = activeIntervention.paziente;
-        document.getElementById('activeLocalita').textContent = activeIntervention.localita || activeIntervention.destinazione || "N/D";
-        document.getElementById('activeIndirizzo').textContent = activeIntervention.indirizzo || "-";
-        const telContainer = document.getElementById('activeTelefonoContainer');
-        if(activeIntervention.telefono) {
-            telContainer.classList.remove('hidden');
-            document.getElementById('activeTelefono').textContent = activeIntervention.telefono;
-        } else {
-            telContainer.classList.add('hidden');
-        }
-        const sTime = new Date(activeIntervention.startTime);
-        document.getElementById('activeStartTime').textContent = `${padZ(sTime.getHours())}:${padZ(sTime.getMinutes())}`;
-        
-        if (activeIntervention.fileUrlsProgrammati && activeIntervention.fileUrlsProgrammati.length > 0) {
-            activeExtraAttachmentsContainer.classList.remove('hidden');
-            activeExtraAttachmentsList.innerHTML = '';
-            activeIntervention.fileUrlsProgrammati.forEach((url, idx) => {
-                const a = document.createElement('a');
-                a.href = url;
-                a.target = '_blank';
-                a.textContent = `📎 Apri Allegato Extra ${idx + 1}`;
-                a.style.cssText = "background: var(--gray-bg); padding: 5px 10px; border-radius: 8px; text-decoration: none; font-weight: bold; color: var(--blue-dark); font-size: 0.85rem;";
-                activeExtraAttachmentsList.appendChild(a);
-            });
-        } else {
-            activeExtraAttachmentsContainer.classList.add('hidden');
-        }
-
-        if (requireKm) {
-            kmContainer.classList.remove('hidden');
-        } else {
-            kmContainer.classList.add('hidden');
-        }
-
+    // Gestione KM visibilità dal Setting
+    if (requireKm) {
+        kmContainer.classList.remove('hidden');
     } else {
-        interventionSection.classList.remove('hidden');
-        activeInterventionSection.classList.add('hidden');
+        kmContainer.classList.add('hidden');
     }
 
     // Le attività programmate
@@ -665,19 +625,9 @@ if(toggleRequireKm) {
     toggleRequireKm.addEventListener('change', (e) => {
         requireKm = e.target.checked;
         localStorage.setItem('antimo_requireKm', JSON.stringify(requireKm));
-        if(activeIntervention) updateUI();
+        updateUI();
     });
 }
-
-function startTimerDisplay() {
-    clearInterval(timerInterval);
-    timerInterval = setInterval(() => {
-        if(activeIntervention) {
-            document.getElementById('activeDuration').textContent = formatTime(new Date().getTime() - activeIntervention.startTime);
-        }
-    }, 1000);
-}
-function stopTimerDisplay() { clearInterval(timerInterval); }
 
 
 
@@ -919,11 +869,12 @@ btnPlanIntervention.addEventListener('click', async () => {
     updateUI();
 });
 
-newInterventionForm.addEventListener('submit', (e) => {
+newInterventionForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
-    if(activeIntervention) {
-        return alert("ATTENZIONE: Hai già un'attività in corso! Devi prima cliccare su 'TERMINA ATTIVITÀ' prima di poterne iniziare una nuova.");
+    // Validazione KM (Obbligatori se impostato su ON nelle Impostazioni)
+    if (requireKm && !inputKmPercorsi.value) {
+        return alert("Inserisci i Km percorsi prima di salvare l'attività (Obbligatorio dalle Impostazioni).");
     }
     
     let dispFinale = iDispositiviSelect.value;
@@ -940,7 +891,13 @@ newInterventionForm.addEventListener('submit', (e) => {
         return alert("Seleziona un dispositivo!");
     }
 
-    activeIntervention = {
+    // UI Loading state indication
+    const oldBtnText = btnStartIntervention.innerHTML;
+    btnStartIntervention.innerHTML = `<span class="btn-icon">⏳</span> SALVATAGGIO IN CORSO...`;
+    btnStartIntervention.disabled = true;
+
+    // Creazione Oggetto Intervento (Ora inizia e finisce nello stesso momento base)
+    let invToSave = {
         id: Date.now().toString(),
         dataObj: new Date().getTime(),
         tipo: iTipo.value,
@@ -951,13 +908,90 @@ newInterventionForm.addEventListener('submit', (e) => {
         dispositivi: dispFinale,
         matricola: inputMatricola.value.trim(),
         note: iNote.value,
-        attachments: currentAttachments, // Array of structured attachment objects
-        fileUrlsProgrammati: pendingFileUrlsProgrammati, // Trasferisci da programmato se esiste
-        startTime: new Date().getTime()
+        attachments: currentAttachments, // Base64 Array se offline
+        fileUrlsProgrammati: pendingFileUrlsProgrammati, 
+        startTime: new Date().getTime(),
+        endTime: new Date().getTime(), // Immediato in modalità 1-Step
+        kmPercorsi: inputKmPercorsi.value || "0"
     };
+    
     pendingFileUrlsProgrammati = [];
     
-    saveState(); updateUI(); startTimerDisplay();
+    let cloudSaveSuccess = false;
+    let uploadedUrls = [];
+
+    try {
+        if(isFirebaseConfigured) {
+            // Upload multiplo file dal Tecnico
+            if(invToSave.attachments && invToSave.attachments.length > 0) {
+                const { ref: storageRefCall, uploadString, getDownloadURL } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js");
+                for(let i = 0; i < invToSave.attachments.length; i++) {
+                    const att = invToSave.attachments[i];
+                    let ext = "jpg";
+                    if(att.name) ext = att.name.split('.').pop();
+                    else if(att.type === "application/pdf") ext = "pdf";
+                    else if(att.type && att.type.startsWith("video/")) ext = "mp4";
+
+                    const storageRef = storageRefCall(storage, `allegati/${invToSave.id}_${i}.${ext}`);
+                    await uploadString(storageRef, att.data, 'data_url');
+                    const url = await getDownloadURL(storageRef);
+                    uploadedUrls.push(url);
+                }
+            }
+            
+            // Fonde eventuali allegati di programmazione se erano link esistenti
+            if(invToSave.fileUrlsProgrammati && invToSave.fileUrlsProgrammati.length > 0) {
+                uploadedUrls = [...uploadedUrls, ...invToSave.fileUrlsProgrammati];
+            }
+
+            // Upload Firestore
+            const { collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            const payloadToSave = {
+                timestamp: serverTimestamp(),
+                id: invToSave.id,
+                tipo: invToSave.tipo || "Gen",
+                paziente: invToSave.paziente || "Sconosciuto",
+                localita: invToSave.localita || "",
+                indirizzo: invToSave.indirizzo || "",
+                telefono: invToSave.telefono || "",
+                dispositivi: invToSave.dispositivi || "",
+                matricola: invToSave.matricola || "",
+                note: invToSave.note || "",
+                startTime: invToSave.startTime,
+                endTime: invToSave.endTime,
+                kmPercorsi: invToSave.kmPercorsi,
+                fileUrls: uploadedUrls.length > 0 ? uploadedUrls : null,
+                haAllegato: uploadedUrls.length > 0
+            };
+
+            Object.keys(payloadToSave).forEach(k => payloadToSave[k] === undefined && delete payloadToSave[k]);
+            await addDoc(collection(db, "interventi"), payloadToSave);
+            
+            cloudSaveSuccess = true;
+        }
+    } catch (error) {
+        console.error("Errore salvataggio Cloud, forzo modalità offline:", error);
+        alert("Rete instabile o errore Cloud. L'intervento è stato SALVATO IN LOCALE offline. Clicca poi su 'Sincronizza' appena la rete torna.");
+    }
+
+    // Passaggio logico locale completato
+    invToSave.cloudSynced = cloudSaveSuccess;
+    invToSave.fileUrls = (uploadedUrls && uploadedUrls.length > 0) ? uploadedUrls : (invToSave.fileUrlsProgrammati || null);
+    invToSave.haAllegato = !!(invToSave.attachments?.length > 0 || invToSave.fileUrls?.length > 0);
+    
+    // Pulizia dei pesanti base64 prima di salvare in mem locale
+    delete invToSave.attachments; 
+    delete invToSave.fileData; 
+    delete invToSave.fileUrlsProgrammati;
+
+    completedInterventions.push(invToSave);
+    
+    saveState(); 
+    updateUI(); 
+    updateInterventiCount();
+    
+    // Reset Globale della Form e Componenti
+    newInterventionForm.reset();
     inputKmPercorsi.value = ""; 
     iDispositiviSelect.value = "";
     inputMatricola.value = "";
@@ -967,110 +1001,15 @@ newInterventionForm.addEventListener('submit', (e) => {
     currentAttachments = [];
     filePreviewContainer.innerHTML = '';
     filePreviewContainer.classList.add('hidden');
-});
+    inputAllegatoProgrammazione.value = "";
+    currentProgAttachments = [];
+    progPreviewContainer.innerHTML = '';
+    progPreviewContainer.classList.add('hidden');
 
-btnStopIntervention.addEventListener('click', async () => {
-    if(!activeIntervention) return;
+    btnStartIntervention.innerHTML = oldBtnText;
+    btnStartIntervention.disabled = false;
     
-    // UI Loading state indication
-    const oldBtnText = btnStopIntervention.innerHTML;
-    btnStopIntervention.innerHTML = `<span class="btn-icon">⏳</span> SALVATAGGIO IN CORSO...`;
-    btnStopIntervention.disabled = true;
-
-    let fileCloudUrl = null;
-    let cloudSaveSuccess = false;
-    let uploadedUrls = [];
-
-    // Validazione km obbligatori se abilitati da impostazioni
-    if (requireKm && !inputKmPercorsi.value) {
-        alert("Inserisci i Km percorsi prima di confermare la chiusura.");
-        btnStopIntervention.innerHTML = oldBtnText;
-        btnStopIntervention.disabled = false;
-        return;
-    }
-
-    // Aggiorniamo i dati base per finalizzare
-    activeIntervention.endTime = new Date().getTime();
-    activeIntervention.kmPercorsi = inputKmPercorsi.value || "0";
-
-    try {
-        if(isFirebaseConfigured) {
-            // Upload multiplo file
-            if(activeIntervention.attachments && activeIntervention.attachments.length > 0) {
-                for(let i = 0; i < activeIntervention.attachments.length; i++) {
-                    const att = activeIntervention.attachments[i];
-                    let ext = "jpg";
-                    if(att.name) ext = att.name.split('.').pop();
-                    else if(att.type === "application/pdf") ext = "pdf";
-                    else if(att.type && att.type.startsWith("video/")) ext = "mp4";
-
-                    const storageRef = ref(storage, `allegati/${activeIntervention.id}_${i}.${ext}`);
-                    await uploadString(storageRef, att.data, 'data_url');
-                    const url = await getDownloadURL(storageRef);
-                    uploadedUrls.push(url);
-                }
-            }
-
-            // Vecchia gestione salvataggio (se un intervento vecchio era in pending)
-            if(activeIntervention.fileData && uploadedUrls.length === 0) {
-                let ext = "jpg";
-                if(activeIntervention.fileName) ext = activeIntervention.fileName.split('.').pop();
-                else if(activeIntervention.fileType === "application/pdf") ext = "pdf";
-                
-                const storageRef = ref(storage, `allegati/${activeIntervention.id}.` + ext);
-                await uploadString(storageRef, activeIntervention.fileData, 'data_url');
-                const url = await getDownloadURL(storageRef);
-                uploadedUrls.push(url);
-            }
-
-            // Upload Firestore
-            const payloadToSave = {
-                timestamp: serverTimestamp(),
-                id: activeIntervention.id,
-                tipo: activeIntervention.tipo || "Gen",
-                paziente: activeIntervention.paziente || "Sconosciuto",
-                localita: activeIntervention.localita || activeIntervention.destinazione || "",
-                indirizzo: activeIntervention.indirizzo || "",
-                telefono: activeIntervention.telefono || "",
-                dispositivi: activeIntervention.dispositivi || "",
-                matricola: activeIntervention.matricola || "",
-                note: activeIntervention.note || "",
-                startTime: activeIntervention.startTime || Date.now(),
-                endTime: activeIntervention.endTime || Date.now(),
-                kmPercorsi: activeIntervention.kmPercorsi || "0",
-                fileUrls: uploadedUrls.length > 0 ? uploadedUrls : null, // Nuovo campo array
-                haAllegato: uploadedUrls.length > 0 // Mantenuto per compatibilità
-            };
-
-            // Rimuovo chiavi undefined per evitare alert silenziosi
-            Object.keys(payloadToSave).forEach(k => payloadToSave[k] === undefined && delete payloadToSave[k]);
-
-            await addDoc(collection(db, "interventi"), payloadToSave);
-            
-            cloudSaveSuccess = true;
-        }
-    } catch (error) {
-        console.error("Errore salvataggio Cloud, forzo modalità offline:", error);
-        alert("Rete instabile o errore Cloud. L'intervento è stato SALVATO IN LOCALE. Clicca poi su 'Sincronizza' appena la rete torna.");
-    }
-
-    // Eseguo SEMPRE il passaggio logico locale
-    activeIntervention.cloudSynced = cloudSaveSuccess;
-    activeIntervention.fileUrls = (uploadedUrls && uploadedUrls.length > 0) ? uploadedUrls : (activeIntervention.fileUrls || null);
-    activeIntervention.haAllegato = !!(activeIntervention.attachments?.length > 0 || activeIntervention.fileUrls?.length > 0);
-    
-    // Pulizia dei pesanti base64 prima di salvare in mem locale
-    delete activeIntervention.attachments; 
-    delete activeIntervention.fileData; 
-
-    completedInterventions.push(activeIntervention);
-    activeIntervention = null;
-    
-    stopTimerDisplay(); saveState(); updateUI(); updateInterventiCount();
-    newInterventionForm.reset();
-
-    btnStopIntervention.innerHTML = oldBtnText;
-    btnStopIntervention.disabled = false;
+    alert("Intervento salvato correttamente! ✅");
 });
 
 if(btnManualSyncMobile) {
@@ -1254,11 +1193,8 @@ function renderActivitiesList() {
             const btnAvvia = document.createElement('button');
             btnAvvia.className = "btn btn-primary btn-orange";
             btnAvvia.style.cssText = "margin-top: 10px; font-size: 0.8rem; padding: 8px;";
-            btnAvvia.innerHTML = "▶️ AVVIA QUESTO INTERVENTO";
+            btnAvvia.innerHTML = "▶️ CARICA DATI SUL FORM";
             btnAvvia.onclick = () => {
-                if(activeIntervention) {
-                    return alert("ATTENZIONE: Hai un intervento già in corso!");
-                }
                 const dataToLoad = plannedInterventions[origIndex];
                 iTipo.value = dataToLoad.tipo;
                 iPaziente.value = dataToLoad.paziente;
