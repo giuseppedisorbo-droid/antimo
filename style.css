@@ -38,11 +38,43 @@ body {
     background: linear-gradient(135deg, #22c55e 0%, #15803d 100%);
     color: white;
     padding: 1.5rem 1rem;
-    text-align: center;
     box-shadow: 0 4px 12px rgba(21, 128, 61, 0.2);
     border-bottom-left-radius: 20px;
     border-bottom-right-radius: 20px;
     margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.header-left {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    flex: 1;
+}
+
+.header-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    flex: 2;
+    justify-content: end;
+}
+
+.header-stat-box {
+    background: white;
+    padding: 6px 4px;
+    border-radius: 8px;
+    text-align: center;
+    color: var(--blue-primary);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 45px;
 }
 
 .top-nav h1 {
@@ -74,6 +106,13 @@ body {
     flex-direction: column;
     gap: 1.2rem;
     overflow-x: hidden;
+    transition: max-width 0.3s ease;
+}
+
+/* Modalità PC Desktop Globale */
+body.pc-layout-mode .container {
+    max-width: 100% !important;
+    padding: 0 2rem;
 }
 
 .card {

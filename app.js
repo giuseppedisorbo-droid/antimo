@@ -1196,34 +1196,132 @@ if(btnViewActivities) {
 
 function renderActivitiesList() {
     activitiesList.innerHTML = '';
-    if(completedInterventions.length === 0) {
-        activitiesList.innerHTML = '<p style="text-align:center; color:gray; font-size:0.9rem;">Nessuna attività registrata in memoria.</p>';
+    
+    // Filtrare per data odierna (Mezzanotte)
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const endOfToday = startOfToday + 24 * 60 * 60 * 1000 - 1;
+
+    // 1. Interventi Programmati (Da fare oggi) - Rossi
+    const toDO = plannedInterventions.filter(inv => {
+        if (inv.status !== 'planned') return false;
+        // Se non ha data ma era per oggi manuale o l'ha salvato con dProgrammata odierna
+        // Assumiamo che se non ha dataPrevista, non lo mostriamo nel recap odierno (o sì?). 
+        // L'utente vuole vedere quelli previsti perOggi.
+        if (inv.dataPrevista) {
+            const dp = new Date(inv.dataPrevista).getTime();
+            return (dp >= startOfToday && dp <= endOfToday);
+        }
+        return false;
+    });
+
+    // 2. Interventi Completati (Eseguiti oggi) - Verdi
+    const done = completedInterventions.filter(inv => {
+        const d = new Date(inv.startTime).getTime();
+        return (d >= startOfToday && d <= endOfToday);
+    });
+
+    if(toDO.length === 0 && done.length === 0) {
+        activitiesList.innerHTML = '<p style="text-align:center; color:gray; font-size:0.9rem;">Nessuna attività programmata o eseguita per oggi.</p>';
         return;
     }
-    
-    // Mostriamo dalla più recente alla più vecchia
-    const revList = [...completedInterventions].reverse();
-    
-    revList.forEach(inv => {
-        const d = new Date(inv.startTime);
-        const div = document.createElement('div');
-        div.style.cssText = "background:white; padding:10px; margin-bottom:10px; border-radius:6px; border-left:4px solid var(--blue-primary); box-shadow:0 1px 3px rgba(0,0,0,0.1);";
-        
-        let fileBadget = inv.haAllegato ? `<span style="font-size:0.8rem; background:var(--blue-light); padding:2px 5px; border-radius:4px; margin-left:5px;">📎 Allegato</span>` : '';
-        
-        div.innerHTML = `
-            <div style="font-size:0.85rem; color:gray; margin-bottom:4px;">
-                ${formatDateDMY(d)} - ${padZ(d.getHours())}:${padZ(d.getMinutes())}
-                ${fileBadget}
-            </div>
-            <div style="font-weight:600; color:#333;">${inv.tipo}</div>
-            <div style="font-size:0.95rem; margin:3px 0;"><strong>Paz/Ente:</strong> ${inv.paziente}</div>
-            <div style="font-size:0.9rem;"><strong>Disp:</strong> ${inv.dispositivi}</div>
-            <div style="font-size:0.85rem; color:#666; margin-top:5px;">📍 ${inv.localita || inv.destinazione} - ${inv.indirizzo || ''}</div>
-            <div style="font-size:0.80rem; color:#666;">📞 ${inv.telefono || '-'}</div>
-        `;
-        activitiesList.appendChild(div);
-    });
+
+    // Rendering DA FARE (Rossi)
+    if(toDO.length > 0) {
+        const title1 = document.createElement('h4');
+        title1.style.cssText = "color: #ef4444; margin-bottom: 8px;";
+        title1.innerText = "🔴 DA FARE OGGI";
+        activitiesList.appendChild(title1);
+
+        toDO.forEach((inv, index) => {
+            const origIndex = plannedInterventions.findIndex(p => p.id === inv.id);
+            const div = document.createElement('div');
+            div.style.cssText = "background:white; padding:10px; margin-bottom:10px; border-radius:6px; border-left:4px solid #ef4444; box-shadow:0 1px 3px rgba(0,0,0,0.1); display:flex; flex-direction:column;";
+            
+            let fileBadget = (inv.fileUrlsProgrammati && inv.fileUrlsProgrammati.length > 0) ? `<span style="font-size:0.8rem; background:var(--orange-light); color:white; padding:2px 5px; border-radius:4px; margin-left:5px;">📎 Allegati Sede</span>` : '';
+            
+            div.innerHTML = `
+                <div style="font-size:0.85rem; color:gray; margin-bottom:4px; display:flex; justify-content:space-between;">
+                    <span>⏳ PROGRAMMATO ${fileBadget}</span>
+                </div>
+                <div style="font-weight:600; color:#333;">${inv.tipo}</div>
+                <div style="font-size:0.95rem; margin:3px 0;"><strong>Paz/Ente:</strong> ${inv.paziente}</div>
+                <div style="font-size:0.9rem;"><strong>Disp:</strong> ${inv.dispositivi}</div>
+                <div style="font-size:0.85rem; color:#666; margin-top:5px;">📍 ${inv.localita || inv.destinazione} - ${inv.indirizzo || ''}</div>
+                <div style="font-size:0.80rem; color:#666;">📞 ${inv.telefono || '-'}</div>
+            `;
+            
+            const btnAvvia = document.createElement('button');
+            btnAvvia.className = "btn btn-primary btn-orange";
+            btnAvvia.style.cssText = "margin-top: 10px; font-size: 0.8rem; padding: 8px;";
+            btnAvvia.innerHTML = "▶️ AVVIA QUESTO INTERVENTO";
+            btnAvvia.onclick = () => {
+                if(activeIntervention) {
+                    return alert("ATTENZIONE: Hai un intervento già in corso!");
+                }
+                const dataToLoad = plannedInterventions[origIndex];
+                iTipo.value = dataToLoad.tipo;
+                iPaziente.value = dataToLoad.paziente;
+                iLocalita.value = dataToLoad.localita || dataToLoad.destinazione;
+                iIndirizzo.value = dataToLoad.indirizzo || "";
+                if(iTelefono) iTelefono.value = dataToLoad.telefono || "";
+                
+                if(Array.from(iDispositiviSelect.options).some(opt => opt.value === dataToLoad.dispositivi)) {
+                    iDispositiviSelect.value = dataToLoad.dispositivi;
+                } else {
+                    iDispositiviSelect.value = "_AZI_NUOVO_";
+                    iNuovoDispositivo.classList.remove('hidden');
+                    iNuovoDispositivo.value = dataToLoad.dispositivi;
+                }
+                iNote.value = dataToLoad.note || "";
+                pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
+
+                plannedInterventions.splice(origIndex, 1);
+                saveState();
+                updateUI();
+                activitiesListContainer.classList.add('hidden');
+                btnViewActivities.innerHTML = `<span class="btn-icon">📅</span> INTERVENTI DELLA GIORNATA`;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                alert("Dati caricati nel form! Adesso clicca su 'TERMINA ATTIVITA'' quando finisci il lavoro.");
+            };
+            
+            div.appendChild(btnAvvia);
+            activitiesList.appendChild(div);
+        });
+    }
+
+    // Rendering ESEGUITI (Verdi)
+    if(done.length > 0) {
+        const title2 = document.createElement('h4');
+        title2.style.cssText = "color: #22c55e; margin-bottom: 8px; margin-top: 15px;";
+        title2.innerText = "✅ ESEGUITI OGGI";
+        activitiesList.appendChild(title2);
+
+        // Mostriamo dalla più recente alla più vecchia
+        const revList = [...done].reverse();
+        revList.forEach(inv => {
+            const d = new Date(inv.startTime);
+            const e = new Date(inv.endTime);
+            const div = document.createElement('div');
+            div.style.cssText = "background:white; padding:10px; margin-bottom:10px; border-radius:6px; border-left:4px solid #22c55e; box-shadow:0 1px 3px rgba(0,0,0,0.1);";
+            
+            let fileBadget = inv.haAllegato ? `<span style="font-size:0.8rem; background:var(--blue-light); color:white; padding:2px 5px; border-radius:4px; margin-left:5px;">📎 Allegato</span>` : '';
+            
+            div.innerHTML = `
+                <div style="font-size:0.85rem; color:gray; margin-bottom:4px;">
+                    Dalle ${padZ(d.getHours())}:${padZ(d.getMinutes())} alle ${padZ(e.getHours())}:${padZ(e.getMinutes())}
+                    ${fileBadget}
+                </div>
+                <div style="font-weight:600; color:#333;">${inv.tipo}</div>
+                <div style="font-size:0.95rem; margin:3px 0;"><strong>Paz/Ente:</strong> ${inv.paziente}</div>
+                <div style="font-size:0.9rem;"><strong>Disp:</strong> ${inv.dispositivi}</div>
+                <div style="font-size:0.85rem; color:#666; margin-top:5px;">📍 ${inv.localita || inv.destinazione} - ${inv.indirizzo || ''}</div>
+                <div style="font-size:0.80rem; color:#666;">📞 ${inv.telefono || '-'}</div>
+            `;
+            activitiesList.appendChild(div);
+        });
+    }
 }
 
+// Inizializzazione Globale
 initApp();

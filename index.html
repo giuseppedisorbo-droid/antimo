@@ -11,30 +11,36 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <header class="top-nav" style="display: flex; justify-content: space-between; align-items: center;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <button id="btnSettings" style="background: none; border: none; font-size: 1.2rem; cursor: pointer;" title="Impostazioni">⚙️</button>
-            <div style="font-size: 0.75rem; color: white; margin-top: 4px; cursor: pointer; font-weight: 600;" id="appVersionStamp" onclick="nukeCache()">v24.2 - Stile App Unificato</div>
+    <header class="top-nav">
+        <!-- Lato Sinistro: Bottoni Impostazioni, Versione, PC Mode -->
+        <div class="header-left">
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <button id="btnSettings" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: white;" title="Impostazioni">⚙️</button>
+                <button id="btnTogglePC" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; cursor: pointer; font-weight: bold; font-size: 0.8rem;">PC</button>
+            </div>
+            <div style="font-size: 0.75rem; color: rgba(255,255,255,0.9); margin-top: 5px; cursor: pointer; font-weight: 600;" id="appVersionStamp" onclick="nukeCache()">v24.3 - Stile App Unificato</div>
         </div>
-        <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
-            <a href="programmati.html" style="background: white; padding: 5px 12px; border-radius: 8px; text-align: center; color: var(--blue-primary); text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">P</a>
-            <div id="btnMostraOggi" style="background: white; padding: 5px 8px; border-radius: 8px; text-align: center; color: var(--blue-primary); cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+        <!-- Lato Destro: Griglia Badge Statistici -->
+        <div class="header-stats-grid">
+            <a href="programmati.html" class="header-stat-box" style="text-decoration: none; font-weight: bold; font-size: 1.2rem;">P</a>
+            <div id="btnMostraOggi" class="header-stat-box" style="cursor: pointer;">
                 <div style="font-size: 0.65rem; text-transform: uppercase;">Oggi</div>
                 <div style="font-size: 1.1rem; font-weight: 700;"><strong id="oggiCount">0</strong></div>
             </div>
-            <div id="btnMostraDomani" style="background: white; padding: 5px 8px; border-radius: 8px; text-align: center; color: var(--blue-primary); cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div id="btnMostraDomani" class="header-stat-box" style="cursor: pointer;">
                 <div style="font-size: 0.65rem; text-transform: uppercase;">Domani</div>
                 <div style="font-size: 1.1rem; font-weight: 700;"><strong id="domaniCount">0</strong></div>
             </div>
-            <div id="btnMostraProgrammati" style="background: white; padding: 5px 8px; border-radius: 8px; text-align: center; color: var(--blue-primary); cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div id="btnMostraProgrammati" class="header-stat-box" style="cursor: pointer;">
                 <div style="font-size: 0.65rem; text-transform: uppercase;">Tutti</div>
                 <div style="font-size: 1.1rem; font-weight: 700;"><strong id="programmatiCount">0</strong></div>
             </div>
-            <div id="btnMostraNP" style="background: white; padding: 5px 8px; border-radius: 8px; text-align: center; color: var(--blue-primary); cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div id="btnMostraNP" class="header-stat-box" style="cursor: pointer;">
                 <div style="font-size: 0.65rem; text-transform: uppercase;">NP</div>
                 <div style="font-size: 1.1rem; font-weight: 700;"><strong id="npCount">0</strong></div>
             </div>
-            <div style="background: white; padding: 5px 8px; border-radius: 8px; text-align: center; color: var(--blue-primary); box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div class="header-stat-box">
                 <div style="font-size: 0.65rem; text-transform: uppercase;">Eseg.</div>
                 <div style="font-size: 1.1rem; font-weight: 700;"><strong id="interventiCount">0</strong></div>
             </div>
@@ -179,8 +185,8 @@
 
                 <div style="display: flex; gap: 10px; flex-direction: column;">
                     <button type="submit" class="btn btn-primary btn-orange btn-large" id="btnStartIntervention">
-                         <span class="btn-icon">⚡</span> INIZIA INTERVENTO
-                    </button>
+                <span class="btn-icon">⚡</span> TERMINA ATTIVITA'
+            </button>
                     
                     <div style="border-top: 1px dashed #ccc; margin-top: 10px; padding-top: 10px;">
                         <label for="dataProgrammata"><strong>Data Programmazione (Opzionale)</strong></label>
@@ -226,20 +232,17 @@
             <h2>Gestione Dati</h2>
             <div class="button-group">
                 <button class="btn btn-primary" id="btnViewActivities">
-                     <span class="btn-icon">👁</span> STORICO INTERVENTI
+                     <span class="btn-icon">📅</span> INTERVENTI DELLA GIORNATA
                 </button>
-                <button class="btn btn-primary btn-orange" id="btnManualSyncMobile" style="width: 100%; margin-top: 10px;">
-                     <span class="btn-icon">🔄</span> SINCRONIZZA CON CLOUD
-                </button>
-                <button class="btn btn-primary btn-blue" id="btnShareCSV" style="width: 100%; margin-top: 10px;">
+                <button class="btn btn-primary btn-blue hidden" id="btnShareCSV" style="width: 100%; margin-top: 10px;">
                      <span class="btn-icon">📤</span> ESTRAI & CONDIVIDI
                 </button>
             </div>
             
             <div id="activitiesListContainer" class="hidden" style="margin-top: 20px; text-align: left;">
-                <h3 style="margin-bottom: 10px; color: var(--blue-primary); border-bottom: 1px solid var(--blue-light); padding-bottom: 5px;">Storico Interventi</h3>
-                <div id="activitiesList" style="max-height: 300px; overflow-y: auto; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px;">
-                    <!-- I task vengono inseriti qui da app.js -->
+                <h3 style="margin-bottom: 10px; color: var(--blue-primary); border-bottom: 1px solid var(--blue-light); padding-bottom: 5px;">Riepilogo Odierno</h3>
+                <div id="activitiesList" style="max-height: 400px; overflow-y: auto; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px;">
+                    <!-- I task vengono inseriti qui da app.js (Rossi/Verdi) -->
                 </div>
             </div>
             
@@ -283,6 +286,12 @@
                             input:checked + .slider:before { transform: translateX(22px); }
                         </style>
                     </label>
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-primary btn-orange" id="btnManualSyncMobile" style="width: 100%; padding: 12px;">
+                        <span class="btn-icon">🔄</span> SINCRONIZZA CON CLOUD
+                    </button>
                 </div>
             </div>
         </div>
@@ -334,8 +343,37 @@
         </div>
 
     </main>
-    <script type="module" src="app.js?v=28"></script>
+    <script type="module" src="app.js?v=29"></script>
     <script>
+      // Gestione layout PC
+      document.addEventListener('DOMContentLoaded', () => {
+          const btnTogglePC = document.getElementById('btnTogglePC');
+          const isPcMode = localStorage.getItem('antimo_pcmode') === 'true';
+          
+          if (isPcMode) {
+              document.body.classList.add('pc-layout-mode');
+              btnTogglePC.style.background = 'white';
+              btnTogglePC.style.color = '#15803d';
+          }
+          
+          if (btnTogglePC) {
+              btnTogglePC.addEventListener('click', () => {
+                  const currentlyPC = document.body.classList.contains('pc-layout-mode');
+                  if (currentlyPC) {
+                      document.body.classList.remove('pc-layout-mode');
+                      localStorage.setItem('antimo_pcmode', 'false');
+                      btnTogglePC.style.background = 'rgba(255,255,255,0.2)';
+                      btnTogglePC.style.color = 'white';
+                  } else {
+                      document.body.classList.add('pc-layout-mode');
+                      localStorage.setItem('antimo_pcmode', 'true');
+                      btnTogglePC.style.background = 'white';
+                      btnTogglePC.style.color = '#15803d';
+                  }
+              });
+          }
+      });
+
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('./sw.js').then(reg => {
