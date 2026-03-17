@@ -466,20 +466,7 @@ function startTimerDisplay() {
 }
 function stopTimerDisplay() { clearInterval(timerInterval); }
 
-btnStartDay.addEventListener('click', () => {
-    let km = inputKmIniziali.value;
-    if(!km) return alert("Inserisci i Km iniziali!");
-    dayState = { isActive: true, startTime: new Date().getTime(), startKm: km };
-    saveState(); updateUI();
-});
 
-btnEndDay.addEventListener('click', () => {
-    if(activeIntervention) return alert("Termina l'intervento in corso prima di chiudere la giornata!");
-    if(!confirm("Sei sicuro di voler terminare la giornata lavorativa?")) return;
-    dayState = { isActive: false, startTime: null, startKm: null };
-    inputKmIniziali.value = ""; inputKmFinali.value = "";
-    saveState(); updateUI();
-});
 
 inputAllegato.addEventListener('change', (e) => {
     const file = e.target.files[0];
