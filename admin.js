@@ -5,13 +5,13 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signO
 // ====== CONFIGURAZIONE FIREBASE ======
 // Riusiamo le chiavi fornite dall'utente in app.js
 const firebaseConfig = {
-  apiKey: "AIzaSyB6CLQZHPG60LqsIKHAlS_Wt5OFXqfwqkw",
-  authDomain: "antimo-6a86b.firebaseapp.com",
-  projectId: "antimo-6a86b",
-  storageBucket: "antimo-6a86b.firebasestorage.app",
-  messagingSenderId: "671676764068",
-  appId: "1:671676764068:web:95027e0babe3f30042fb31",
-  measurementId: "G-WTWNH23PLS"
+    apiKey: "AIzaSyB6CLQZHPG60LqsIKHAlS_Wt5OFXqfwqkw",
+    authDomain: "antimo-6a86b.firebaseapp.com",
+    projectId: "antimo-6a86b",
+    storageBucket: "antimo-6a86b.firebasestorage.app",
+    messagingSenderId: "671676764068",
+    appId: "1:671676764068:web:95027e0babe3f30042fb31",
+    measurementId: "G-WTWNH23PLS"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -24,21 +24,21 @@ let isAdminLogged = false;
 const btnLoginAdmin = document.getElementById('btnLoginAdmin');
 
 onAuthStateChanged(auth, (user) => {
-    if (user && user.email === 'giuseppedisorbo@gmail.it') {
+    if (user && user.email === 'giuseppedisorbo@gmail.com') {
         isAdminLogged = true;
-        if(btnLoginAdmin) {
+        if (btnLoginAdmin) {
             btnLoginAdmin.textContent = "👤 Ciao Giuseppe (Esci)";
             btnLoginAdmin.style.backgroundColor = "var(--red)";
             btnLoginAdmin.style.color = "white";
         }
     } else {
         isAdminLogged = false;
-        if(btnLoginAdmin) {
+        if (btnLoginAdmin) {
             btnLoginAdmin.textContent = "👤 Login Admin";
             btnLoginAdmin.style.backgroundColor = "var(--blue-dark)";
             btnLoginAdmin.style.color = "white";
         }
-        if(user) {
+        if (user) {
             alert("Accesso negato. Solo l'amministratore può modificare lo storico.");
             signOut(auth);
         }
@@ -48,9 +48,9 @@ onAuthStateChanged(auth, (user) => {
     // Potrebbe servire renderizzare i non eseguiti, ma lo farà loadData.
 });
 
-if(btnLoginAdmin) {
+if (btnLoginAdmin) {
     btnLoginAdmin.addEventListener('click', () => {
-        if(isAdminLogged) {
+        if (isAdminLogged) {
             signOut(auth);
         } else {
             signInWithPopup(auth, provider).catch(err => alert("Errore Login: " + err.message));
@@ -76,10 +76,10 @@ let tuttiGliInterventi = [];
 // Helper
 function padZ(num) { return num.toString().padStart(2, '0'); }
 function formatDateDMY(date) { return `${padZ(date.getDate())}/${padZ(date.getMonth() + 1)}/${date.getFullYear()}`; }
-function formatTime(ms) { 
-    if(!ms) return '--:--';
-    const d = new Date(ms); 
-    return `${padZ(d.getHours())}:${padZ(d.getMinutes())}`; 
+function formatTime(ms) {
+    if (!ms) return '--:--';
+    const d = new Date(ms);
+    return `${padZ(d.getHours())}:${padZ(d.getMinutes())}`;
 }
 
 async function loadData() {
@@ -89,15 +89,15 @@ async function loadData() {
         querySnapshot.forEach((doc) => {
             rawData.push({ fbId: doc.id, ...doc.data() });
         });
-        
+
         // Ordina decrescente (più recenti prima)
-        tuttiGliInterventi = rawData.sort((a,b) => b.startTime - a.startTime);
+        tuttiGliInterventi = rawData.sort((a, b) => b.startTime - a.startTime);
         renderTable(tuttiGliInterventi);
     } catch (e) {
         console.error("Errore download dati:", e);
         tableBody.innerHTML = `<tr><td colspan="8" style="color:red; text-align:center;">Errore di connessione a Firebase: ${e.message}</td></tr>`;
     }
-    
+
     // Carica anche la sezione Non Eseguiti
     await loadNonEseguiti();
 }
@@ -107,48 +107,48 @@ async function loadNonEseguiti() {
         // Al posto di usare una query() con where() che potrebbe richiedere un Indice Composto su Firestore,
         // scarichiamo semplicemente tutti i 'programmati' e filtriamo in locale per sicurezza e robustezza.
         const snap = await getDocs(collection(db, "programmati"));
-        
+
         const data = [];
         snap.forEach(d => {
             const val = d.data();
-            if(val.status === "justified_not_executed") {
+            if (val.status === "justified_not_executed") {
                 data.push({ fbId: d.id, ...val });
             }
         });
-        
+
         renderNonEseguitiTable(data);
-    } catch(e) {
+    } catch (e) {
         console.error("Errore fetch non eseguiti:", e);
         nonEseguitiTableBody.innerHTML = `<tr><td colspan="6" style="color:red; text-align:center;">Errore interno caricamento Non Eseguiti: ${e.message}</td></tr>`;
     }
 }
 
 function renderTable(dataArray) {
-    if(dataArray.length === 0) {
+    if (dataArray.length === 0) {
         tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center;">Nessun intervento trovato per i filtri selezionati.</td></tr>`;
         return;
     }
 
     tableBody.innerHTML = '';
-    
+
     dataArray.forEach(inv => {
         const tr = document.createElement('tr');
-        
+
         const dStart = new Date(inv.startTime);
         const dataStr = formatDateDMY(dStart);
         const timeStr = `${formatTime(inv.startTime)} - ${formatTime(inv.endTime)}`;
-        
+
         let fileHtml = '<span style="color:#aaa;">-</span>';
-        if(inv.fileUrl) {
+        if (inv.fileUrl) {
             fileHtml = `<a href="${inv.fileUrl}" target="_blank" class="attachment-link">📎 Apri / Scarica</a>`;
-        } else if(inv.fileUrls && inv.fileUrls.length > 0) {
+        } else if (inv.fileUrls && inv.fileUrls.length > 0) {
             fileHtml = `<a href="${inv.fileUrls[0]}" target="_blank" class="attachment-link">📎 Apri / Scarica</a>`;
-        } else if(inv.haAllegato) {
+        } else if (inv.haAllegato) {
             fileHtml = `<span class="badge badge-warning">Caricamento fallito</span>`;
         }
-        
+
         let adminActions = '';
-        if(isAdminLogged) {
+        if (isAdminLogged) {
             adminActions = `
                 <br>
                 <div style="margin-top: 8px; display: flex; gap: 5px;">
@@ -169,23 +169,23 @@ function renderTable(dataArray) {
             <td>${inv.kmPercorsi ? inv.kmPercorsi + ' km' : '-'}</td>
             <td>${fileHtml} ${adminActions}</td>
         `;
-        
-        if(isAdminLogged) {
+
+        if (isAdminLogged) {
             let deleteBtn = tr.querySelector('.btn-delete');
-            if(deleteBtn) deleteBtn.addEventListener('click', async (e) => {
-                if(!confirm("Sicuro di voler eliminare definitivamente questo intervento?")) return;
+            if (deleteBtn) deleteBtn.addEventListener('click', async (e) => {
+                if (!confirm("Sicuro di voler eliminare definitivamente questo intervento?")) return;
                 const fbId = e.target.getAttribute('data-fbid');
                 try {
                     await deleteDoc(doc(db, "interventi", fbId));
                     alert("Intervento eliminato.");
                     await loadData();
-                } catch(err) { alert("Errore eliminazione: " + err.message); }
+                } catch (err) { alert("Errore eliminazione: " + err.message); }
             });
             let editBtn = tr.querySelector('.btn-edit');
-            if(editBtn) editBtn.addEventListener('click', (e) => {
+            if (editBtn) editBtn.addEventListener('click', (e) => {
                 const fbId = e.target.getAttribute('data-fbid');
                 const invToEdit = tuttiGliInterventi.find(i => i.fbId === fbId);
-                if(invToEdit) openEditModal(invToEdit, false);
+                if (invToEdit) openEditModal(invToEdit, false);
             });
         }
 
@@ -194,18 +194,18 @@ function renderTable(dataArray) {
 }
 
 function renderNonEseguitiTable(dataArray) {
-    if(dataArray.length === 0) {
+    if (dataArray.length === 0) {
         nonEseguitiTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 2rem; color: #666;">🎉 Nessun intervento pendente da controllare.</td></tr>`;
         return;
     }
-    
+
     nonEseguitiTableBody.innerHTML = '';
-    
+
     dataArray.forEach(inv => {
         const tr = document.createElement('tr');
-        
+
         let dateStr = inv.dataPrevista ? inv.dataPrevista.split('-').reverse().join('/') : 'N/D';
-        
+
         tr.innerHTML = `
             <td><strong>${dateStr}</strong></td>
             <td style="font-weight: 600;">${inv.paziente}</td>
@@ -218,33 +218,33 @@ function renderNonEseguitiTable(dataArray) {
                 ${isAdminLogged ? `<button class="btn btn-danger btn-sm btn-delete-prog" data-fbid="${inv.fbId}" style="color: white; width: 100%;">Elimina</button>` : ''}
             </td>
         `;
-        
+
         if (isAdminLogged) {
             let deleteProgBtn = tr.querySelector('.btn-delete-prog');
-            if(deleteProgBtn) deleteProgBtn.addEventListener('click', async (e) => {
-                if(!confirm("Sicuro di eliminare questo non eseguito?")) return;
+            if (deleteProgBtn) deleteProgBtn.addEventListener('click', async (e) => {
+                if (!confirm("Sicuro di eliminare questo non eseguito?")) return;
                 try {
                     await deleteDoc(doc(db, "programmati", e.target.getAttribute('data-fbid')));
                     await loadNonEseguiti();
-                } catch(err) { alert(err.message); }
+                } catch (err) { alert(err.message); }
             });
         }
 
         tr.querySelector('.btn-chiudi').addEventListener('click', async (e) => {
-            if(!confirm("Vuoi archiviare definitivamente questo intervento non eseguito? Scomparirà dalla lista dell'ufficio.")) return;
+            if (!confirm("Vuoi archiviare definitivamente questo intervento non eseguito? Scomparirà dalla lista dell'ufficio.")) return;
             const fbId = e.target.getAttribute('data-fbid');
             try {
                 e.target.disabled = true;
                 e.target.textContent = "Chiusura...";
                 await updateDoc(doc(db, "programmati", fbId), { status: 'archived' });
                 await loadNonEseguiti();
-            } catch(err) {
+            } catch (err) {
                 alert("Errore durante l'archiviazione: " + err.message);
                 e.target.disabled = false;
                 e.target.textContent = "Archivia (Chiudi)";
             }
         });
-        
+
         nonEseguitiTableBody.appendChild(tr);
     });
 }
@@ -252,26 +252,26 @@ function renderNonEseguitiTable(dataArray) {
 // Filtri
 function applyFilters() {
     let filtrati = [...tuttiGliInterventi];
-    
+
     // Filtro Ricerca Testo
     const searchVal = filterSearch.value.toLowerCase().trim();
-    if(searchVal) {
-        filtrati = filtrati.filter(i => 
-            i.paziente.toLowerCase().includes(searchVal) || 
+    if (searchVal) {
+        filtrati = filtrati.filter(i =>
+            i.paziente.toLowerCase().includes(searchVal) ||
             (i.destinazione || "").toLowerCase().includes(searchVal) ||
             (i.localita || "").toLowerCase().includes(searchVal)
         );
     }
-    
+
     // Filtro Date
-    if(filterDateStart.value) {
+    if (filterDateStart.value) {
         // start of that day
-        const ds = new Date(filterDateStart.value).setHours(0,0,0,0);
+        const ds = new Date(filterDateStart.value).setHours(0, 0, 0, 0);
         filtrati = filtrati.filter(i => i.startTime >= ds);
     }
-    if(filterDateEnd.value) {
+    if (filterDateEnd.value) {
         // end of that day
-        const de = new Date(filterDateEnd.value).setHours(23,59,59,999);
+        const de = new Date(filterDateEnd.value).setHours(23, 59, 59, 999);
         filtrati = filtrati.filter(i => i.startTime <= de);
     }
 
@@ -282,33 +282,33 @@ function applyFilters() {
 function esporterCSV() {
     let currentData = [...tuttiGliInterventi]; // idealmente si espostano quelli filtrati, li ricalcoliamo
     // Riapplichiamo la logica di filtering base
-     const searchVal = filterSearch.value.toLowerCase().trim();
-    if(searchVal) {
-        currentData = currentData.filter(i => 
-            i.paziente.toLowerCase().includes(searchVal) || 
+    const searchVal = filterSearch.value.toLowerCase().trim();
+    if (searchVal) {
+        currentData = currentData.filter(i =>
+            i.paziente.toLowerCase().includes(searchVal) ||
             i.destinazione.toLowerCase().includes(searchVal)
         );
     }
-    if(filterDateStart.value) {
-        const ds = new Date(filterDateStart.value).setHours(0,0,0,0);
+    if (filterDateStart.value) {
+        const ds = new Date(filterDateStart.value).setHours(0, 0, 0, 0);
         currentData = currentData.filter(i => i.startTime >= ds);
     }
-    if(filterDateEnd.value) {
-        const de = new Date(filterDateEnd.value).setHours(23,59,59,999);
+    if (filterDateEnd.value) {
+        const de = new Date(filterDateEnd.value).setHours(23, 59, 59, 999);
         currentData = currentData.filter(i => i.startTime <= de);
     }
 
-    if(currentData.length === 0) {
+    if (currentData.length === 0) {
         return alert("Nessun dato da esportare con questi filtri.");
     }
 
     let header = ["Data", "Orario Inizio", "Orario Fine", "Paziente / Ente", "Localita", "Indirizzo", "Telefono", "Tipo Intervento", "Dispositivi", "Matricola", "Km Extra", "Note", "Link Allegato"];
     let csvContent = header.join(";") + "\n";
-    
+
     currentData.forEach(inv => {
         let loc = inv.localita || inv.destinazione || "";
         let ind = inv.indirizzo || "";
-        
+
         let rs = [
             `"${formatDateDMY(new Date(inv.startTime))}"`, `"${formatTime(inv.startTime)}"`, `"${formatTime(inv.endTime)}"`,
             `"${inv.paziente.replace(/"/g, '""')}"`, `"${loc.replace(/"/g, '""')}"`, `"${ind.replace(/"/g, '""')}"`, `"${inv.telefono || ""}"`,
@@ -318,7 +318,7 @@ function esporterCSV() {
         csvContent += rs.join(";") + "\n";
     });
 
-    const blob = new Blob(["\uFEFF"+csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -342,16 +342,16 @@ function openEditModal(inv, isProgrammato) {
     document.getElementById('editDispositivi').value = inv.dispositivi || "";
     document.getElementById('editKm').value = inv.kmPercorsi || "0";
     document.getElementById('editNote').value = inv.note || "";
-    
-    if(isProgrammato) document.getElementById('containerKm').style.display = 'none';
+
+    if (isProgrammato) document.getElementById('containerKm').style.display = 'none';
     else document.getElementById('containerKm').style.display = 'block';
 
     editInterventionModal.classList.remove('hidden');
 }
 
-if(btnCancelEdit) btnCancelEdit.addEventListener('click', () => editInterventionModal.classList.add('hidden'));
+if (btnCancelEdit) btnCancelEdit.addEventListener('click', () => editInterventionModal.classList.add('hidden'));
 
-if(btnSaveEdit) btnSaveEdit.addEventListener('click', async () => {
+if (btnSaveEdit) btnSaveEdit.addEventListener('click', async () => {
     const fbId = document.getElementById('editFbId').value;
     const isProg = document.getElementById('editIsProgrammato').value === 'true';
     const coll = isProg ? 'programmati' : 'interventi';
@@ -371,7 +371,7 @@ if(btnSaveEdit) btnSaveEdit.addEventListener('click', async () => {
         });
         editInterventionModal.classList.add('hidden');
         await loadData();
-    } catch(err) {
+    } catch (err) {
         alert("Errore salvataggio modifiche: " + err.message);
     } finally {
         btnSaveEdit.textContent = "SALVA MODIFICHE";
@@ -388,7 +388,7 @@ btnResetFilters.addEventListener('click', () => {
 });
 btnExportExcel.addEventListener('click', esporterCSV);
 
-if(btnManualSync) {
+if (btnManualSync) {
     btnManualSync.addEventListener('click', async () => {
         const oldText = btnManualSync.innerHTML;
         try {
@@ -396,7 +396,7 @@ if(btnManualSync) {
             btnManualSync.disabled = true;
             await loadData();
             alert("Dati sincronizzati con successo dal Cloud!");
-        } catch(e) {
+        } catch (e) {
             alert("Errore di sincronizzazione: " + e.message);
         } finally {
             btnManualSync.innerHTML = oldText;
