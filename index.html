@@ -12,7 +12,10 @@
 </head>
 <body>
     <header class="top-nav" style="display: flex; justify-content: space-between; align-items: center;">
-        <div style="font-size: 0.75rem; color: white; margin-top: 4px; cursor: pointer; font-weight: 600;" id="appVersionStamp" onclick="nukeCache()">v24.1 - Stile App Unificato</div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <button id="btnSettings" style="background: none; border: none; font-size: 1.2rem; cursor: pointer;" title="Impostazioni">⚙️</button>
+            <div style="font-size: 0.75rem; color: white; margin-top: 4px; cursor: pointer; font-weight: 600;" id="appVersionStamp" onclick="nukeCache()">v24.2 - Stile App Unificato</div>
+        </div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
             <a href="programmati.html" style="background: white; padding: 5px 12px; border-radius: 8px; text-align: center; color: var(--blue-primary); text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">P</a>
             <div id="btnMostraOggi" style="background: white; padding: 5px 8px; border-radius: 8px; text-align: center; color: var(--blue-primary); cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
@@ -129,7 +132,7 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="allegatoFile">Allegato/i (Foto, PDF, o Video)</label>
+                    <label for="allegatoFile">Allegato/i (Foto, PDF, o Video) - Operatore Campo</label>
                     <input type="file" id="allegatoFile" accept="image/*,video/*,application/pdf" multiple>
                     <div id="filePreviewContainer" class="hidden" style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: start; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px;">
                         <!-- Le anteprime verranno inserite qui dinamicamente -->
@@ -165,6 +168,14 @@
                     <label for="note">Eventuali Note</label>
                     <textarea id="note" rows="2" placeholder="Note sull'intervento..."></textarea>
                 </div>
+                
+                <div class="form-group" style="background: rgba(234, 88, 12, 0.05); padding: 10px; border-radius: 8px; border: 1px dashed var(--orange-accent);">
+                    <label for="allegatoProgrammazione">Allegati Extra (Programmazione / Sede)</label>
+                    <input type="file" id="allegatoProgrammazione" accept="image/*,video/*,application/pdf" multiple>
+                    <div id="progPreviewContainer" class="hidden" style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: start; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px;">
+                        <!-- Le anteprime extra verranno inserite qui dinamicamente -->
+                    </div>
+                </div>
 
                 <div style="display: flex; gap: 10px; flex-direction: column;">
                     <button type="submit" class="btn btn-primary btn-orange btn-large" id="btnStartIntervention">
@@ -195,7 +206,12 @@
                 <p><strong>Durata:</strong> <span id="activeDuration">00:00:00</span></p>
             </div>
             
-            <div class="form-group mt-15">
+            <div id="activeExtraAttachmentsContainer" class="hidden" style="margin-bottom: 1rem;">
+                <h4 style="color: var(--orange-accent); margin-bottom: 5px; font-size: 0.9rem;">📎 Allegati Programmazione:</h4>
+                <div id="activeExtraAttachmentsList" style="display: flex; gap: 10px; flex-wrap: wrap;"></div>
+            </div>
+            
+            <div id="kmContainer" class="form-group mt-15 hidden">
                 <label for="kmPercorsi">Km A/R Percorsi per questo intervento (Obbligatorio)</label>
                 <input type="number" id="kmPercorsi" placeholder="Es. 35" required>
             </div>
@@ -241,6 +257,32 @@
                 <div style="display: flex; gap: 10px; margin-top: 15px;">
                     <button id="btnCancelJustify" class="btn" style="background: #e2e8f0; color: #333; padding: 10px; flex: 1;">Annulla</button>
                     <button id="btnConfirmJustify" class="btn btn-danger" style="padding: 10px; flex: 1;">Conferma</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL IMPOSTAZIONI -->
+        <div id="settingsModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; display: flex; align-items: center; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
+                    <span><span class="btn-icon">⚙️</span> Impostazioni App</span>
+                    <button id="btnCloseSettings" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                </h3>
+                
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee;">
+                    <div>
+                        <strong style="display: block; color: var(--blue-dark);">Richiedi Km Fine Intervento</strong>
+                        <span style="font-size: 0.8rem; color: #666;">Se disattivato, il campo km viene nascosto.</span>
+                    </div>
+                    <label style="position: relative; display: inline-block; width: 50px; height: 28px;">
+                        <input type="checkbox" id="toggleRequireKm" style="opacity: 0; width: 0; height: 0;">
+                        <span class="slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px;"></span>
+                        <style>
+                            .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+                            input:checked + .slider { background-color: #22c55e; }
+                            input:checked + .slider:before { transform: translateX(22px); }
+                        </style>
+                    </label>
                 </div>
             </div>
         </div>
@@ -292,7 +334,7 @@
         </div>
 
     </main>
-    <script type="module" src="app.js?v=27"></script>
+    <script type="module" src="app.js?v=28"></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {

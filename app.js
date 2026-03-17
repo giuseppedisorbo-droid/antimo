@@ -50,6 +50,11 @@ let plannedInterventions = JSON.parse(localStorage.getItem('antimo_plannedInterv
 
 let timerInterval;
 let currentAttachments = [];
+let currentProgAttachments = []; // Novita: Array allegati per la programmazione
+let pendingFileUrlsProgrammati = []; // Trasferisce gli allegati dal programmato all'attivo
+let requireKm = JSON.parse(localStorage.getItem('antimo_requireKm')); 
+if (requireKm === null) requireKm = false; // default
+
 
 // DOM Elements
 const interventionSection = document.getElementById('interventionSection');
@@ -109,6 +114,18 @@ const inputMatricola = document.getElementById('matricola');
 const inputAllegato = document.getElementById('allegatoFile');
 const filePreviewContainer = document.getElementById('filePreviewContainer');
 const inputDataProgrammata = document.getElementById('dataProgrammata');
+
+// Setting e Nuovi
+const btnSettings = document.getElementById('btnSettings');
+const settingsModal = document.getElementById('settingsModal');
+const btnCloseSettings = document.getElementById('btnCloseSettings');
+const toggleRequireKm = document.getElementById('toggleRequireKm');
+const kmContainer = document.getElementById('kmContainer');
+const activeExtraAttachmentsContainer = document.getElementById('activeExtraAttachmentsContainer');
+const activeExtraAttachmentsList = document.getElementById('activeExtraAttachmentsList');
+const inputAllegatoProgrammazione = document.getElementById('allegatoProgrammazione');
+const progPreviewContainer = document.getElementById('progPreviewContainer');
+
 
 const justifyModal = document.getElementById('justifyModal');
 const justifyReason = document.getElementById('justifyReason');
@@ -304,6 +321,28 @@ function updateUI() {
         }
         const sTime = new Date(activeIntervention.startTime);
         document.getElementById('activeStartTime').textContent = `${padZ(sTime.getHours())}:${padZ(sTime.getMinutes())}`;
+        
+        if (activeIntervention.fileUrlsProgrammati && activeIntervention.fileUrlsProgrammati.length > 0) {
+            activeExtraAttachmentsContainer.classList.remove('hidden');
+            activeExtraAttachmentsList.innerHTML = '';
+            activeIntervention.fileUrlsProgrammati.forEach((url, idx) => {
+                const a = document.createElement('a');
+                a.href = url;
+                a.target = '_blank';
+                a.textContent = `📎 Apri Allegato Extra ${idx + 1}`;
+                a.style.cssText = "background: var(--gray-bg); padding: 5px 10px; border-radius: 8px; text-decoration: none; font-weight: bold; color: var(--blue-dark); font-size: 0.85rem;";
+                activeExtraAttachmentsList.appendChild(a);
+            });
+        } else {
+            activeExtraAttachmentsContainer.classList.add('hidden');
+        }
+
+        if (requireKm) {
+            kmContainer.classList.remove('hidden');
+        } else {
+            kmContainer.classList.add('hidden');
+        }
+
     } else {
         interventionSection.classList.remove('hidden');
         activeInterventionSection.classList.add('hidden');
@@ -440,6 +479,7 @@ function renderSpecialPlannedList(container, filteredData) {
                 iNuovoDispositivo.value = dataToLoad.dispositivi;
             }
             iNote.value = dataToLoad.note;
+            pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
 
             plannedInterventions.splice(idx, 1);
             saveState();
@@ -528,6 +568,7 @@ function renderNpInterventions() {
                 iNuovoDispositivo.value = dataToLoad.dispositivi;
             }
             iNote.value = dataToLoad.note;
+            pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
 
             plannedInterventions.splice(idx, 1);
             saveState();
@@ -608,6 +649,26 @@ btnConfirmJustify.addEventListener('click', async () => {
     }
 });
 
+// IMPOSTAZIONI EVENT LISTENERS
+if(btnSettings) {
+    btnSettings.addEventListener('click', () => {
+        toggleRequireKm.checked = requireKm;
+        settingsModal.classList.remove('hidden');
+    });
+}
+if(btnCloseSettings) {
+    btnCloseSettings.addEventListener('click', () => {
+        settingsModal.classList.add('hidden');
+    });
+}
+if(toggleRequireKm) {
+    toggleRequireKm.addEventListener('change', (e) => {
+        requireKm = e.target.checked;
+        localStorage.setItem('antimo_requireKm', JSON.stringify(requireKm));
+        if(activeIntervention) updateUI();
+    });
+}
+
 function startTimerDisplay() {
     clearInterval(timerInterval);
     timerInterval = setInterval(() => {
@@ -684,6 +745,67 @@ inputAllegato.addEventListener('change', (e) => {
     inputAllegato.value = "";
 });
 
+function renderProgAttachmentsPreview() {
+    progPreviewContainer.innerHTML = '';
+    if(currentProgAttachments.length === 0) {
+        progPreviewContainer.classList.add('hidden');
+        return;
+    }
+    
+    progPreviewContainer.classList.remove('hidden');
+    currentProgAttachments.forEach((att, index) => {
+        const div = document.createElement('div');
+        div.style.cssText = "position: relative; border: 1px solid #ea580c; border-radius: 8px; padding: 5px; text-align: center; width: 100px; display: flex; flex-direction: column; align-items: center; background: white;";
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.innerHTML = "&times;";
+        removeBtn.style.cssText = "position: absolute; top: -5px; right: -5px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-weight: bold;";
+        removeBtn.onclick = () => {
+            currentProgAttachments.splice(index, 1);
+            renderProgAttachmentsPreview();
+        };
+        
+        if (att.type.startsWith('image/')) {
+            const img = document.createElement('img');
+            img.src = att.data;
+            img.style.cssText = "width: 80px; height: 80px; object-fit: cover; border-radius: 4px;";
+            div.appendChild(img);
+        } else {
+            const icon = document.createElement('div');
+            icon.style.cssText = "width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; font-size: 2rem; background: #fff7ed; border-radius: 4px; color: #ea580c;";
+            icon.innerText = "📎";
+            div.appendChild(icon);
+            const nameObj = document.createElement('div');
+            nameObj.style.cssText = "font-size: 0.6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; margin-top: 4px; color: #ea580c;";
+            nameObj.innerText = att.name;
+            div.appendChild(nameObj);
+        }
+        
+        div.appendChild(removeBtn);
+        progPreviewContainer.appendChild(div);
+    });
+}
+
+inputAllegatoProgrammazione.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files);
+    if (!files || files.length === 0) return;
+    
+    files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            currentProgAttachments.push({
+                data: event.target.result,
+                type: file.type,
+                name: file.name
+            });
+            renderProgAttachmentsPreview();
+        };
+        reader.readAsDataURL(file);
+    });
+    
+    inputAllegatoProgrammazione.value = "";
+});
+
 iDispositiviSelect.addEventListener('change', (e) => {
     if(e.target.value === "_AZI_NUOVO_") {
         iNuovoDispositivo.classList.remove('hidden');
@@ -711,6 +833,33 @@ btnPlanIntervention.addEventListener('click', async () => {
     }
 
     const plannedId = "plan_" + Date.now().toString();
+
+    const oldBtnPlanHtml = btnPlanIntervention.innerHTML;
+    btnPlanIntervention.innerHTML = `<span class="btn-icon">⏳</span> CARICAMENTO...`;
+    btnPlanIntervention.disabled = true;
+
+    // Upload prog attachments on Firebase
+    let fileUrlsProgrammati = [];
+    if(isFirebaseConfigured && currentProgAttachments.length > 0) {
+        try {
+            const { ref, uploadString, getDownloadURL } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js");
+            for(let i = 0; i < currentProgAttachments.length; i++) {
+                const att = currentProgAttachments[i];
+                let ext = "jpg";
+                if(att.name) ext = att.name.split('.').pop();
+                else if(att.type === "application/pdf") ext = "pdf";
+                else if(att.type && att.type.startsWith("video/")) ext = "mp4";
+
+                const storageRef = ref(storage, `allegatiProg/${plannedId}_${i}.${ext}`);
+                await uploadString(storageRef, att.data, 'data_url');
+                const url = await getDownloadURL(storageRef);
+                fileUrlsProgrammati.push(url);
+            }
+        } catch(err) {
+            console.error("Errore upload allegati programmazione", err);
+        }
+    }
+
     const planned = {
         id: plannedId,
         tipo: iTipo.value,
@@ -722,7 +871,8 @@ btnPlanIntervention.addEventListener('click', async () => {
         note: iNote.value,
         dataPrevista: dProgrammata,
         status: 'planned',
-        timestamp: new Date().getTime()
+        timestamp: new Date().getTime(),
+        fileUrlsProgrammati: fileUrlsProgrammati
     };
 
     // Salvataggio DIRETTO sul cloud VERO (Firestore programmati)
@@ -758,7 +908,14 @@ btnPlanIntervention.addEventListener('click', async () => {
     currentAttachments = [];
     filePreviewContainer.innerHTML = '';
     filePreviewContainer.classList.add('hidden');
+    inputAllegatoProgrammazione.value = "";
+    currentProgAttachments = [];
+    progPreviewContainer.innerHTML = '';
+    progPreviewContainer.classList.add('hidden');
     
+    btnPlanIntervention.innerHTML = oldBtnPlanHtml;
+    btnPlanIntervention.disabled = false;
+
     updateUI();
 });
 
@@ -795,8 +952,11 @@ newInterventionForm.addEventListener('submit', (e) => {
         matricola: inputMatricola.value.trim(),
         note: iNote.value,
         attachments: currentAttachments, // Array of structured attachment objects
+        fileUrlsProgrammati: pendingFileUrlsProgrammati, // Trasferisci da programmato se esiste
         startTime: new Date().getTime()
     };
+    pendingFileUrlsProgrammati = [];
+    
     saveState(); updateUI(); startTimerDisplay();
     inputKmPercorsi.value = ""; 
     iDispositiviSelect.value = "";
@@ -821,8 +981,8 @@ btnStopIntervention.addEventListener('click', async () => {
     let cloudSaveSuccess = false;
     let uploadedUrls = [];
 
-    // Validazione km obbligatori
-    if (!inputKmPercorsi.value) {
+    // Validazione km obbligatori se abilitati da impostazioni
+    if (requireKm && !inputKmPercorsi.value) {
         alert("Inserisci i Km percorsi prima di confermare la chiusura.");
         btnStopIntervention.innerHTML = oldBtnText;
         btnStopIntervention.disabled = false;
