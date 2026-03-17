@@ -819,6 +819,15 @@ btnStopIntervention.addEventListener('click', async () => {
 
     let fileCloudUrl = null;
     let cloudSaveSuccess = false;
+    let uploadedUrls = [];
+
+    // Validazione km obbligatori
+    if (!inputKmPercorsi.value) {
+        alert("Inserisci i Km percorsi prima di confermare la chiusura.");
+        btnStopIntervention.innerHTML = oldBtnText;
+        btnStopIntervention.disabled = false;
+        return;
+    }
 
     // Aggiorniamo i dati base per finalizzare
     activeIntervention.endTime = new Date().getTime();
@@ -827,7 +836,6 @@ btnStopIntervention.addEventListener('click', async () => {
     try {
         if(isFirebaseConfigured) {
             // Upload multiplo file
-            let uploadedUrls = [];
             if(activeIntervention.attachments && activeIntervention.attachments.length > 0) {
                 for(let i = 0; i < activeIntervention.attachments.length; i++) {
                     const att = activeIntervention.attachments[i];
