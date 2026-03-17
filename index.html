@@ -12,27 +12,26 @@
 </head>
 <body>
     <header class="top-nav" style="display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.7); margin-top: 4px; cursor: pointer;" id="appVersionStamp" onclick="nukeCache()">v22.0 - Cache & Contrasto</div>
-        </div>
+        <div style="font-size: 0.75rem; color: white; margin-top: 4px; cursor: pointer; font-weight: 600;" id="appVersionStamp" onclick="nukeCache()">v24.0 - Stile App Unificato</div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
-            <a href="programmati.html" style="background: rgba(46,204,113,0.8); padding: 5px 12px; border-radius: 8px; text-align: center; color: white; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">P</a>
-            <div id="btnMostraOggi" style="background: rgba(59,130,246,0.2); padding: 5px 8px; border-radius: 8px; text-align: center; color: white; cursor: pointer;">
+            <a href="programmati.html" style="background: white; padding: 5px 12px; border-radius: 8px; text-align: center; color: var(--blue-primary); text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">P</a>
+            <div id="btnMostraOggi" style="background: white; padding: 5px 8px; border-radius: 8px; text-align: center; color: var(--blue-primary); cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 <div style="font-size: 0.65rem; text-transform: uppercase;">Oggi</div>
-                <div style="font-size: 1.1rem; font-weight: 700; color: #3b82f6;"><strong id="oggiCount">0</strong></div>
+                <div style="font-size: 1.1rem; font-weight: 700;"><strong id="oggiCount">0</strong></div>
             </div>
-            <div id="btnMostraDomani" style="background: rgba(168,85,247,0.2); padding: 5px 8px; border-radius: 8px; text-align: center; color: white; cursor: pointer;">
+            <div id="btnMostraDomani" style="background: white; padding: 5px 8px; border-radius: 8px; text-align: center; color: var(--blue-primary); cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 <div style="font-size: 0.65rem; text-transform: uppercase;">Domani</div>
-                <div style="font-size: 1.1rem; font-weight: 700; color: #a855f7;"><strong id="domaniCount">0</strong></div>
+                <div style="font-size: 1.1rem; font-weight: 700;"><strong id="domaniCount">0</strong></div>
             </div>
-            <div id="btnMostraProgrammati" style="background: rgba(255,165,0,0.2); padding: 5px 8px; border-radius: 8px; text-align: center; color: white; cursor: pointer;">
+            <div id="btnMostraProgrammati" style="background: white; padding: 5px 8px; border-radius: 8px; text-align: center; color: var(--blue-primary); cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 <div style="font-size: 0.65rem; text-transform: uppercase;">Tutti</div>
-                <div style="font-size: 1.1rem; font-weight: 700; color: var(--orange);"><strong id="programmatiCount">0</strong></div>
+                <div style="font-size: 1.1rem; font-weight: 700;"><strong id="programmatiCount">0</strong></div>
             </div>
-            <div id="btnMostraNP" style="background: rgba(220,38,38,0.2); padding: 5px 8px; border-radius: 8px; text-align: center; color: white; cursor: pointer;">
+            <div id="btnMostraNP" style="background: white; padding: 5px 8px; border-radius: 8px; text-align: center; color: var(--blue-primary); cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 <div style="font-size: 0.65rem; text-transform: uppercase;">NP</div>
-                <div style="font-size: 1.1rem; font-weight: 700; color: #ef4444;"><strong id="npCount">0</strong></div>
+                <div style="font-size: 1.1rem; font-weight: 700;"><strong id="npCount">0</strong></div>
             </div>
-            <div style="background: rgba(255,255,255,0.2); padding: 5px 8px; border-radius: 8px; text-align: center; color: white;">
+            <div style="background: white; padding: 5px 8px; border-radius: 8px; text-align: center; color: var(--blue-primary); box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 <div style="font-size: 0.65rem; text-transform: uppercase;">Eseg.</div>
                 <div style="font-size: 1.1rem; font-weight: 700;"><strong id="interventiCount">0</strong></div>
             </div>
@@ -80,6 +79,13 @@
             </div>
         </section>
 
+        <!-- PULSANTE ANAGRAFICHE -->
+        <div style="margin-bottom: 20px;">
+            <a href="anagrafiche.html" class="btn btn-primary btn-blue btn-large" style="width: 100%; text-decoration: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(30,58,138,0.2); display: flex; align-items: center; justify-content: center; gap: 8px; color: white;">
+                <span style="font-size: 1.4rem;">📇</span> GESTIONE ANAGRAFICHE
+            </a>
+        </div>
+
         <!-- SEZIONE INSERIMENTO INTERVENTO (sempre visibile) -->
         <section class="card glass-card" id="interventionSection">
             <h2>Nuovo Intervento</h2>
@@ -106,9 +112,20 @@
                     <input type="text" id="paziente" placeholder="Nominativo" required>
                 </div>
 
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <div class="form-group" style="flex: 1; min-width: 140px;">
+                        <label for="localita">Località (Città) *</label>
+                        <input type="text" id="localita" placeholder="Es. Napoli" required>
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 140px;">
+                        <label for="indirizzo">Indirizzo *</label>
+                        <input type="text" id="indirizzo" placeholder="Es. Via Roma 1" required>
+                    </div>
+                </div>
+                
                 <div class="form-group">
-                    <label for="destinazione">Destinazione (Città/Indirizzo) *</label>
-                    <input type="text" id="destinazione" placeholder="Es. Napoli / Via Roma 1" required>
+                    <label for="telefono">Recapito Telefonico (Opzionale ma Consigliato)</label>
+                    <input type="tel" id="telefono" placeholder="Es. 3331234567">
                 </div>
                 
                 <div class="form-group">
@@ -171,7 +188,9 @@
             <h2>Intervento in Corso</h2>
             <div class="details-box">
                 <p><strong>Paziente:</strong> <span id="activePaziente"></span></p>
-                <p><strong>Destinazione:</strong> <span id="activeDestinazione"></span></p>
+                <p><strong>Località:</strong> <span id="activeLocalita"></span></p>
+                <p><strong>Indirizzo:</strong> <span id="activeIndirizzo"></span></p>
+                <p id="activeTelefonoContainer"><strong>Telefono:</strong> <span id="activeTelefono"></span></p>
                 <p><strong>Iniziato alle:</strong> <span id="activeStartTime"></span></p>
                 <p><strong>Durata:</strong> <span id="activeDuration">00:00:00</span></p>
             </div>
@@ -240,8 +259,16 @@
                         <input type="text" id="editPaziente" required>
                     </div>
                     <div class="form-group">
-                        <label>Destinazione</label>
-                        <input type="text" id="editDestinazione">
+                        <label>Località</label>
+                        <input type="text" id="editLocalita" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Indirizzo</label>
+                        <input type="text" id="editIndirizzo" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Telefono</label>
+                        <input type="tel" id="editTelefono">
                     </div>
                     <div class="form-group">
                         <label>Tipo Intervento</label>
@@ -265,7 +292,7 @@
         </div>
 
     </main>
-    <script type="module" src="app.js?v=22"></script>
+    <script type="module" src="app.js?v=26"></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {

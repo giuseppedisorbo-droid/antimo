@@ -29,7 +29,9 @@ let calendar;
 // DOM
 const form = document.querySelector('form');
 const iPaziente = document.getElementById('paziente');
-const iDestinazione = document.getElementById('destinazione');
+const iLocalita = document.getElementById('localita');
+const iIndirizzo = document.getElementById('indirizzo');
+const iTelefono = document.getElementById('telefono');
 const iTipoAttivita = document.getElementById('tipoAttivita');
 const iData = document.getElementById('dataProgrammata');
 const iDispositivi = document.getElementById('dispositivi');
@@ -105,7 +107,8 @@ function renderWaitingTable() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="font-weight: bold;">${p.paziente}</td>
-            <td>${p.destinazione}</td>
+            <td>${p.localita || p.destinazione || 'N/D'}</td>
+            <td>${p.indirizzo || ''} <br><small style="color:gray;">${p.telefono || ''}</small></td>
             <td>
                 <div style="display: flex; gap: 5px;">
                     <input type="date" id="date_${p.idFb}" style="padding: 5px; border-radius: 6px; border: 1px solid #ccc;">
@@ -134,7 +137,8 @@ function renderTable() {
         tr.innerHTML = `
             <td style="font-weight: 600; color: var(--blue-primary);">${dateStr}</td>
             <td style="font-weight: bold;">${p.paziente}</td>
-            <td>${p.destinazione}</td>
+            <td>${p.localita || p.destinazione || 'N/D'}</td>
+            <td>${p.indirizzo || ''} <br><small style="color:gray;">${p.telefono || ''}</small></td>
             <td><span class="status-badge" style="background-color: #f1f5f9; color: var(--text-main); font-size: 0.8rem; padding: 4px 8px;">${p.tipo || 'Non spec.'}</span></td>
             <td style="font-size: 0.85rem; color: #555;">${notes}</td>
         `;
@@ -164,7 +168,7 @@ function renderCalendar() {
             events: [],
             eventClick: function(info) {
                 // Se si vuole gestire il click sull\'evento in futuro
-                alert('Paziente: ' + info.event.title + '\nDestinazione: ' + info.event.extendedProps.destinazione + '\nDispositivi: ' + info.event.extendedProps.dispositivi);
+                alert('Paziente: ' + info.event.title + '\nLocalità: ' + (info.event.extendedProps.localita || info.event.extendedProps.destinazione) + '\nIndirizzo: ' + (info.event.extendedProps.indirizzo || '') + '\nTel: ' + (info.event.extendedProps.telefono || '') + '\nDispositivi: ' + info.event.extendedProps.dispositivi);
             }
         });
         calendar.render();
@@ -184,6 +188,9 @@ function renderCalendar() {
                 borderColor: '#ea580c',
                 extendedProps: {
                     destinazione: p.destinazione,
+                    localita: p.localita,
+                    indirizzo: p.indirizzo,
+                    telefono: p.telefono,
                     dispositivi: p.dispositivi || p.note || ''
                 }
             });
@@ -195,8 +202,8 @@ function renderCalendar() {
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    if(!iPaziente.value || !iDestinazione.value || !iData.value) {
-        return alert("Compila tutti i campi obbligatori (inclusa la Data) per PROGRAMMARE! Altrimenti salva in attesa.");
+    if(!iPaziente.value || !iLocalita.value || !iIndirizzo.value || !iData.value) {
+        return alert("Compila tutti i campi obbligatori (Paziente, Località, Indirizzo e Data) per PROGRAMMARE! Altrimenti salva in attesa.");
     }
 
     const btn = document.getElementById('btnPlanIntervention');
@@ -209,7 +216,9 @@ form.addEventListener('submit', async (e) => {
         id: plannedId,
         tipo: iTipoAttivita.value,
         paziente: iPaziente.value,
-        destinazione: iDestinazione.value,
+        localita: iLocalita.value,
+        indirizzo: iIndirizzo.value,
+        telefono: iTelefono ? iTelefono.value : "",
         dispositivi: iDispositivi.value,
         dataPrevista: iData.value,
         status: 'planned',
@@ -249,8 +258,8 @@ btnToggleWaiting.addEventListener('click', () => {
 
 // Submit Nuovo "In Attesa"
 btnSaveWaiting.addEventListener('click', async () => {
-    if(!iPaziente.value || !iDestinazione.value) {
-        return alert("Compila almeno Paziente e Destinazione per salvare l'intervento in attesa!");
+    if(!iPaziente.value || !iLocalita.value || !iIndirizzo.value) {
+        return alert("Compila Paziente, Località e Indirizzo per salvare l'intervento in attesa!");
     }
 
     const oldHtml = btnSaveWaiting.innerHTML;
@@ -262,7 +271,9 @@ btnSaveWaiting.addEventListener('click', async () => {
         id: plannedId,
         tipo: iTipoAttivita.value,
         paziente: iPaziente.value,
-        destinazione: iDestinazione.value,
+        localita: iLocalita.value,
+        indirizzo: iIndirizzo.value,
+        telefono: iTelefono ? iTelefono.value : "",
         dispositivi: iDispositivi.value,
         dataPrevista: "",
         status: 'in_attesa',

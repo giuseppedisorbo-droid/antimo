@@ -98,7 +98,9 @@ if(btnMostraNP) { btnMostraNP.addEventListener('click', () => { isNpVisible = !i
 // Form Inputs
 const iTipo = document.getElementById('tipoAttivita');
 const iPaziente = document.getElementById('paziente');
-const iDestinazione = document.getElementById('destinazione');
+const iLocalita = document.getElementById('localita');
+const iIndirizzo = document.getElementById('indirizzo');
+const iTelefono = document.getElementById('telefono');
 const iDispositiviSelect = document.getElementById('dispositiviSelect');
 const iNuovoDispositivo = document.getElementById('nuovoDispositivo');
 const iNote = document.getElementById('note');
@@ -240,7 +242,9 @@ async function syncLocalDataToCloud() {
                 id: inv.id || Date.now().toString(),
                 tipo: inv.tipo || "Non specificato",
                 paziente: inv.paziente || "Sconosciuto",
-                destinazione: inv.destinazione || "",
+                localita: inv.localita || inv.destinazione || "",
+                indirizzo: inv.indirizzo || "",
+                telefono: inv.telefono || "",
                 dispositivi: inv.dispositivi || "",
                 matricola: inv.matricola || "",
                 note: inv.note || "",
@@ -289,7 +293,15 @@ function updateUI() {
         interventionSection.classList.add('hidden');
         activeInterventionSection.classList.remove('hidden');
         document.getElementById('activePaziente').textContent = activeIntervention.paziente;
-        document.getElementById('activeDestinazione').textContent = activeIntervention.destinazione;
+        document.getElementById('activeLocalita').textContent = activeIntervention.localita || activeIntervention.destinazione || "N/D";
+        document.getElementById('activeIndirizzo').textContent = activeIntervention.indirizzo || "-";
+        const telContainer = document.getElementById('activeTelefonoContainer');
+        if(activeIntervention.telefono) {
+            telContainer.classList.remove('hidden');
+            document.getElementById('activeTelefono').textContent = activeIntervention.telefono;
+        } else {
+            telContainer.classList.add('hidden');
+        }
         const sTime = new Date(activeIntervention.startTime);
         document.getElementById('activeStartTime').textContent = `${padZ(sTime.getHours())}:${padZ(sTime.getMinutes())}`;
     } else {
@@ -399,7 +411,8 @@ function renderSpecialPlannedList(container, filteredData) {
         div.innerHTML = `
             <div>
                 <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${p.paziente}</div>
-                <div style="font-size:0.85rem; color:#555;">📍 ${p.destinazione} | 🔧 ${p.tipo}</div>
+                <div style="font-size:0.85rem; color:#555;">📍 ${p.localita || p.destinazione} - ${p.indirizzo || ''} | 🔧 ${p.tipo}</div>
+                <div style="font-size:0.80rem; color:#555;">📞 ${p.telefono || '-'}</div>
                 <div style="font-size:0.80rem; color:var(--orange); font-weight:600; margin-top:4px;">🗓 Data Prevista: ${dateStr}</div>
             </div>
             <div style="display:flex; gap:10px;">
@@ -415,7 +428,9 @@ function renderSpecialPlannedList(container, filteredData) {
             // Popoliamo il form
             iTipo.value = dataToLoad.tipo;
             iPaziente.value = dataToLoad.paziente;
-            iDestinazione.value = dataToLoad.destinazione;
+            if(iLocalita) iLocalita.value = dataToLoad.localita || dataToLoad.destinazione || "";
+            if(iIndirizzo) iIndirizzo.value = dataToLoad.indirizzo || "";
+            if(iTelefono) iTelefono.value = dataToLoad.telefono || "";
             if(customDevices.includes(dataToLoad.dispositivi) || Array.from(iDispositiviSelect.options).some(o=>o.value===dataToLoad.dispositivi)) {
                 iDispositiviSelect.value = dataToLoad.dispositivi;
                 iNuovoDispositivo.classList.add('hidden');
@@ -484,7 +499,8 @@ function renderNpInterventions() {
         div.innerHTML = `
             <div>
                 <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${p.paziente}</div>
-                <div style="font-size:0.85rem; color:#555;">📍 ${p.destinazione} | 🔧 ${p.tipo}</div>
+                <div style="font-size:0.85rem; color:#555;">📍 ${p.localita || p.destinazione} - ${p.indirizzo || ''} | 🔧 ${p.tipo}</div>
+                <div style="font-size:0.80rem; color:#555;">📞 ${p.telefono || '-'}</div>
                 <div style="font-size:0.80rem; color:#ef4444; font-weight:600; margin-top:4px;">⏳ Da Programmare</div>
                 <div style="font-size:0.75rem; color:#777; margin-top:4px;">${noteStr}</div>
             </div>
@@ -500,7 +516,9 @@ function renderNpInterventions() {
             // Popoliamo il form
             iTipo.value = dataToLoad.tipo;
             iPaziente.value = dataToLoad.paziente;
-            iDestinazione.value = dataToLoad.destinazione;
+            if(iLocalita) iLocalita.value = dataToLoad.localita || dataToLoad.destinazione || "";
+            if(iIndirizzo) iIndirizzo.value = dataToLoad.indirizzo || "";
+            if(iTelefono) iTelefono.value = dataToLoad.telefono || "";
             if(customDevices.includes(dataToLoad.dispositivi) || Array.from(iDispositiviSelect.options).some(o=>o.value===dataToLoad.dispositivi)) {
                 iDispositiviSelect.value = dataToLoad.dispositivi;
                 iNuovoDispositivo.classList.add('hidden');
@@ -676,8 +694,8 @@ iDispositiviSelect.addEventListener('change', (e) => {
 });
 
 btnPlanIntervention.addEventListener('click', async () => {
-    if(!iTipo.value || !iPaziente.value || !iDestinazione.value) {
-        return alert("Compila almeno Tipo, Paziente e Destinazione per salvare l'intervento programmato!");
+    if(!iTipo.value || !iPaziente.value || !iLocalita.value || !iIndirizzo.value) {
+        return alert("Compila Tipo, Paziente, Località e Indirizzo per salvare l'intervento programmato!");
     }
     
     let dispFinale = iDispositiviSelect.value;
@@ -697,7 +715,9 @@ btnPlanIntervention.addEventListener('click', async () => {
         id: plannedId,
         tipo: iTipo.value,
         paziente: iPaziente.value,
-        destinazione: iDestinazione.value,
+        localita: iLocalita.value,
+        indirizzo: iIndirizzo.value,
+        telefono: iTelefono ? iTelefono.value : "",
         dispositivi: dispFinale,
         note: iNote.value,
         dataPrevista: dProgrammata,
@@ -768,7 +788,9 @@ newInterventionForm.addEventListener('submit', (e) => {
         dataObj: new Date().getTime(),
         tipo: iTipo.value,
         paziente: iPaziente.value,
-        destinazione: iDestinazione.value,
+        localita: iLocalita.value,
+        indirizzo: iIndirizzo.value,
+        telefono: iTelefono ? iTelefono.value : "",
         dispositivi: dispFinale,
         matricola: inputMatricola.value.trim(),
         note: iNote.value,
@@ -839,7 +861,9 @@ btnStopIntervention.addEventListener('click', async () => {
                 id: activeIntervention.id,
                 tipo: activeIntervention.tipo || "Gen",
                 paziente: activeIntervention.paziente || "Sconosciuto",
-                destinazione: activeIntervention.destinazione || "",
+                localita: activeIntervention.localita || activeIntervention.destinazione || "",
+                indirizzo: activeIntervention.indirizzo || "",
+                telefono: activeIntervention.telefono || "",
                 dispositivi: activeIntervention.dispositivi || "",
                 matricola: activeIntervention.matricola || "",
                 note: activeIntervention.note || "",
@@ -1027,7 +1051,8 @@ function renderActivitiesList() {
             <div style="font-weight:600; color:#333;">${inv.tipo}</div>
             <div style="font-size:0.95rem; margin:3px 0;"><strong>Paz/Ente:</strong> ${inv.paziente}</div>
             <div style="font-size:0.9rem;"><strong>Disp:</strong> ${inv.dispositivi}</div>
-            <div style="font-size:0.85rem; color:#666; margin-top:5px;">${inv.destinazione}</div>
+            <div style="font-size:0.85rem; color:#666; margin-top:5px;">📍 ${inv.localita || inv.destinazione} - ${inv.indirizzo || ''}</div>
+            <div style="font-size:0.80rem; color:#666;">📞 ${inv.telefono || '-'}</div>
         `;
         activitiesList.appendChild(div);
     });

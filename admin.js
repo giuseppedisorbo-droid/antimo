@@ -1,5 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // ====== CONFIGURAZIONE FIREBASE ======
 // Riusiamo le chiavi fornite dall'utente in app.js
@@ -15,6 +16,48 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+let isAdminLogged = false;
+
+// DOM Auth
+const btnLoginAdmin = document.getElementById('btnLoginAdmin');
+
+onAuthStateChanged(auth, (user) => {
+    if (user && user.email === 'giuseppedisorbo@gmail.it') {
+        isAdminLogged = true;
+        if(btnLoginAdmin) {
+            btnLoginAdmin.textContent = "👤 Ciao Giuseppe (Esci)";
+            btnLoginAdmin.style.backgroundColor = "var(--red)";
+            btnLoginAdmin.style.color = "white";
+        }
+    } else {
+        isAdminLogged = false;
+        if(btnLoginAdmin) {
+            btnLoginAdmin.textContent = "👤 Login Admin";
+            btnLoginAdmin.style.backgroundColor = "var(--blue-dark)";
+            btnLoginAdmin.style.color = "white";
+        }
+        if(user) {
+            alert("Accesso negato. Solo l'amministratore può modificare lo storico.");
+            signOut(auth);
+        }
+    }
+    // Rendi visibili o invisibili i tasti:
+    renderTable(tuttiGliInterventi);
+    // Potrebbe servire renderizzare i non eseguiti, ma lo farà loadData.
+});
+
+if(btnLoginAdmin) {
+    btnLoginAdmin.addEventListener('click', () => {
+        if(isAdminLogged) {
+            signOut(auth);
+        } else {
+            signInWithPopup(auth, provider).catch(err => alert("Errore Login: " + err.message));
+        }
+    });
+
+}
 
 // DOM Elements
 const tableBody = document.getElementById('tableBody');
@@ -98,20 +141,54 @@ function renderTable(dataArray) {
         let fileHtml = '<span style="color:#aaa;">-</span>';
         if(inv.fileUrl) {
             fileHtml = `<a href="${inv.fileUrl}" target="_blank" class="attachment-link">📎 Apri / Scarica</a>`;
+        } else if(inv.fileUrls && inv.fileUrls.length > 0) {
+            fileHtml = `<a href="${inv.fileUrls[0]}" target="_blank" class="attachment-link">📎 Apri / Scarica</a>`;
         } else if(inv.haAllegato) {
             fileHtml = `<span class="badge badge-warning">Caricamento fallito</span>`;
+        }
+        
+        let adminActions = '';
+        if(isAdminLogged) {
+            adminActions = `
+                <br>
+                <div style="margin-top: 8px; display: flex; gap: 5px;">
+                    <button class="btn btn-primary btn-sm btn-edit" data-fbid="${inv.fbId}" style="padding: 4px 8px; font-size: 0.75rem;"><span class="btn-icon">✏️</span> Edit</button>
+                    <button class="btn btn-danger btn-sm btn-delete" data-fbid="${inv.fbId}" style="padding: 4px 8px; font-size: 0.75rem;"><span class="btn-icon">🗑️</span> Del</button>
+                </div>
+            `;
         }
 
         tr.innerHTML = `
             <td><strong>${dataStr}</strong></td>
             <td>${timeStr}</td>
             <td>${inv.paziente}</td>
-            <td>${inv.destinazione}</td>
+            <td>${inv.localita || inv.destinazione || "N/D"}</td>
+            <td>${inv.indirizzo || ""} <br><small style="color:gray;">${inv.telefono || ""}</small></td>
             <td><span class="badge badge-success">${inv.tipo}</span><br><small style="color:gray;">${inv.note || ''}</small></td>
             <td>${inv.dispositivi}<br><small style="color:gray;">${inv.matricola ? 'SN: ' + inv.matricola : ''}</small></td>
             <td>${inv.kmPercorsi ? inv.kmPercorsi + ' km' : '-'}</td>
-            <td>${fileHtml}</td>
+            <td>${fileHtml} ${adminActions}</td>
         `;
+        
+        if(isAdminLogged) {
+            let deleteBtn = tr.querySelector('.btn-delete');
+            if(deleteBtn) deleteBtn.addEventListener('click', async (e) => {
+                if(!confirm("Sicuro di voler eliminare definitivamente questo intervento?")) return;
+                const fbId = e.target.getAttribute('data-fbid');
+                try {
+                    await deleteDoc(doc(db, "interventi", fbId));
+                    alert("Intervento eliminato.");
+                    await loadData();
+                } catch(err) { alert("Errore eliminazione: " + err.message); }
+            });
+            let editBtn = tr.querySelector('.btn-edit');
+            if(editBtn) editBtn.addEventListener('click', (e) => {
+                const fbId = e.target.getAttribute('data-fbid');
+                const invToEdit = tuttiGliInterventi.find(i => i.fbId === fbId);
+                if(invToEdit) openEditModal(invToEdit, false);
+            });
+        }
+
         tableBody.appendChild(tr);
     });
 }
@@ -132,12 +209,27 @@ function renderNonEseguitiTable(dataArray) {
         tr.innerHTML = `
             <td><strong>${dateStr}</strong></td>
             <td style="font-weight: 600;">${inv.paziente}</td>
-            <td>${inv.destinazione}</td>
+            <td>${inv.localita || inv.destinazione || "N/D"}</td>
+            <td>${inv.indirizzo || ""} <br><small style="color:gray;">${inv.telefono || ""}</small></td>
             <td><span class="badge badge-warning">${inv.tipo}</span><br><small style="color:gray;">${inv.dispositivi} ${inv.matricola ? `(SN: ${inv.matricola})` : ''}</small></td>
             <td style="color:#b45309; font-weight:600; font-style: italic;">"${inv.motivazione || 'Nessuna'}"</td>
-            <td><button class="btn btn-primary btn-sm btn-chiudi" data-fbid="${inv.fbId}" style="background-color: var(--blue-dark);">Archivia (Chiudi)</button></td>
+            <td>
+                <button class="btn btn-primary btn-sm btn-chiudi" data-fbid="${inv.fbId}" style="background-color: var(--blue-dark); width: 100%; margin-bottom: 5px;">Archivia (Chiudi)</button>
+                ${isAdminLogged ? `<button class="btn btn-danger btn-sm btn-delete-prog" data-fbid="${inv.fbId}" style="width: 100%;">Elimina</button>` : ''}
+            </td>
         `;
         
+        if (isAdminLogged) {
+            let deleteProgBtn = tr.querySelector('.btn-delete-prog');
+            if(deleteProgBtn) deleteProgBtn.addEventListener('click', async (e) => {
+                if(!confirm("Sicuro di eliminare questo non eseguito?")) return;
+                try {
+                    await deleteDoc(doc(db, "programmati", e.target.getAttribute('data-fbid')));
+                    await loadNonEseguiti();
+                } catch(err) { alert(err.message); }
+            });
+        }
+
         tr.querySelector('.btn-chiudi').addEventListener('click', async (e) => {
             if(!confirm("Vuoi archiviare definitivamente questo intervento non eseguito? Scomparirà dalla lista dell'ufficio.")) return;
             const fbId = e.target.getAttribute('data-fbid');
@@ -166,7 +258,8 @@ function applyFilters() {
     if(searchVal) {
         filtrati = filtrati.filter(i => 
             i.paziente.toLowerCase().includes(searchVal) || 
-            i.destinazione.toLowerCase().includes(searchVal)
+            (i.destinazione || "").toLowerCase().includes(searchVal) ||
+            (i.localita || "").toLowerCase().includes(searchVal)
         );
     }
     
@@ -209,13 +302,16 @@ function esporterCSV() {
         return alert("Nessun dato da esportare con questi filtri.");
     }
 
-    let header = ["Data", "Orario Inizio", "Orario Fine", "Paziente / Ente", "Citta / Destinazione", "Tipo Intervento", "Dispositivi", "Matricola", "Km Extra", "Note", "Link Allegato"];
+    let header = ["Data", "Orario Inizio", "Orario Fine", "Paziente / Ente", "Localita", "Indirizzo", "Telefono", "Tipo Intervento", "Dispositivi", "Matricola", "Km Extra", "Note", "Link Allegato"];
     let csvContent = header.join(";") + "\n";
     
     currentData.forEach(inv => {
+        let loc = inv.localita || inv.destinazione || "";
+        let ind = inv.indirizzo || "";
+        
         let rs = [
             `"${formatDateDMY(new Date(inv.startTime))}"`, `"${formatTime(inv.startTime)}"`, `"${formatTime(inv.endTime)}"`,
-            `"${inv.paziente.replace(/"/g, '""')}"`, `"${inv.destinazione.replace(/"/g, '""')}"`,
+            `"${inv.paziente.replace(/"/g, '""')}"`, `"${loc.replace(/"/g, '""')}"`, `"${ind.replace(/"/g, '""')}"`, `"${inv.telefono || ""}"`,
             `"${inv.tipo}"`, `"${inv.dispositivi.replace(/"/g, '""')}"`, `"${inv.matricola ? inv.matricola.replace(/"/g, '""') : ''}"`, `"${inv.kmPercorsi}"`,
             `"${inv.note ? inv.note.replace(/"/g, '""') : ''}"`, `"${inv.fileUrl || ''}"`
         ];
@@ -229,6 +325,59 @@ function esporterCSV() {
     a.download = `Estrazione_Archivio_Interventi.csv`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
+
+// Global modal handlers
+const editInterventionModal = document.getElementById('editInterventionModal');
+const btnCancelEdit = document.getElementById('btnCancelEdit');
+const btnSaveEdit = document.getElementById('btnSaveEdit');
+
+function openEditModal(inv, isProgrammato) {
+    document.getElementById('editFbId').value = inv.fbId;
+    document.getElementById('editIsProgrammato').value = isProgrammato;
+    document.getElementById('editPaziente').value = inv.paziente || "";
+    document.getElementById('editLocalita').value = inv.localita || inv.destinazione || "";
+    document.getElementById('editIndirizzo').value = inv.indirizzo || "";
+    document.getElementById('editTelefono').value = inv.telefono || "";
+    document.getElementById('editTipo').value = inv.tipo || "";
+    document.getElementById('editDispositivi').value = inv.dispositivi || "";
+    document.getElementById('editKm').value = inv.kmPercorsi || "0";
+    document.getElementById('editNote').value = inv.note || "";
+    
+    if(isProgrammato) document.getElementById('containerKm').style.display = 'none';
+    else document.getElementById('containerKm').style.display = 'block';
+
+    editInterventionModal.classList.remove('hidden');
+}
+
+if(btnCancelEdit) btnCancelEdit.addEventListener('click', () => editInterventionModal.classList.add('hidden'));
+
+if(btnSaveEdit) btnSaveEdit.addEventListener('click', async () => {
+    const fbId = document.getElementById('editFbId').value;
+    const isProg = document.getElementById('editIsProgrammato').value === 'true';
+    const coll = isProg ? 'programmati' : 'interventi';
+
+    try {
+        btnSaveEdit.textContent = "Salvataggio...";
+        btnSaveEdit.disabled = true;
+        await updateDoc(doc(db, coll, fbId), {
+            paziente: document.getElementById('editPaziente').value,
+            localita: document.getElementById('editLocalita').value,
+            indirizzo: document.getElementById('editIndirizzo').value,
+            telefono: document.getElementById('editTelefono').value,
+            tipo: document.getElementById('editTipo').value,
+            dispositivi: document.getElementById('editDispositivi').value,
+            kmPercorsi: document.getElementById('editKm').value,
+            note: document.getElementById('editNote').value
+        });
+        editInterventionModal.classList.add('hidden');
+        await loadData();
+    } catch(err) {
+        alert("Errore salvataggio modifiche: " + err.message);
+    } finally {
+        btnSaveEdit.textContent = "SALVA MODIFICHE";
+        btnSaveEdit.disabled = false;
+    }
+});
 
 btnApplyFilters.addEventListener('click', applyFilters);
 btnResetFilters.addEventListener('click', () => {
