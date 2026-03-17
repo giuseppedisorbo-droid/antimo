@@ -16,7 +16,7 @@
             display: block; /* Overrides mobile app centering */
         }
         .admin-header {
-            background: linear-gradient(135deg, var(--blue-primary) 0%, var(--blue-dark) 100%);
+            background: linear-gradient(135deg, #22c55e 0%, #15803d 100%);
             color: white;
             padding: 1rem 2rem;
             display: flex;
@@ -119,14 +119,20 @@
 <body>
 
     <header class="admin-header">
-        <div>
-            <h1 style="margin: 0; font-size: 1.5rem; color: var(--blue-dark);">Antimo - Dashboard Ufficio</h1>
-            <p style="margin: 0; font-size: 0.85rem; color: var(--blue-dark); font-weight: 600;">Gestione Remota Interventi</p>
-        </div>
-        <div style="display: flex; gap: 10px;">
+        <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start;">
+            <div style="background: white; padding: 6px 16px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h1 style="margin: 0; font-size: 1.5rem; color: var(--blue-primary);">Antimo - Dashboard Ufficio</h1>
+            </div>
+            <div style="background: white; padding: 4px 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <p style="margin: 0; font-size: 0.85rem; color: var(--blue-primary); font-weight: 700;">Gestione Remota Interventi</p>
+            </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <div id="adminAuthContainer" style="color: white; font-size: 0.9rem; font-weight: bold; margin-right: 15px;">
+                <button class="btn btn-primary" id="btnLoginAdmin" style="margin: 0; background-color: var(--blue-dark); border: none;">👤 Login Admin</button>
+            </div>
             <button class="btn btn-primary" id="btnManualSync" style="margin: 0; background-color: var(--orange); border-color: var(--orange);">🔄 Sincronizza Dati</button>
             <a href="index.html" class="btn" style="margin: 0; background-color: white; color: var(--blue-dark); text-decoration: none; border: 2px solid var(--blue-dark); display: flex; align-items: center; padding: 0.5rem 1rem; border-radius: 8px; font-weight: bold;">🔙 Torna al Menu</a>
-            <button class="btn btn-primary" id="btnExportExcel" style="margin: 0;">⬇ ESporta Excel (CSV)</button>
+            <button class="btn btn-primary" id="btnExportExcel" style="margin: 0;">⬇ Esporta Excel (CSV)</button>
         </div>
     </header>
 
@@ -160,7 +166,8 @@
                     <tr>
                         <th>Data Prevista</th>
                         <th>Paziente</th>
-                        <th>Città / Destinazione</th>
+                        <th>Località</th>
+                        <th>Indirizzo (Tel)</th>
                         <th>Tipo Intervento</th>
                         <th>Dispositivi / Matricola</th>
                         <th>Motivazione Mancata Esecuzione</th>
@@ -183,7 +190,8 @@
                         <th>Data Esecuzione</th>
                         <th>Orario (Inizio - Fine)</th>
                         <th>Paziente</th>
-                        <th>Città / Destinazione</th>
+                        <th>Località</th>
+                        <th>Indirizzo (Tel)</th>
                         <th>Tipo Intervento</th>
                         <th>Dispositivi / Matricola</th>
                         <th>Km</th>
@@ -195,8 +203,55 @@
                 </tbody>
             </table>
         </div>
+        <!-- MODAL MODIFICA ATTIVITA (Admin) -->
+        <div id="editInterventionModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
+                    <span><span class="btn-icon">✏️</span> Modifica Attività (Admin)</span>
+                    <button id="btnCancelEdit" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                </h3>
+                <form id="editInterventionForm">
+                    <input type="hidden" id="editFbId">
+                    <input type="hidden" id="editIsProgrammato">
+                    <div class="form-group">
+                        <label>Paziente / Ente</label>
+                        <input type="text" id="editPaziente" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Località</label>
+                        <input type="text" id="editLocalita" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Indirizzo</label>
+                        <input type="text" id="editIndirizzo">
+                    </div>
+                    <div class="form-group">
+                        <label>Telefono</label>
+                        <input type="tel" id="editTelefono">
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo Intervento</label>
+                        <input type="text" id="editTipo">
+                    </div>
+                    <div class="form-group">
+                        <label>Dispositivi</label>
+                        <input type="text" id="editDispositivi">
+                    </div>
+                    <div class="form-group" id="containerKm">
+                        <label>Km Percorsi</label>
+                        <input type="number" id="editKm">
+                    </div>
+                    <div class="form-group">
+                        <label>Note</label>
+                        <textarea id="editNote" rows="2"></textarea>
+                    </div>
+                    <button type="button" id="btnSaveEdit" class="btn btn-primary btn-large" style="width: 100%; margin-top: 10px;">SALVA MODIFICHE</button>
+                </form>
+            </div>
+        </div>
+
     </main>
 
-    <script type="module" src="admin.js?v=22"></script>
+    <script type="module" src="admin.js?v=25"></script>
 </body>
 </html>
