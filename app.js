@@ -61,6 +61,8 @@ const interventiCount = document.getElementById('interventiCount');
 const programmatiCount = document.getElementById('programmatiCount');
 
 const newInterventionForm = document.getElementById('newInterventionForm');
+const btnToggleNuovoIntervento = document.getElementById('btnToggleNuovoIntervento');
+const btnCloseInterventionSection = document.getElementById('btnCloseInterventionSection');
 const btnStartIntervention = document.getElementById('btnStartIntervention');
 const btnPlanIntervention = document.getElementById('btnPlanIntervention');
 const btnViewActivities = document.getElementById('btnViewActivities');
@@ -225,6 +227,21 @@ if(btnTopNotification) {
     });
 }
 
+if(btnToggleNuovoIntervento) {
+    btnToggleNuovoIntervento.addEventListener('click', () => {
+        interventionSection.classList.toggle('hidden');
+        if(!interventionSection.classList.contains('hidden')) {
+            interventionSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    });
+}
+
+if(btnCloseInterventionSection) {
+    btnCloseInterventionSection.addEventListener('click', () => {
+        interventionSection.classList.add('hidden');
+    });
+}
+
 // LOGICA MESSAGGISTICA E NOTIFICHE
 async function loadMessages() {
     if (!isFirebaseConfigured) {
@@ -323,31 +340,130 @@ async function loadMessages() {
     } catch(e) { console.error(e); }
 }
 
+let pendingMessageText = "";
+let pendingMessageIsNotification = false;
+
+const waSelectModal = document.getElementById('waSelectModal');
+const waContactsList = document.getElementById('waContactsList');
+const waSelectAll = document.getElementById('waSelectAll');
+const btnWaSkip = document.getElementById('btnWaSkip');
+const btnWaSend = document.getElementById('btnWaSend');
+
+const waQueueModal = document.getElementById('waQueueModal');
+const waQueueList = document.getElementById('waQueueList');
+const btnCloseWaQueue = document.getElementById('btnCloseWaQueue');
+
+async function processMessageSave(text, isNotif) {
+    if(!isFirebaseConfigured) return false;
+    try {
+        const { collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        await addDoc(collection(db, "messaggi"), {
+            text: text,
+            isNotification: isNotif,
+            timestamp: serverTimestamp()
+        });
+        return true;
+    } catch(err) {
+        console.error("Errore invio msg", err);
+        alert("Errore invio messaggio.");
+        return false;
+    }
+}
+
 if(newMessageForm) {
     newMessageForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const testoS = msgText.value.trim();
+        const testoS = document.getElementById('msgText').value.trim();
+        const isNotif = document.getElementById('msgIsNotification') ? document.getElementById('msgIsNotification').checked : true;
+        
         if(!testoS || !isFirebaseConfigured) return;
         
-        const btn = document.getElementById('btnSendMsg');
-        const oldHtml = btn.innerHTML;
-        btn.innerHTML = '...'; btn.disabled = true;
+        pendingMessageText = testoS;
+        pendingMessageIsNotification = isNotif;
         
-        try {
-            const { collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-            await addDoc(collection(db, "messaggi"), {
-                text: testoS,
-                isNotification: msgIsNotification.checked,
-                timestamp: serverTimestamp()
+        if (localeRubrica.length > 0) {
+            waContactsList.innerHTML = '';
+            localeRubrica.forEach((c, i) => {
+                const div = document.createElement('label');
+                div.style.cssText = "display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: #f9f9f9; border-radius: 6px; border: 1px solid #eee;";
+                div.innerHTML = `<input type="checkbox" class="wa-contact-cb" value="${i}" style="transform: scale(1.2);"> <span style="font-weight:bold; color:var(--blue-dark);">${c.nome}</span> <span style="color:#666; font-size:0.85rem;">(${c.numero})</span>`;
+                waContactsList.appendChild(div);
             });
-            msgText.value = '';
-            msgIsNotification.checked = false;
-        } catch(err) {
-            console.error("Errore invio msg", err);
-            alert("Errore invio messaggio.");
-        } finally {
+            waSelectAll.checked = false;
+            waSelectModal.classList.remove('hidden');
+        } else {
+            const btn = newMessageForm.querySelector('button[type="submit"]');
+            const oldHtml = btn.innerHTML;
+            btn.innerHTML = '...'; btn.disabled = true;
+            
+            await processMessageSave(pendingMessageText, pendingMessageIsNotification);
+            
+            document.getElementById('msgText').value = '';
+            if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = false;
             btn.innerHTML = oldHtml; btn.disabled = false;
         }
+    });
+}
+
+if(waSelectAll) {
+    waSelectAll.addEventListener('change', (e) => {
+        document.querySelectorAll('.wa-contact-cb').forEach(cb => cb.checked = e.target.checked);
+    });
+}
+
+if(btnWaSkip) {
+    btnWaSkip.addEventListener('click', async () => {
+        btnWaSkip.disabled = true; btnWaSkip.innerHTML = '...';
+        await processMessageSave(pendingMessageText, pendingMessageIsNotification);
+        document.getElementById('msgText').value = '';
+        if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = false;
+        
+        waSelectModal.classList.add('hidden');
+        btnWaSkip.disabled = false; btnWaSkip.innerHTML = 'Solo Bacheca';
+    });
+}
+
+if(btnWaSend) {
+    btnWaSend.addEventListener('click', async () => {
+        const selectedIndexes = Array.from(document.querySelectorAll('.wa-contact-cb:checked')).map(cb => parseInt(cb.value));
+        
+        btnWaSend.disabled = true; btnWaSend.innerHTML = '...';
+        await processMessageSave(pendingMessageText, pendingMessageIsNotification);
+        document.getElementById('msgText').value = '';
+        if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = false;
+        
+        waSelectModal.classList.add('hidden');
+        btnWaSend.disabled = false; btnWaSend.innerHTML = 'Procedi su WA';
+        
+        if(selectedIndexes.length > 0) {
+            waQueueList.innerHTML = '';
+            selectedIndexes.forEach(idx => {
+                const c = localeRubrica[idx];
+                const btn = document.createElement('a');
+                btn.className = "btn btn-primary";
+                btn.style.cssText = "background: #25D366; border: none; padding: 12px; text-decoration: none; color: white; display: flex; justify-content: center; align-items: center; gap: 8px; font-weight: bold; border-radius: 8px;";
+                btn.target = "_blank";
+                
+                let cleanNum = c.numero.replace(/\s+/g, '');
+                if(!cleanNum.startsWith('+') && cleanNum.length <= 10) cleanNum = "39" + cleanNum;
+                else cleanNum = cleanNum.replace('+', ''); // WhatsApp links do not require +
+                
+                btn.href = `https://wa.me/${cleanNum}?text=${encodeURIComponent(pendingMessageText)}`;
+                btn.innerHTML = `<span style="font-size:1.2rem;">💬</span> WhatsApp per ${c.nome}`;
+                btn.onclick = () => { 
+                    btn.style.opacity = '0.5'; 
+                    btn.innerHTML = `<span style="font-size:1.2rem;">✅</span> Inviato a ${c.nome}`;
+                };
+                waQueueList.appendChild(btn);
+            });
+            waQueueModal.classList.remove('hidden');
+        }
+    });
+}
+
+if(btnCloseWaQueue) {
+    btnCloseWaQueue.addEventListener('click', () => {
+        waQueueModal.classList.add('hidden');
     });
 }
 
@@ -894,6 +1010,7 @@ function renderSpecialPlannedList(container, filteredData) {
             }
 
             updateUI();
+            interventionSection.classList.remove('hidden');
             interventionSection.scrollIntoView({ behavior: 'smooth' });
         });
         
@@ -1008,6 +1125,7 @@ function renderNpInterventions() {
 
             updateUI();
             updateInterventiCount();
+            interventionSection.classList.remove('hidden');
             interventionSection.scrollIntoView({ behavior: 'smooth' });
         });
 
@@ -1519,6 +1637,8 @@ btnPlanIntervention.addEventListener('click', async () => {
     btnPlanIntervention.innerHTML = oldBtnPlanHtml;
     btnPlanIntervention.disabled = false;
 
+    interventionSection.classList.add('hidden'); // Chiude la scheda dopo il salvataggio
+    
     updateUI();
 });
 
@@ -1667,6 +1787,8 @@ newInterventionForm.addEventListener('submit', async (e) => {
 
     btnStartIntervention.innerHTML = oldBtnText;
     btnStartIntervention.disabled = false;
+    
+    interventionSection.classList.add('hidden'); // Chiude la scheda
     
     alert("Intervento salvato correttamente! ✅");
 });
@@ -1906,7 +2028,8 @@ function renderActivitiesList() {
                 updateUI();
                 activitiesListContainer.classList.add('hidden');
                 btnViewActivities.innerHTML = `<span class="btn-icon">📅</span> INTERVENTI DELLA GIORNATA`;
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                interventionSection.classList.remove('hidden');
+                interventionSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 alert("Dati caricati nel form! Adesso clicca su 'TERMINA ATTIVITA'' quando finisci il lavoro.");
             });
             

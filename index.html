@@ -70,11 +70,11 @@
                 <h2 style="color: var(--blue-primary); margin:0;"><span class="btn-icon">💬</span> Bacheca & Notifiche</h2>
                 <div style="display: flex; gap: 5px;">
                     <button id="btnOpenRubrica" class="btn btn-secondary" style="width: auto; padding: 5px 10px; font-size: 0.8rem; margin: 0; background: var(--orange); color: white; border: none;">📱 Rubrica SMS</button>
-                    <button id="btnToggleMessages" class="btn btn-secondary" style="width: auto; padding: 5px 10px; font-size: 0.8rem; margin: 0;">Nascondi</button>
+                    <button id="btnToggleMessages" class="btn btn-secondary" style="width: auto; padding: 5px 10px; font-size: 0.8rem; margin: 0;">Mostra</button>
                 </div>
             </div>
             
-            <div id="messagesContainer" class="" style="margin-top: 15px;">
+            <div id="messagesContainer" class="hidden" style="margin-top: 15px;">
                 <div id="messagesList" style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px; margin-bottom: 10px;">
                     <div style="text-align: center; font-size: 0.9rem; color: #666;">Caricamento messaggi...</div>
                 </div>
@@ -131,16 +131,22 @@
             </div>
         </section>
 
-        <!-- PULSANTE ANAGRAFICHE -->
-        <div style="margin-bottom: 20px;">
+        <!-- PULSANTE ANAGRAFICHE & NUOVO INTERVENTO -->
+        <div style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
             <a href="anagrafiche.html" class="btn btn-primary btn-blue btn-large" style="width: 100%; text-decoration: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(30,58,138,0.2); display: flex; align-items: center; justify-content: center; gap: 8px; color: white;">
                 <span style="font-size: 1.4rem;">📇</span> GESTIONE ANAGRAFICHE
             </a>
+            <button id="btnToggleNuovoIntervento" class="btn btn-primary btn-blue btn-large" style="width: 100%; border: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(30,58,138,0.2); display: flex; align-items: center; justify-content: center; gap: 8px; color: white; margin: 0; cursor: pointer;">
+                <span style="font-size: 1.4rem;">📝</span> NUOVO INTERVENTO
+            </button>
         </div>
 
-        <!-- SEZIONE INSERIMENTO INTERVENTO (sempre visibile) -->
-        <section class="card glass-card" id="interventionSection">
-            <h2>Nuovo Intervento</h2>
+        <!-- SEZIONE INSERIMENTO INTERVENTO -->
+        <section class="card glass-card hidden" id="interventionSection">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="margin: 0; padding: 0;">Nuovo Intervento</h2>
+                <button id="btnCloseInterventionSection" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #666;">&times;</button>
+            </div>
             <form id="newInterventionForm">
                 <div class="form-group">
                     <label for="tipoAttivita">Tipo Intervento (Partenza) *</label>
@@ -467,6 +473,43 @@
                 <div id="rubricaList" style="display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto;">
                     <div style="text-align: center; color: #666; font-size: 0.9rem;">Caricamento rubrica...</div>
                 </div>
+            </div>
+        </div>
+
+        <!-- MODAL SELEZIONE DESTINATARI WHATSAPP -->
+        <div id="waSelectModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: var(--blue-dark); margin-bottom: 10px;"><span class="btn-icon">💬</span> Invia anche via WhatsApp</h3>
+                <p style="font-size: 0.9rem; color: #555; margin-bottom: 15px;">Seleziona i destinatari dalla tua rubrica.</p>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-weight: bold; cursor: pointer;">
+                        <input type="checkbox" id="waSelectAll"> Seleziona Tutti
+                    </label>
+                </div>
+                
+                <div id="waContactsList" style="display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; margin-bottom: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+                    <!-- Checkbox iniettati da JS -->
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button id="btnWaSkip" class="btn btn-secondary" style="flex: 1; padding: 10px;">Solo Bacheca</button>
+                    <button id="btnWaSend" class="btn btn-primary" style="flex: 2; padding: 10px; background: #25D366; border: none;">Procedi su WA</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL INVIO SEQUENZIALE WHATSAPP -->
+        <div id="waQueueModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3100; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; margin: 40px auto; text-align: center;">
+                <h3 style="color: #25D366; margin-bottom: 15px;">Messaggio Salvato!</h3>
+                <p style="font-size: 0.9rem; color: #555; margin-bottom: 20px;">Clicca sui pulsanti per inviare il messaggio WhatsApp ai destinatari selezionati.</p>
+                
+                <div id="waQueueList" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                    <!-- Bottoni iniettati da JS -->
+                </div>
+                
+                <button id="btnCloseWaQueue" class="btn btn-secondary" style="width: 100%; padding: 10px;">Chiudi Terminata l'Operazione</button>
             </div>
         </div>
 
