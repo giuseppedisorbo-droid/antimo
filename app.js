@@ -80,8 +80,7 @@ const domaniList = document.getElementById('domaniList');
 // Buttons for Toggling Sections
 const btnMostraProgrammati = document.getElementById('btnMostraProgrammati');
 const btnMostraP = document.getElementById('btnMostraP');
-const btnCalendar = document.getElementById('btnCalendar');
-const calendarPicker = document.getElementById('calendarPicker');
+const btnCalendar = document.getElementById('btnCalendarLink'); // changed to Link!
 const btnMostraEseguiti = document.getElementById('btnMostraEseguiti');
 const btnMostraNP = document.getElementById('btnMostraNP');
 const npCount = document.getElementById('npCount');
@@ -89,6 +88,15 @@ const btnMostraOggi = document.getElementById('btnMostraOggi');
 const btnMostraDomani = document.getElementById('btnMostraDomani');
 const oggiCount = document.getElementById('oggiCount');
 const domaniCount = document.getElementById('domaniCount');
+
+// Messaggistica
+const messagesSection = document.getElementById('messagesSection');
+const btnToggleMessages = document.getElementById('btnToggleMessages');
+const messagesContainer = document.getElementById('messagesContainer');
+const messagesList = document.getElementById('messagesList');
+const newMessageForm = document.getElementById('newMessageForm');
+const msgText = document.getElementById('msgText');
+const msgIsNotification = document.getElementById('msgIsNotification');
 
 // Nuovi Toggles Logic
 let isPlannedVisible = false;
@@ -198,24 +206,103 @@ if(btnMostraP) btnMostraP.addEventListener('click', () => toggleTarget('planned'
 if(btnMostraNP) btnMostraNP.addEventListener('click', () => toggleTarget('np'));
 if(btnMostraEseguiti) btnMostraEseguiti.addEventListener('click', () => toggleTarget('eseguiti'));
 
-if(calendarPicker) {
-    calendarPicker.addEventListener('change', (e) => {
-        const d = e.target.value;
-        if (d) {
-            selectedCalendarDate = d;
-            isPlannedVisible = true;
-            isOggiVisible = false;
-            isDomaniVisible = false;
-            isNpVisible = false;
-            isEseguitiVisible = false;
-            if(activitiesListContainer) activitiesListContainer.classList.add('hidden');
-            if(btnViewActivities) btnViewActivities.innerHTML = `<span class="btn-icon">👁</span> VISUALIZZA ATTIVITÀ`;
-            
-            allExpanded = true;
-            if (btnToggleAllCollapse) btnToggleAllCollapse.innerHTML = `<span class="btn-icon">⏫</span> CHIUDI TUTTE LE SCHEDE`;
-            
-            updateHeaderFiltersUI();
-            updateUI();
+if(btnToggleMessages) {
+    btnToggleMessages.addEventListener('click', () => {
+        messagesContainer.classList.toggle('hidden');
+        btnToggleMessages.textContent = messagesContainer.classList.contains('hidden') ? 'Mostra' : 'Nascondi';
+    });
+}
+
+// LOGICA MESSAGGISTICA E NOTIFICHE
+async function loadMessages() {
+    if (!isFirebaseConfigured) {
+        if(messagesList) messagesList.innerHTML = '<div style="color:red; font-size:0.85rem; text-align:center;">Sincronizzazione Cloud non configurata per i messaggi.</div>';
+        return;
+    }
+    try {
+        const { query, collection, onSnapshot, orderBy } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        const q = query(collection(db, "messaggi"), orderBy("timestamp", "desc"));
+        
+        onSnapshot(q, (snapshot) => {
+            if(!messagesList) return;
+            messagesList.innerHTML = '';
+            let count = 0;
+            snapshot.forEach((docSnap) => {
+                count++;
+                const data = docSnap.data();
+                const div = document.createElement('div');
+                div.style.padding = "10px";
+                div.style.borderRadius = "8px";
+                div.style.backgroundColor = data.isNotification ? "#fffbeb" : "#f1f5f9";
+                div.style.borderLeft = data.isNotification ? "4px solid #f59e0b" : "4px solid #cbd5e1";
+                div.style.fontSize = "0.9rem";
+                div.style.display = "flex";
+                div.style.flexDirection = "column";
+                div.style.gap = "5px";
+
+                let timeStr = "--/--/---- --:--";
+                if(data.timestamp) {
+                    const d = new Date(data.timestamp.toMillis());
+                    timeStr = `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+                }
+
+                div.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <span style="font-size: 0.75rem; color: #666; font-weight: 600;">⏰ ${timeStr} </span>
+                        ${data.isNotification ? '<span style="font-size:0.75rem; background:#f59e0b; color:white; padding:2px 6px; border-radius:12px; font-weight:bold;">📌 NOTIFICA</span>' : ''}
+                    </div>
+                    <div style="color: #333; line-height: 1.4; white-space: pre-wrap;">${data.text}</div>
+                `;
+                
+                if (data.isNotification) {
+                    const dismissBtn = document.createElement('button');
+                    dismissBtn.innerHTML = "Rimuovi Notifica";
+                    dismissBtn.style.cssText = "align-self: flex-start; margin-top: 5px; background: none; border: 1px solid #ccc; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; cursor: pointer; color: #555;";
+                    dismissBtn.onclick = async () => {
+                        try {
+                            const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                            await updateDoc(doc(db, "messaggi", docSnap.id), { isNotification: false });
+                        } catch(err) { console.error("Errore dismissione", err); }
+                    };
+                    div.appendChild(dismissBtn);
+                }
+                
+                messagesList.appendChild(div);
+            });
+            if(count === 0) {
+                messagesList.innerHTML = '<div style="text-align: center; font-size: 0.9rem; color: #666; padding: 10px;">Nessun messaggio in bacheca.</div>';
+            }
+        }, (error) => {
+            console.error("Errore snapshot messaggi", error);
+            if(messagesList) messagesList.innerHTML = '<div style="color:red; font-size:0.85rem; text-align:center;">Errore caricamento messaggi.</div>';
+        });
+    } catch(e) { console.error(e); }
+}
+
+if(newMessageForm) {
+    newMessageForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const testoS = msgText.value.trim();
+        if(!testoS || !isFirebaseConfigured) return;
+        
+        const btn = document.getElementById('btnSendMsg');
+        const oldHtml = btn.innerHTML;
+        btn.innerHTML = '...'; btn.disabled = true;
+        
+        try {
+            const { collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            await addDoc(collection(db, "messaggi"), {
+                text: testoS,
+                isNotification: msgIsNotification.checked,
+                timestamp: serverTimestamp()
+            });
+            msgText.value = '';
+            msgIsNotification.checked = false;
+        } catch(err) {
+            console.error("Errore invio msg", err);
+            alert("Errore invio messaggio.");
+        } finally {
+            btn.innerHTML = oldHtml; btn.disabled = false;
         }
     });
 }
@@ -276,6 +363,100 @@ let interventionToJustify = null; // Memorizza l'ID in fase di giustificazione
 
 let customDevices = JSON.parse(localStorage.getItem('antimo_customDevices')) || [];
 
+const editInterventionModal = document.getElementById('editInterventionModal');
+const btnCancelEdit = document.getElementById('btnCancelEdit');
+const btnSaveEdit = document.getElementById('btnSaveEdit');
+
+async function deleteProgrammatoAppJs(index) {
+    const p = plannedInterventions[index];
+    if(!p) return;
+    if(!confirm(`Sicuro di voler eliminare l'intervento programmato per ${p.paziente}?`)) return;
+    
+    plannedInterventions.splice(index, 1);
+    saveState();
+    
+    if (isFirebaseConfigured && (p.idFb || p.id)) {
+        try {
+            const { doc, deleteDoc, collection, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            if (p.idFb) {
+                await deleteDoc(doc(db, "programmati", p.idFb));
+            } else {
+                const q = query(collection(db, "programmati"), where("id", "==", p.id));
+                const snaps = await getDocs(q);
+                snaps.forEach(async d => await deleteDoc(doc(db, "programmati", d.id)));
+            }
+        } catch(e) { console.error("Errore rimozione cloud", e); }
+    }
+    updateUI();
+    updateInterventiCount();
+}
+
+let currentEditProgIndex = null;
+function editProgrammatoAppJs(index) {
+    const p = plannedInterventions[index];
+    if(!p) return;
+    currentEditProgIndex = index;
+    
+    document.getElementById('editItemIndex').value = index;
+    document.getElementById('editPaziente').value = p.paziente || "";
+    document.getElementById('editLocalita').value = p.localita || p.destinazione || "";
+    document.getElementById('editIndirizzo').value = p.indirizzo || "";
+    document.getElementById('editTelefono').value = p.telefono || "";
+    document.getElementById('editTipo').value = p.tipo || "";
+    document.getElementById('editDispositivi').value = p.dispositivi || "";
+    document.getElementById('editDataPrevista').value = p.dataPrevista || "";
+    document.getElementById('editNote').value = p.note || "";
+    
+    editInterventionModal.classList.remove('hidden');
+}
+
+if(btnCancelEdit) btnCancelEdit.addEventListener('click', () => editInterventionModal.classList.add('hidden'));
+
+if(btnSaveEdit) {
+    btnSaveEdit.addEventListener('click', async () => {
+        if(currentEditProgIndex === null) return;
+        const p = plannedInterventions[currentEditProgIndex];
+        
+        btnSaveEdit.textContent = "Salvataggio...";
+        btnSaveEdit.disabled = true;
+        
+        p.paziente = document.getElementById('editPaziente').value;
+        p.localita = document.getElementById('editLocalita').value;
+        p.indirizzo = document.getElementById('editIndirizzo').value;
+        p.telefono = document.getElementById('editTelefono').value;
+        p.tipo = document.getElementById('editTipo').value;
+        p.dispositivi = document.getElementById('editDispositivi').value;
+        p.dataPrevista = document.getElementById('editDataPrevista').value;
+        p.note = document.getElementById('editNote').value;
+        p.status = p.dataPrevista ? 'planned' : 'in_attesa';
+        
+        saveState();
+        
+        if (isFirebaseConfigured && (p.idFb || p.id)) {
+            try {
+                const { doc, updateDoc, collection, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                const payload = { ...p };
+                delete payload.idFb; // non salviamo la chiave fb se presente
+                
+                if (p.idFb) {
+                    await updateDoc(doc(db, "programmati", p.idFb), payload);
+                } else {
+                    const q = query(collection(db, "programmati"), where("id", "==", p.id));
+                    const snaps = await getDocs(q);
+                    snaps.forEach(async d => await updateDoc(doc(db, "programmati", d.id), payload));
+                }
+            } catch(e) { console.error("Errore aggiornamento cloud", e); }
+        }
+        
+        editInterventionModal.classList.add('hidden');
+        btnSaveEdit.textContent = "SALVA MODIFICHE";
+        btnSaveEdit.disabled = false;
+        
+        updateUI();
+        updateInterventiCount();
+    });
+}
+
 function initApp() {
     customDevices.forEach(d => {
         const opt = document.createElement('option');
@@ -285,6 +466,9 @@ function initApp() {
 
     updateUI();
     updateInterventiCount();
+    
+    // Inizializza Listeners Real-time e sync
+    loadMessages();
     
     // Proviamo a sincronizzare i dati locali vecchi/offline non ancora sul cloud
     setTimeout(syncLocalDataToCloud, 2000);
@@ -600,12 +784,17 @@ function renderSpecialPlannedList(container, filteredData) {
                 <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${p.note || 'Nessuna'}</div>
                 ${attachHtml}
                 <div style="display:flex; gap:10px; margin-top: 15px;">
-                    <button class="btn btn-danger btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="justify" data-index="${index}">✖ Non Eseguito</button>
+                    <button class="btn btn-primary btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="edit" data-index="${index}">✏ Modifica</button>
+                    <button class="btn btn-danger btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="delete" data-index="${index}">🗑 Elimina</button>
+                    <button class="btn btn-danger btn-sm" style="flex:1; padding:8px; font-size:0.85rem; background:#b45309;" data-action="justify" data-index="${index}">✖ Non Eseg</button>
                 </div>
             </div>
         `;
         
         setupAccordionCard(div);
+        
+        div.querySelector('button[data-action="edit"]')?.addEventListener('click', (e) => editProgrammatoAppJs(e.target.getAttribute('data-index')));
+        div.querySelector('button[data-action="delete"]')?.addEventListener('click', (e) => deleteProgrammatoAppJs(e.target.getAttribute('data-index')));
         
         div.querySelector('button[data-action="avvia"]').addEventListener('click', (e) => {
             const idx = e.target.getAttribute('data-index');
@@ -711,11 +900,17 @@ function renderNpInterventions() {
                 <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${p.telefono || '-'}</div>
                 <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${p.dispositivi || 'Nessuno'}</div>
                 <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${noteStr}</div>
-                ${attachHtml}
+                <div style="display:flex; gap:10px; margin-top: 15px;">
+                    <button class="btn btn-primary btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="edit" data-index="${index}">✏ Modifica</button>
+                    <button class="btn btn-danger btn-sm" style="flex:1; padding:8px; font-size:0.85rem; background:#b45309;" data-action="delete" data-index="${index}">🗑 Elimina</button>
+                </div>
             </div>
         `;
         
         setupAccordionCard(div);
+        
+        div.querySelector('button[data-action="edit"]')?.addEventListener('click', (e) => editProgrammatoAppJs(e.target.getAttribute('data-index')));
+        div.querySelector('button[data-action="delete"]')?.addEventListener('click', (e) => deleteProgrammatoAppJs(e.target.getAttribute('data-index')));
         
         div.querySelector('button[data-action="avvia"]').addEventListener('click', (e) => {
             const idx = e.target.getAttribute('data-index');

@@ -14,21 +14,21 @@
     <header class="top-nav">
         <!-- Lato Sinistro: Bottoni Impostazioni, Versione, PC Mode -->
         <div class="header-left">
-            <div style="display: flex; gap: 15px; align-items: center;">
+            <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
                 <button id="btnSettings" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: white;" title="Impostazioni">⚙️</button>
                 <button id="btnTogglePC" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; cursor: pointer; font-weight: bold; font-size: 0.8rem;">PC</button>
+                <a href="admin.html?filter=oggi" id="btnOpenDashboard" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; cursor: pointer; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: flex; align-items: center;">💻 Dashboard Ufficio</a>
             </div>
-            <div style="font-size: 0.75rem; color: rgba(255,255,255,0.9); margin-top: 5px; cursor: pointer; font-weight: 600;" id="appVersionStamp" onclick="nukeCache()">v24.3 - Stile App Unificato</div>
+            <div style="font-size: 0.75rem; color: rgba(255,255,255,0.9); margin-top: 8px; cursor: pointer; font-weight: 600;" id="appVersionStamp" onclick="nukeCache()">v24.4 - Messaggistica & Calendario</div>
         </div>
 
         <!-- Lato Destro: Griglia Badge Statistici -->
         <div class="header-stats-grid">
             <div style="display: flex; gap: 4px;">
                 <div id="btnMostraP" class="header-stat-box" style="cursor: pointer; flex: 1; font-weight: bold; font-size: 1.2rem; display: flex; align-items: center; justify-content: center;">P</div>
-                <div id="btnCalendar" class="header-stat-box" style="cursor: pointer; flex: 1; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
+                <a href="programmati.html" id="btnCalendarLink" class="header-stat-box" style="cursor: pointer; flex: 1; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; text-decoration: none; color: inherit;">
                     📅
-                    <input type="date" id="calendarPicker" style="position: absolute; top:0; left:0; width:100px; height:50px; opacity:0; cursor:pointer;" aria-label="Seleziona data">
-                </div>
+                </a>
             </div>
             <div id="btnMostraOggi" class="header-stat-box" style="cursor: pointer;">
                 <div style="font-size: 0.65rem; text-transform: uppercase;">Oggi</div>
@@ -60,6 +60,31 @@
                 <span class="btn-icon">⏬</span> APRI TUTTE LE SCHEDE
             </button>
         </div>
+
+        <!-- BACHECA MESSAGGI / NOTIFICHE -->
+        <section class="card glass-card" id="messagesSection" style="margin-bottom: 20px; border-left: 4px solid var(--orange);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="color: var(--blue-primary); margin:0;"><span class="btn-icon">💬</span> Bacheca & Notifiche</h2>
+                <button id="btnToggleMessages" class="btn btn-secondary" style="width: auto; padding: 5px 10px; font-size: 0.8rem; margin: 0;">Nascondi</button>
+            </div>
+            
+            <div id="messagesContainer" class="" style="margin-top: 15px;">
+                <div id="messagesList" style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px; margin-bottom: 10px;">
+                    <div style="text-align: center; font-size: 0.9rem; color: #666;">Caricamento messaggi...</div>
+                </div>
+                <hr style="border: 0; border-top: 1px dotted #ccc; margin: 10px 0;">
+                <form id="newMessageForm" style="display: flex; flex-direction: column; gap: 8px;">
+                    <textarea id="msgText" rows="2" placeholder="Scrivi un nuovo messaggio o comunicazione..." style="width: 100%; border-radius: 8px; border: 1px solid #ccc; padding: 10px; font-family: inherit; font-size: 0.9rem;" required></textarea>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <label style="display: flex; align-items: center; gap: 5px; font-size: 0.85rem; color: var(--blue-dark); cursor: pointer; font-weight: 600;">
+                            <input type="checkbox" id="msgIsNotification" style="width: 18px; height: 18px; accent-color: var(--orange);"> 
+                            📌 Fissa come Notifica
+                        </label>
+                        <button type="submit" class="btn btn-primary btn-orange btn-sm" style="width: auto; margin: 0; padding: 8px 15px;" id="btnSendMsg">Invia</button>
+                    </div>
+                </form>
+            </div>
+        </section>
         <!-- SEZIONE INTERVENTI OGGI -->
         <section class="card glass-card hidden" id="oggiInterventionsSection" style="margin-bottom: 20px; border-left: 4px solid #3b82f6;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -234,10 +259,6 @@
                 <div id="activitiesList" style="max-height: 400px; overflow-y: auto; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px;">
                     <!-- I task vengono inseriti qui da app.js (Rossi/Verdi) -->
                 </div>
-            </div>
-            
-            <div style="margin-top: 20px; text-align: center; font-size: 0.85rem;">
-                <a href="admin.html" style="color: var(--blue-dark); text-decoration: none; font-weight: 800; border-bottom: 2px solid var(--blue-dark); padding-bottom: 2px;">💻 Apri Dashboard Ufficio (PC)</a>
             </div>
         </section>
 

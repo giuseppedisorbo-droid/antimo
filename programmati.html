@@ -180,17 +180,60 @@
                             <th>Indirizzo (Tel)</th>
                             <th>Tipo</th>
                             <th>Dispositivi / Note</th>
+                            <th>Azioni</th>
                         </tr>
                     </thead>
                     <tbody id="programmatiTableBody">
-                        <tr><td colspan="5" style="text-align: center; padding: 20px;">Caricamento...</td></tr>
+                        <tr><td colspan="7" style="text-align: center; padding: 20px;">Caricamento...</td></tr>
                     </tbody>
                 </table>
             </div>
         </section>
 
     </main>
+    
+    <!-- MODAL MODIFICA ATTIVITA PROGRAMMATA -->
+    <div id="editProgrammatoModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+        <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+            <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
+                <span><span class="btn-icon">✏️</span> Modifica Programmazione</span>
+                <button id="btnCancelEditProg" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+            </h3>
+            <form id="editProgForm">
+                <input type="hidden" id="editProgFbId">
+                <div class="form-group">
+                    <label>Paziente / Ente</label>
+                    <input type="text" id="editProgPaziente" required>
+                </div>
+                <div class="form-group">
+                    <label>Località</label>
+                    <input type="text" id="editProgLocalita">
+                </div>
+                <div class="form-group">
+                    <label>Indirizzo</label>
+                    <input type="text" id="editProgIndirizzo">
+                </div>
+                <div class="form-group">
+                    <label>Telefono</label>
+                    <input type="tel" id="editProgTelefono">
+                </div>
+                <div class="form-group">
+                    <label>Tipo Intervento</label>
+                    <input type="text" id="editProgTipo">
+                </div>
+                <div class="form-group">
+                    <label>Dispositivi / Note</label>
+                    <input type="text" id="editProgDispositivi">
+                </div>
+                <div class="form-group">
+                    <label>Data Prevista</label>
+                    <input type="date" id="editProgData">
+                </div>
+                <button type="button" id="btnSaveEditProg" class="btn btn-primary btn-large" style="width: 100%; margin-top: 10px;">SALVA MODIFICHE</button>
+            </form>
+        </div>
+    </div>
 
-    <script type="module" src="programmati.js?v=25"></script>
+    <script type="module" src="programmati.js?v=26"></script>
 </body>
 </html>

@@ -141,6 +141,10 @@ function renderTable() {
             <td>${p.indirizzo || ''} <br><small style="color:gray;">${p.telefono || ''}</small></td>
             <td><span class="status-badge" style="background-color: #f1f5f9; color: var(--text-main); font-size: 0.8rem; padding: 4px 8px;">${p.tipo || 'Non spec.'}</span></td>
             <td style="font-size: 0.85rem; color: #555;">${notes}</td>
+            <td>
+                <button class="btn btn-primary btn-sm" onclick="editProgrammato('${p.idFb}')" style="padding: 4px 8px; font-size: 0.8rem; text-transform: none; margin-bottom: 4px; width:100%; border-radius: 6px;">Modifica</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteProgrammato('${p.idFb}')" style="padding: 4px 8px; font-size: 0.8rem; text-transform: none; width:100%; border-radius: 6px;">Elimina</button>
+            </td>
         `;
         tableBody.appendChild(tr);
     });
@@ -155,17 +159,23 @@ function renderCalendar() {
             headerToolbar: {
                 left: 'prev,next today',
                 center: 'title',
-                right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay'
+                right: 'dayGridMonth,timeGridWeek,timeGridDay,listDay'
             },
             buttonText: {
                 today: 'Oggi',
                 year: 'Anno',
                 month: 'Mese',
                 week: 'Settimana',
-                day: 'Giorno'
+                day: 'Giorno',
+                list: 'Lista'
             },
             firstDay: 1, // Lunedì
+            navLinks: true, 
+            navLinkDayClick: 'listDay',
             events: [],
+            dateClick: function(info) {
+                calendar.changeView('listDay', info.dateStr);
+            },
             eventClick: function(info) {
                 // Se si vuole gestire il click sull\'evento in futuro
                 alert('Paziente: ' + info.event.title + '\nLocalità: ' + (info.event.extendedProps.localita || info.event.extendedProps.destinazione) + '\nIndirizzo: ' + (info.event.extendedProps.indirizzo || '') + '\nTel: ' + (info.event.extendedProps.telefono || '') + '\nDispositivi: ' + info.event.extendedProps.dispositivi);
@@ -316,8 +326,67 @@ window.programmaAttesa = async function(idFb) {
     }
 };
 
-// Init
+window.deleteProgrammato = async function(idFb) {
+    const p = plannedInterventions.find(x => x.idFb === idFb);
+    if(!p) return;
+    if(!confirm(`Sicuro di voler eliminare questa programmazione?\n\nPaziente: ${p.paziente}\nLocalità: ${p.localita||p.destinazione||''}`)) return;
+    try {
+        await deleteDoc(doc(db, "programmati", idFb));
+        await fetchProgrammati();
+    } catch(e) { alert(e.message); }
+};
+
+window.editProgrammato = function(idFb) {
+    const p = plannedInterventions.find(x => x.idFb === idFb);
+    if(!p) return;
+    
+    document.getElementById('editProgFbId').value = idFb;
+    document.getElementById('editProgPaziente').value = p.paziente || "";
+    document.getElementById('editProgLocalita').value = p.localita || p.destinazione || "";
+    document.getElementById('editProgIndirizzo').value = p.indirizzo || "";
+    document.getElementById('editProgTelefono').value = p.telefono || "";
+    document.getElementById('editProgTipo').value = p.tipo || "";
+    document.getElementById('editProgDispositivi').value = p.dispositivi || p.note || "";
+    document.getElementById('editProgData').value = p.dataPrevista || "";
+    
+    document.getElementById('editProgrammatoModal').classList.remove('hidden');
+};
+
 document.addEventListener('DOMContentLoaded', () => {
+    // Gestione Modal
+    const modal = document.getElementById('editProgrammatoModal');
+    const btnCancel = document.getElementById('btnCancelEditProg');
+    const btnSave = document.getElementById('btnSaveEditProg');
+    
+    if (btnCancel) btnCancel.addEventListener('click', () => modal.classList.add('hidden'));
+    
+    if (btnSave) btnSave.addEventListener('click', async () => {
+        const idFb = document.getElementById('editProgFbId').value;
+        const newD = document.getElementById('editProgData').value;
+        
+        try {
+            btnSave.textContent = "Salvataggio...";
+            btnSave.disabled = true;
+            await updateDoc(doc(db, "programmati", idFb), {
+                paziente: document.getElementById('editProgPaziente').value,
+                localita: document.getElementById('editProgLocalita').value,
+                indirizzo: document.getElementById('editProgIndirizzo').value,
+                telefono: document.getElementById('editProgTelefono').value,
+                tipo: document.getElementById('editProgTipo').value,
+                dispositivi: document.getElementById('editProgDispositivi').value,
+                dataPrevista: newD,
+                status: newD ? 'planned' : 'in_attesa' // revaluta status in base a se c'è data o no
+            });
+            modal.classList.add('hidden');
+            await fetchProgrammati();
+        } catch(e) {
+            alert("Errore salvataggio: " + e.message);
+        } finally {
+            btnSave.textContent = "SALVA MODIFICHE";
+            btnSave.disabled = false;
+        }
+    });
+
     // Di default impostiamo la data a domani
     let domani = new Date();
     domani.setDate(domani.getDate() + 1);

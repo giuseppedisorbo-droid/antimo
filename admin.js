@@ -100,6 +100,18 @@ async function loadData() {
 
     // Carica anche la sezione Non Eseguiti
     await loadNonEseguiti();
+    
+    // Filtro Oggi automatico
+    const urlParams = new URLSearchParams(window.location.search);
+    if (!window.filterAppliedOnce && urlParams.get('filter') === 'oggi') {
+        window.filterAppliedOnce = true;
+        const oggi = new Date();
+        const pdZ = n => n.toString().padStart(2, '0');
+        const dStr = `${oggi.getFullYear()}-${pdZ(oggi.getMonth() + 1)}-${pdZ(oggi.getDate())}`;
+        filterDateStart.value = dStr;
+        filterDateEnd.value = dStr;
+        applyFilters();
+    }
 }
 
 async function loadNonEseguiti() {
@@ -173,7 +185,7 @@ function renderTable(dataArray) {
         if (isAdminLogged) {
             let deleteBtn = tr.querySelector('.btn-delete');
             if (deleteBtn) deleteBtn.addEventListener('click', async (e) => {
-                if (!confirm("Sicuro di voler eliminare definitivamente questo intervento?")) return;
+                if (!confirm(`Sicuro di voler eliminare definitivamente questo intervento?\n\nPaziente: ${inv.paziente}\nData: ${dataStr}\nLocalità: ${inv.localita || inv.destinazione || "N/D"}`)) return;
                 const fbId = e.currentTarget.getAttribute('data-fbid');
                 try {
                     await deleteDoc(doc(db, "interventi", fbId));
