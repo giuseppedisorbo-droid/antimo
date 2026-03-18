@@ -97,6 +97,8 @@ const messagesList = document.getElementById('messagesList');
 const newMessageForm = document.getElementById('newMessageForm');
 const msgText = document.getElementById('msgText');
 const msgIsNotification = document.getElementById('msgIsNotification');
+const btnTopNotification = document.getElementById('btnTopNotification');
+const topNotificationText = document.getElementById('topNotificationText');
 
 // Nuovi Toggles Logic
 let isPlannedVisible = false;
@@ -213,6 +215,16 @@ if(btnToggleMessages) {
     });
 }
 
+if(btnTopNotification) {
+    btnTopNotification.addEventListener('click', () => {
+        if(messagesContainer.classList.contains('hidden')) {
+            messagesContainer.classList.remove('hidden');
+            btnToggleMessages.textContent = 'Nascondi';
+        }
+        messagesSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+}
+
 // LOGICA MESSAGGISTICA E NOTIFICHE
 async function loadMessages() {
     if (!isFirebaseConfigured) {
@@ -227,9 +239,13 @@ async function loadMessages() {
             if(!messagesList) return;
             messagesList.innerHTML = '';
             let count = 0;
+            let activeNotes = [];
+            
             snapshot.forEach((docSnap) => {
                 count++;
                 const data = docSnap.data();
+                if(data.isNotification) activeNotes.push(data.text);
+                
                 const div = document.createElement('div');
                 div.style.padding = "10px";
                 div.style.borderRadius = "8px";
@@ -269,6 +285,17 @@ async function loadMessages() {
                 
                 messagesList.appendChild(div);
             });
+            
+            // Aggiorna Pulsante Globale Notifiche
+            if(activeNotes.length > 0 && btnTopNotification) {
+                btnTopNotification.classList.remove('hidden');
+                topNotificationText.textContent = `${activeNotes.length > 1 ? `(${activeNotes.length}) ` : ''}${activeNotes[0]}`;
+                btnToggleMessages.innerHTML = `Nascondi <span style="background:var(--orange);color:white;padding:2px 6px;border-radius:12px;font-size:0.7rem;">${activeNotes.length}</span>`;
+            } else if(btnTopNotification) {
+                btnTopNotification.classList.add('hidden');
+                btnToggleMessages.textContent = messagesContainer.classList.contains('hidden') ? 'Mostra' : 'Nascondi';
+            }
+            
             if(count === 0) {
                 messagesList.innerHTML = '<div style="text-align: center; font-size: 0.9rem; color: #666; padding: 10px;">Nessun messaggio in bacheca.</div>';
             }
