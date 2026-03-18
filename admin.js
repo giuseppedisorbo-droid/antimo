@@ -174,7 +174,7 @@ function renderTable(dataArray) {
             let deleteBtn = tr.querySelector('.btn-delete');
             if (deleteBtn) deleteBtn.addEventListener('click', async (e) => {
                 if (!confirm("Sicuro di voler eliminare definitivamente questo intervento?")) return;
-                const fbId = e.target.getAttribute('data-fbid');
+                const fbId = e.currentTarget.getAttribute('data-fbid');
                 try {
                     await deleteDoc(doc(db, "interventi", fbId));
                     alert("Intervento eliminato.");
@@ -183,7 +183,7 @@ function renderTable(dataArray) {
             });
             let editBtn = tr.querySelector('.btn-edit');
             if (editBtn) editBtn.addEventListener('click', (e) => {
-                const fbId = e.target.getAttribute('data-fbid');
+                const fbId = e.currentTarget.getAttribute('data-fbid');
                 const invToEdit = tuttiGliInterventi.find(i => i.fbId === fbId);
                 if (invToEdit) openEditModal(invToEdit, false);
             });
@@ -224,7 +224,7 @@ function renderNonEseguitiTable(dataArray) {
             if (deleteProgBtn) deleteProgBtn.addEventListener('click', async (e) => {
                 if (!confirm("Sicuro di eliminare questo non eseguito?")) return;
                 try {
-                    await deleteDoc(doc(db, "programmati", e.target.getAttribute('data-fbid')));
+                    await deleteDoc(doc(db, "programmati", e.currentTarget.getAttribute('data-fbid')));
                     await loadNonEseguiti();
                 } catch (err) { alert(err.message); }
             });
@@ -232,16 +232,16 @@ function renderNonEseguitiTable(dataArray) {
 
         tr.querySelector('.btn-chiudi').addEventListener('click', async (e) => {
             if (!confirm("Vuoi archiviare definitivamente questo intervento non eseguito? Scomparirà dalla lista dell'ufficio.")) return;
-            const fbId = e.target.getAttribute('data-fbid');
+            const fbId = e.currentTarget.getAttribute('data-fbid');
             try {
-                e.target.disabled = true;
-                e.target.textContent = "Chiusura...";
+                e.currentTarget.disabled = true;
+                e.currentTarget.textContent = "Chiusura...";
                 await updateDoc(doc(db, "programmati", fbId), { status: 'archived' });
                 await loadNonEseguiti();
             } catch (err) {
                 alert("Errore durante l'archiviazione: " + err.message);
-                e.target.disabled = false;
-                e.target.textContent = "Archivia (Chiudi)";
+                e.currentTarget.disabled = false;
+                e.currentTarget.textContent = "Archivia (Chiudi)";
             }
         });
 
