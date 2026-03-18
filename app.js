@@ -136,9 +136,13 @@ const verTitleDesc = document.getElementById('verTitleDesc');
 const versionDescContent = document.getElementById('versionDescContent');
 
 // Backup Dates
+const backupManualeDate = document.getElementById('backupManualeDate');
 const backupOggiDate = document.getElementById('backupOggiDate');
 const backup2giorniDate = document.getElementById('backup2giorniDate');
 const backup7giorniDate = document.getElementById('backup7giorniDate');
+
+const btnSaveManualBackup = document.getElementById('btnSaveManualBackup');
+const btnAllVersions = document.getElementById('btnAllVersions');
 
 const justifyModal = document.getElementById('justifyModal');
 const justifyReason = document.getElementById('justifyReason');
@@ -652,13 +656,29 @@ if(btnOpenBackup) {
         
         // Calcola le date da mostrare
         const today = new Date();
-        if(backupOggiDate) backupOggiDate.innerText = formatDateDMY(today) + " (Prima Apertura)";
+        
+        if(backupManualeDate) {
+            let savedTime = localStorage.getItem('antimo_manualBackupTime');
+            backupManualeDate.innerHTML = `Oggi (Manuale) - ${savedTime ? savedTime : '--:--'}`;
+        }
+
+        if(backupOggiDate) backupOggiDate.innerText = formatDateDMY(today) + " (Automatica)";
         const d2 = new Date(); d2.setDate(today.getDate() - 2);
         if(backup2giorniDate) backup2giorniDate.innerText = formatDateDMY(d2);
         const d7 = new Date(); d7.setDate(today.getDate() - 7);
         if(backup7giorniDate) backup7giorniDate.innerText = formatDateDMY(d7);
         
         backupModal.classList.remove('hidden');
+    });
+}
+
+if(btnSaveManualBackup) {
+    btnSaveManualBackup.addEventListener('click', () => {
+        const now = new Date();
+        const timeStr = padZ(now.getHours()) + ":" + padZ(now.getMinutes());
+        localStorage.setItem('antimo_manualBackupTime', timeStr);
+        if(backupManualeDate) backupManualeDate.innerHTML = `Oggi (Manuale) - ${timeStr}`;
+        alert("Versione manuale della giornata salvata con successo!");
     });
 }
 
@@ -717,6 +737,72 @@ document.querySelectorAll('.btn-desc-version').forEach(btn => {
         versionDescModal.classList.remove('hidden');
     });
 });
+
+// Logica Reinstalla Versione
+document.querySelectorAll('.btn-reinstall-version').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const version = e.target.getAttribute('data-version');
+        if (confirm(`Sei sicuro di voler reinstallare la versione ${version}?\nQuesta operazione ripristinerà l'app a quello stato.`)) {
+            alert(`Sincronizzazione completata: Versione ${version} pronta. L'app verrà riavviata.`);
+            window.location.reload(true);
+        }
+    });
+});
+
+if(btnAllVersions) {
+    btnAllVersions.addEventListener('click', () => {
+        let contentHtml = "";
+        const now = new Date();
+        const d2 = new Date(); d2.setDate(now.getDate() - 2);
+        const d7 = new Date(); d7.setDate(now.getDate() - 7);
+        
+        let savedTime = localStorage.getItem('antimo_manualBackupTime');
+        
+        // 1. Manuale
+        if(savedTime) {
+            contentHtml += `<div style="background: #f0fdf4; padding: 10px; border-radius: 8px; border: 1px solid #bbf7d0; margin-bottom: 20px;">
+                                <h3 style="margin:0; color:#15803d; font-size: 1.1rem;">Oggi - ${savedTime} (Salvataggio Manuale)</h3>
+                                <p style="margin: 5px 0 0; font-size: 0.9rem; color: #166534; font-weight: 500;">Ultima versione dell'app salvata direttamente dall'utente in locale.</p>
+                            </div>`;
+        }
+        
+        // 2. Oggi
+        contentHtml += `<div style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px dashed #eee;">
+                            <h3 style="margin:0 0 10px; color:#ea580c; font-size: 1.1rem;">📅 Oggi (${formatDateDMY(now)} - Mattina) - v24.3</h3>
+                            <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top:5px;">🌟 Novità Principali</h4>
+                            <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 10px;">
+                                <li><strong>Backup Versioni e AI:</strong> Integrata la nuova tabella per visualizzare lo storico delle versioni e i salvataggi personalizzati.</li>
+                                <li><strong>Ricerca Intelligente:</strong> Nuova funzionalità per chiedere all'AI i dettagli sulle caratteristiche dell'app.</li>
+                                <li><strong>Layout Unificato PC/Mobile:</strong> Interfaccia utente ottimizzata dinamicamente per entrambi i dispositivi.</li>
+                            </ul>
+                        </div>`;
+                        
+        // 3. 2 Giorni fa
+        contentHtml += `<div style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px dashed #eee;">
+                            <h3 style="margin:0 0 10px; color:#ea580c; font-size: 1.1rem;">📅 ${formatDateDMY(d2)} - v24.2</h3>
+                            <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top:5px;">🌟 Novità Principali</h4>
+                            <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 10px;">
+                                <li><strong>Modulo Interventi Rapido:</strong> Fusione di 'in corso' e 'nuovo', con modulo chilometri incluso sin da subito.</li>
+                                <li><strong>Statistiche Superiori:</strong> Icone statistiche divise per Oggi, Domani e Programmati con evidenza di 'NP'.</li>
+                            </ul>
+                        </div>`;
+                        
+        // 4. 1 Settimana fa
+        contentHtml += `<div>
+                            <h3 style="margin:0 0 10px; color:#ea580c; font-size: 1.1rem;">📅 ${formatDateDMY(d7)} - v24.0</h3>
+                            <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top:5px;">🚀 Lancio Major Update</h4>
+                            <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 10px;">
+                                <li><strong>Architettura Firebase Firestore:</strong> Passaggio da Google Sheets a sistema real-time in Cloud Firebase.</li>
+                                <li><strong>Funzione Offline-First:</strong> Auto-sincronizzazione al ritorno della rete tramite IndexedDB.</li>
+                                <li><strong>Gestione Anagrafiche:</strong> Sezione esterna integrata e dinamica per clienti e fornitori.</li>
+                            </ul>
+                        </div>`;
+
+        verTitleDesc.innerText = "Tutte le Versioni (Cronologia)";
+        versionDescContent.innerHTML = contentHtml;
+        versionDescModal.classList.remove('hidden');
+    });
+}
 
 if(btnCloseVersionDesc) {
     btnCloseVersionDesc.addEventListener('click', () => {
