@@ -270,18 +270,35 @@ async function loadMessages() {
                     <div style="color: #333; line-height: 1.4; white-space: pre-wrap;">${data.text}</div>
                 `;
                 
-                if (data.isNotification) {
-                    const dismissBtn = document.createElement('button');
-                    dismissBtn.innerHTML = "Rimuovi Notifica";
-                    dismissBtn.style.cssText = "align-self: flex-start; margin-top: 5px; background: none; border: 1px solid #ccc; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; cursor: pointer; color: #555;";
-                    dismissBtn.onclick = async () => {
-                        try {
-                            const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                            await updateDoc(doc(db, "messaggi", docSnap.id), { isNotification: false });
-                        } catch(err) { console.error("Errore dismissione", err); }
-                    };
-                    div.appendChild(dismissBtn);
-                }
+                const actionDiv = document.createElement('div');
+                actionDiv.style.display = "flex";
+                actionDiv.style.gap = "10px";
+                actionDiv.style.marginTop = "5px";
+
+                const toggleBtn = document.createElement('button');
+                toggleBtn.innerHTML = data.isNotification ? "🔕 Rimuovi Notifica" : "🔔 Setta Promemoria";
+                toggleBtn.style.cssText = "background: none; border: 1px solid #b8b8b8; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; cursor: pointer; color: #555; background-color: rgba(255,255,255,0.5);";
+                toggleBtn.onclick = async () => {
+                    try {
+                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                        await updateDoc(doc(db, "messaggi", docSnap.id), { isNotification: !data.isNotification });
+                    } catch(err) { console.error("Errore toggle", err); }
+                };
+                actionDiv.appendChild(toggleBtn);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.innerHTML = "🗑️ Elimina";
+                deleteBtn.style.cssText = "background: none; border: 1px solid #ffcccc; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; cursor: pointer; color: #d32f2f; background-color: rgba(255,255,255,0.5);";
+                deleteBtn.onclick = async () => {
+                    if(!confirm("Eliminare definitivamente questo messaggio?")) return;
+                    try {
+                        const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                        await deleteDoc(doc(db, "messaggi", docSnap.id));
+                    } catch(err) { console.error("Errore elim msg", err); }
+                };
+                actionDiv.appendChild(deleteBtn);
+
+                div.appendChild(actionDiv);
                 
                 messagesList.appendChild(div);
             });
