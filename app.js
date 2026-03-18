@@ -123,6 +123,22 @@ const activeExtraAttachmentsList = document.getElementById('activeExtraAttachmen
 const inputAllegatoProgrammazione = document.getElementById('allegatoProgrammazione');
 const progPreviewContainer = document.getElementById('progPreviewContainer');
 
+// Backup & Versioni
+const btnOpenBackup = document.getElementById('btnOpenBackup');
+const backupModal = document.getElementById('backupModal');
+const btnCloseBackup = document.getElementById('btnCloseBackup');
+const versionDescModal = document.getElementById('versionDescModal');
+const btnCloseVersionDesc = document.getElementById('btnCloseVersionDesc');
+const btnAiSearch = document.getElementById('btnAiSearch');
+const aiSearchInput = document.getElementById('aiSearchInput');
+const aiSearchResult = document.getElementById('aiSearchResult');
+const verTitleDesc = document.getElementById('verTitleDesc');
+const versionDescContent = document.getElementById('versionDescContent');
+
+// Backup Dates
+const backupOggiDate = document.getElementById('backupOggiDate');
+const backup2giorniDate = document.getElementById('backup2giorniDate');
+const backup7giorniDate = document.getElementById('backup7giorniDate');
 
 const justifyModal = document.getElementById('justifyModal');
 const justifyReason = document.getElementById('justifyReason');
@@ -626,6 +642,112 @@ if(toggleRequireKm) {
         requireKm = e.target.checked;
         localStorage.setItem('antimo_requireKm', JSON.stringify(requireKm));
         updateUI();
+    });
+}
+
+// BACKUP E VERISONI EVENT LISTENERS
+if(btnOpenBackup) {
+    btnOpenBackup.addEventListener('click', () => {
+        settingsModal.classList.add('hidden'); // Chiude impostazioni
+        
+        // Calcola le date da mostrare
+        const today = new Date();
+        if(backupOggiDate) backupOggiDate.innerText = formatDateDMY(today) + " (Prima Apertura)";
+        const d2 = new Date(); d2.setDate(today.getDate() - 2);
+        if(backup2giorniDate) backup2giorniDate.innerText = formatDateDMY(d2);
+        const d7 = new Date(); d7.setDate(today.getDate() - 7);
+        if(backup7giorniDate) backup7giorniDate.innerText = formatDateDMY(d7);
+        
+        backupModal.classList.remove('hidden');
+    });
+}
+
+if(btnCloseBackup) {
+    btnCloseBackup.addEventListener('click', () => {
+        backupModal.classList.add('hidden');
+    });
+}
+
+// Apertura modale singola versione
+document.querySelectorAll('.btn-desc-version').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const version = e.target.getAttribute('data-version');
+        let contentHtml = "";
+        
+        // Genera il changelog hardcoded
+        if(version === "v24.3") {
+            contentHtml = `
+                <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px;">🌟 Novità Principali</h4>
+                <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 15px;">
+                    <li><strong>Backup Versioni e AI:</strong> Integrata la nuova tabella per visualizzare lo storico delle versioni.</li>
+                    <li><strong>Ricerca Intelligente:</strong> Nuova funzionalità per chiedere all'AI i dettagli sulle caratteristiche dell'app.</li>
+                    <li><strong>Layout Unificato PC/Mobile:</strong> Interfaccia utente ottimizzata dinamicamente per entrambi i dispositivi.</li>
+                </ul>
+                <h4 style="color: #166534; border-bottom: 1px solid #ddd; padding-bottom: 5px;">🔧 Dettagli Tecnici</h4>
+                <ul style="padding-left: 20px; margin-bottom: 15px;">
+                    <li>Modali separati per settings, backup e note versione.</li>
+                    <li>Implementazione Event Listeners asincroni protetti.</li>
+                </ul>
+            `;
+        } else if(version === "v24.2") {
+            contentHtml = `
+                <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px;">🌟 Novità Principali</h4>
+                <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 15px;">
+                    <li><strong>Modulo Interventi Rapido:</strong> Fusione di 'in corso' e 'nuovo', con singola schermata e modulo chilometri incluso sin da subito.</li>
+                    <li><strong>Statistiche Superiori:</strong> Icone statistiche divise per Oggi, Domani e Programmati con evidenza di 'non eseguiti' (NP).</li>
+                </ul>
+                <h4 style="color: #ea580c; border-bottom: 1px solid #ddd; padding-bottom: 5px;">⚠️ Bug Fixes</h4>
+                <ul style="padding-left: 20px; margin-bottom: 15px;">
+                    <li>Riparato lo scorrimento e il caricamento dei modali da mobile iOS/Android.</li>
+                </ul>
+            `;
+        } else if(version === "v24.0") {
+            contentHtml = `
+                <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px;">🚀 Lancio Major Update</h4>
+                <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 15px;">
+                    <li><strong>Architettura Firebase Firestore:</strong> I dati passano da Google Sheets a sistema real-time in Cloud Firebase.</li>
+                    <li><strong>Funzione Offline-First:</strong> Se manca internet, tutto si salva in IndexedDB e si auto-sincronizza al ritorno della rete.</li>
+                    <li><strong>Gestione Anagrafiche:</strong> Sezione esterna integrata e dinamica per clienti e fornitori.</li>
+                </ul>
+            `;
+        }
+        
+        verTitleDesc.innerText = version;
+        versionDescContent.innerHTML = contentHtml;
+        versionDescModal.classList.remove('hidden');
+    });
+});
+
+if(btnCloseVersionDesc) {
+    btnCloseVersionDesc.addEventListener('click', () => {
+        versionDescModal.classList.add('hidden');
+    });
+}
+
+// Motore ricerca AI mock
+if(btnAiSearch) {
+    btnAiSearch.addEventListener('click', () => {
+        const query = aiSearchInput.value.trim().toLowerCase();
+        if(!query) return;
+        
+        aiSearchResult.classList.remove('hidden');
+        aiSearchResult.innerHTML = "<em>L'AI sta analizzando la tua richiesta... 🤖</em>";
+        
+        setTimeout(() => {
+            let response = "";
+            if(query.includes("km") || query.includes("chilometri") || query.includes("rimborso") || query.includes("distanza")) {
+                response = "<strong>🚗 Gestione Chilometri:</strong> L'app prevede l'opzione (attivabile in Impostazioni) di richiedere obbligatoriamente i km percorsi per ogni intervento, utile per i rimborsi spese di trasferta. Sono registrati a fine attività.";
+            } else if (query.includes("allegat") || query.includes("foto") || query.includes("pdf") || query.includes("scatta")) {
+                response = "<strong>📎 Gestione Allegati:</strong> L'app supporta il caricamento di immagini dirette da fotocamera mobile o file multimediali per ogni attività sia in avvio (Programmazione) che a fine intervento (Operatore Campo), inviati direttamente nello Storage Firebase.";
+            } else if (query.includes("sincro") || query.includes("cloud") || query.includes("internet") || query.includes("offline") || query.includes("connessione")) {
+                 response = "<strong>☁️ Offline-First & Sync:</strong> Se non c'è connessione, i tuoi interventi vengono salvati prima sul dispositivo locale (IndexedDB). Non appena l'app rileva una connessione o premi 'Sincronizza Dati', verranno sparati in Firebase.";
+            } else if (query.includes("anagrafich") || query.includes("pazient") || query.includes("utent")) {
+                 response = "<strong>📇 Anagrafiche:</strong> Tramite il portale dedicato (raggiungibile cliccando 'GESTIONE ANAGRAFICHE'), puoi inserire Clienti, Pazienti ed Enti. Essi si autocompleteranno nei moduli di creazione intervento.";
+            } else {
+                 response = "<strong>🧠 AI-Assistant:</strong> Attualmente la versione 24.3 dell'app permette registrazione interventi in un click, gestione anagrafiche, salvataggi allegati in cloud offline-ready, e organizzazione programmati Ognuno categorizzato per giorno. Prova a chiedermi di 'allegati', 'sincronizzazione', 'chilometri' o 'anagrafiche'!";
+            }
+            aiSearchResult.innerHTML = response;
+        }, 1200);
     });
 }
 

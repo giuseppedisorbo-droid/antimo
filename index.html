@@ -270,6 +270,9 @@
                     <button class="btn btn-primary btn-orange" id="btnManualSyncMobile" style="width: 100%; padding: 12px;">
                         <span class="btn-icon">🔄</span> SINCRONIZZA CON CLOUD
                     </button>
+                    <button class="btn btn-primary btn-blue" id="btnOpenBackup" style="width: 100%; padding: 12px; margin-top: 10px;">
+                        <span class="btn-icon">💾</span> BACKUP VERSIONI
+                    </button>
                 </div>
             </div>
         </div>
@@ -317,6 +320,74 @@
                     </div>
                     <button type="button" id="btnSaveEdit" class="btn btn-primary btn-large" style="width: 100%; margin-top: 10px;">SALVA MODIFICHE</button>
                 </form>
+            </div>
+        </div>
+
+        <!-- MODAL BACKUP -->
+        <div id="backupModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 600px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
+                    <span><span class="btn-icon">💾</span> Riepilogo Versioni</span>
+                    <button id="btnCloseBackup" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                </h3>
+                
+                <div style="margin-bottom: 20px;">
+                    <label style="font-weight: 600; font-size: 0.9rem; color: var(--blue-dark);">Cerca funzionalità con AI</label>
+                    <div style="display: flex; gap: 10px; margin-top: 5px;">
+                        <input type="text" id="aiSearchInput" placeholder="Cosa sa fare l'app? Chiedi all'AI..." style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit;">
+                        <button id="btnAiSearch" class="btn btn-primary btn-orange" style="padding: 10px 15px;">🔍 Cerca</button>
+                    </div>
+                    <div id="aiSearchResult" class="hidden" style="margin-top: 10px; padding: 10px; background: #f8fafc; border-left: 4px solid #3b82f6; border-radius: 4px; font-size: 0.85rem; color: #333; line-height: 1.4;"></div>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                        <thead>
+                            <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
+                                <th style="padding: 10px; font-size: 0.85rem;">Data / Periodo</th>
+                                <th style="padding: 10px; font-size: 0.85rem;">Versione</th>
+                                <th style="padding: 10px; font-size: 0.85rem;">Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody id="backupTableBody">
+                            <tr style="border-bottom: 1px solid #eee;">
+                                <td style="padding: 10px; font-size: 0.9rem;" id="backupOggiDate">Oggi</td>
+                                <td style="padding: 10px; font-weight: bold; color: #166534; font-size: 0.9rem;">v24.3 (Attuale)</td>
+                                <td style="padding: 10px;">
+                                    <button class="btn btn-sm btn-desc-version" data-version="v24.3" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Descrizione Versione</button>
+                                </td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #eee;">
+                                <td style="padding: 10px; font-size: 0.9rem;" id="backup2giorniDate">2 Giorni Fa</td>
+                                <td style="padding: 10px; font-size: 0.9rem;">v24.2</td>
+                                <td style="padding: 10px;">
+                                    <button class="btn btn-sm btn-desc-version" data-version="v24.2" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Descrizione Versione</button>
+                                </td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #eee;">
+                                <td style="padding: 10px; font-size: 0.9rem;" id="backup7giorniDate">1 Settimana Fa</td>
+                                <td style="padding: 10px; font-size: 0.9rem;">v24.0</td>
+                                <td style="padding: 10px;">
+                                    <button class="btn btn-sm btn-desc-version" data-version="v24.0" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Descrizione Versione</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL DESCRIZIONE VERSIONE -->
+        <div id="versionDescModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2500; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 600px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+                    <span><span class="btn-icon">📄</span> Versione <span id="verTitleDesc" style="color: #ea580c;"></span></span>
+                    <button id="btnCloseVersionDesc" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                </h3>
+                
+                <div id="versionDescContent" style="font-size: 0.9rem; line-height: 1.5; color: #333;">
+                    <!-- Content generated by JS -->
+                </div>
             </div>
         </div>
 
