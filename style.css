@@ -291,3 +291,50 @@ body.pc-layout-mode .container {
     0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0.8; }
     100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; }
 }
+
+/* Active Filter for Header Stat Box */
+.header-stat-box.active-filter {
+    background-color: var(--blue-primary) !important;
+    color: white !important;
+}
+
+.header-stat-box.active-filter div, 
+.header-stat-box.active-filter strong {
+    color: white !important;
+}
+
+/* Accordion Card Components */
+.card-item-container {
+    background: white;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-bottom: 10px;
+}
+
+.card-compact-view {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-expanded-view {
+    border-top: 1px dashed #ccc;
+    padding-top: 10px;
+    margin-top: 10px;
+}
+
+.expand-icon {
+    transition: transform 0.3s ease;
+    font-size: 1.2rem;
+    color: var(--blue-light);
+}
+
+.expand-icon.rotate-icon {
+    transform: rotate(180deg);
+}

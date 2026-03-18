@@ -23,7 +23,13 @@
 
         <!-- Lato Destro: Griglia Badge Statistici -->
         <div class="header-stats-grid">
-            <a href="programmati.html" class="header-stat-box" style="text-decoration: none; font-weight: bold; font-size: 1.2rem;">P</a>
+            <div style="display: flex; gap: 4px;">
+                <div id="btnMostraP" class="header-stat-box" style="cursor: pointer; flex: 1; font-weight: bold; font-size: 1.2rem; display: flex; align-items: center; justify-content: center;">P</div>
+                <div id="btnCalendar" class="header-stat-box" style="cursor: pointer; flex: 1; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
+                    📅
+                    <input type="date" id="calendarPicker" style="position: absolute; top:0; left:0; width:100px; height:50px; opacity:0; cursor:pointer;" aria-label="Seleziona data">
+                </div>
+            </div>
             <div id="btnMostraOggi" class="header-stat-box" style="cursor: pointer;">
                 <div style="font-size: 0.65rem; text-transform: uppercase;">Oggi</div>
                 <div style="font-size: 1.1rem; font-weight: 700;"><strong id="oggiCount">0</strong></div>
@@ -40,7 +46,7 @@
                 <div style="font-size: 0.65rem; text-transform: uppercase;">NP</div>
                 <div style="font-size: 1.1rem; font-weight: 700;"><strong id="npCount">0</strong></div>
             </div>
-            <div class="header-stat-box">
+            <div id="btnMostraEseguiti" class="header-stat-box" style="cursor: pointer;">
                 <div style="font-size: 0.65rem; text-transform: uppercase;">Eseg.</div>
                 <div style="font-size: 1.1rem; font-weight: 700;"><strong id="interventiCount">0</strong></div>
             </div>
@@ -48,6 +54,12 @@
     </header>
 
     <main class="container">
+        <!-- GLOBAL TOGGLE FOR LISTS -->
+        <div id="globalToggleCardContainer" style="text-align: right; width: 100%;">
+            <button id="btnToggleAllCollapse" class="btn btn-secondary btn-sm" style="width: 100%; font-size: 0.95rem; padding: 12px; margin-bottom: 0px;">
+                <span class="btn-icon">⏬</span> APRI TUTTE LE SCHEDE
+            </button>
+        </div>
         <!-- SEZIONE INTERVENTI OGGI -->
         <section class="card glass-card hidden" id="oggiInterventionsSection" style="margin-bottom: 20px; border-left: 4px solid #3b82f6;">
             <div style="display: flex; justify-content: space-between; align-items: center;">

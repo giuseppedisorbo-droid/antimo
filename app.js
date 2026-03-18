@@ -79,6 +79,10 @@ const domaniList = document.getElementById('domaniList');
 
 // Buttons for Toggling Sections
 const btnMostraProgrammati = document.getElementById('btnMostraProgrammati');
+const btnMostraP = document.getElementById('btnMostraP');
+const btnCalendar = document.getElementById('btnCalendar');
+const calendarPicker = document.getElementById('calendarPicker');
+const btnMostraEseguiti = document.getElementById('btnMostraEseguiti');
 const btnMostraNP = document.getElementById('btnMostraNP');
 const npCount = document.getElementById('npCount');
 const btnMostraOggi = document.getElementById('btnMostraOggi');
@@ -91,11 +95,130 @@ let isPlannedVisible = false;
 let isNpVisible = false;
 let isOggiVisible = false;
 let isDomaniVisible = false;
+let isEseguitiVisible = false;
+let selectedCalendarDate = null;
+let allExpanded = false;
 
-if(btnMostraOggi) { btnMostraOggi.addEventListener('click', () => { isOggiVisible = !isOggiVisible; updateUI(); }); }
-if(btnMostraDomani) { btnMostraDomani.addEventListener('click', () => { isDomaniVisible = !isDomaniVisible; updateUI(); }); }
-if(btnMostraProgrammati) { btnMostraProgrammati.addEventListener('click', () => { isPlannedVisible = !isPlannedVisible; updateUI(); }); }
-if(btnMostraNP) { btnMostraNP.addEventListener('click', () => { isNpVisible = !isNpVisible; updateUI(); }); }
+const globalToggleCardContainer = document.getElementById('globalToggleCardContainer');
+const btnToggleAllCollapse = document.getElementById('btnToggleAllCollapse');
+
+if(btnToggleAllCollapse) {
+    btnToggleAllCollapse.addEventListener('click', () => {
+        allExpanded = !allExpanded;
+        const expandedViews = document.querySelectorAll('.card-expanded-view');
+        const icons = document.querySelectorAll('.expand-icon');
+        expandedViews.forEach(el => {
+            if (allExpanded) el.classList.remove('hidden');
+            else el.classList.add('hidden');
+        });
+        icons.forEach(el => {
+            if (allExpanded) el.classList.add('rotate-icon');
+            else el.classList.remove('rotate-icon');
+        });
+        btnToggleAllCollapse.innerHTML = allExpanded ? `<span class="btn-icon">⏫</span> CHIUDI TUTTE LE SCHEDE` : `<span class="btn-icon">⏬</span> APRI TUTTE LE SCHEDE`;
+    });
+}
+
+function setupAccordionCard(cardContainer) {
+    const compactView = cardContainer.querySelector('.card-compact-view');
+    const expandedView = cardContainer.querySelector('.card-expanded-view');
+    const icon = cardContainer.querySelector('.expand-icon');
+    
+    if (allExpanded && expandedView) {
+        expandedView.classList.remove('hidden');
+        if (icon) icon.classList.add('rotate-icon');
+    }
+    
+    if (compactView && expandedView) {
+        compactView.addEventListener('click', (e) => {
+            if (e.target.tagName.toLowerCase() === 'button' || e.target.closest('button')) return;
+            const isHidden = expandedView.classList.contains('hidden');
+            if (isHidden && !allExpanded) {
+                document.querySelectorAll('.card-expanded-view').forEach(el => el.classList.add('hidden'));
+                document.querySelectorAll('.expand-icon').forEach(el => el.classList.remove('rotate-icon'));
+            }
+            if (isHidden) {
+                expandedView.classList.remove('hidden');
+                if (icon) icon.classList.add('rotate-icon');
+            } else {
+                expandedView.classList.add('hidden');
+                if (icon) icon.classList.remove('rotate-icon');
+            }
+        });
+    }
+}
+
+function updateHeaderFiltersUI() {
+    const list = [
+        { btn: btnMostraOggi, active: isOggiVisible },
+        { btn: btnMostraDomani, active: isDomaniVisible },
+        { btn: btnMostraProgrammati, active: isPlannedVisible && !selectedCalendarDate },
+        { btn: btnMostraP, active: isPlannedVisible && !selectedCalendarDate },
+        { btn: btnMostraNP, active: isNpVisible },
+        { btn: btnMostraEseguiti, active: isEseguitiVisible },
+        { btn: btnCalendar, active: !!selectedCalendarDate }
+    ];
+    list.forEach(item => {
+        if (item.btn) {
+            if (item.active) item.btn.classList.add('active-filter');
+            else item.btn.classList.remove('active-filter');
+        }
+    });
+    
+    const anyListVisible = isOggiVisible || isDomaniVisible || isPlannedVisible || isNpVisible || isEseguitiVisible;
+    if (anyListVisible && globalToggleCardContainer) globalToggleCardContainer.classList.remove('hidden');
+    else if (globalToggleCardContainer) globalToggleCardContainer.classList.add('hidden');
+}
+
+function toggleTarget(target) {
+    if (target === 'oggi') { isOggiVisible = !isOggiVisible; selectedCalendarDate = null; }
+    if (target === 'domani') { isDomaniVisible = !isDomaniVisible; selectedCalendarDate = null; }
+    if (target === 'planned') { isPlannedVisible = !isPlannedVisible; selectedCalendarDate = null; }
+    if (target === 'np') { isNpVisible = !isNpVisible; selectedCalendarDate = null; }
+    if (target === 'eseguiti') {
+        isEseguitiVisible = !isEseguitiVisible;
+        selectedCalendarDate = null;
+        if (isEseguitiVisible) {
+            activitiesListContainer.classList.remove('hidden');
+            if(btnViewActivities) btnViewActivities.innerHTML = `<span class="btn-icon">🙈</span> NASCONDI ATTIVITÀ`;
+            renderActivitiesList();
+        } else {
+            activitiesListContainer.classList.add('hidden');
+            if(btnViewActivities) btnViewActivities.innerHTML = `<span class="btn-icon">👁</span> VISUALIZZA ATTIVITÀ`;
+        }
+    }
+    updateHeaderFiltersUI();
+    updateUI();
+}
+
+if(btnMostraOggi) btnMostraOggi.addEventListener('click', () => toggleTarget('oggi'));
+if(btnMostraDomani) btnMostraDomani.addEventListener('click', () => toggleTarget('domani'));
+if(btnMostraProgrammati) btnMostraProgrammati.addEventListener('click', () => toggleTarget('planned'));
+if(btnMostraP) btnMostraP.addEventListener('click', () => toggleTarget('planned'));
+if(btnMostraNP) btnMostraNP.addEventListener('click', () => toggleTarget('np'));
+if(btnMostraEseguiti) btnMostraEseguiti.addEventListener('click', () => toggleTarget('eseguiti'));
+
+if(calendarPicker) {
+    calendarPicker.addEventListener('change', (e) => {
+        const d = e.target.value;
+        if (d) {
+            selectedCalendarDate = d;
+            isPlannedVisible = true;
+            isOggiVisible = false;
+            isDomaniVisible = false;
+            isNpVisible = false;
+            isEseguitiVisible = false;
+            if(activitiesListContainer) activitiesListContainer.classList.add('hidden');
+            if(btnViewActivities) btnViewActivities.innerHTML = `<span class="btn-icon">👁</span> VISUALIZZA ATTIVITÀ`;
+            
+            allExpanded = true;
+            if (btnToggleAllCollapse) btnToggleAllCollapse.innerHTML = `<span class="btn-icon">⏫</span> CHIUDI TUTTE LE SCHEDE`;
+            
+            updateHeaderFiltersUI();
+            updateUI();
+        }
+    });
+}
 
 // Form Inputs
 const iTipo = document.getElementById('tipoAttivita');
@@ -330,6 +453,27 @@ function updateUI() {
 
     // Le attività programmate
     const visibiliProg = plannedInterventions.filter(p => !p.status || p.status === 'planned');
+    updateHeaderFiltersUI();
+    
+    if (selectedCalendarDate) {
+        oggiInterventionsSection.classList.add('hidden');
+        domaniInterventionsSection.classList.add('hidden');
+        npInterventionsSection.classList.add('hidden');
+        
+        if (isPlannedVisible) {
+            plannedInterventionsSection.classList.remove('hidden');
+            const titolo = plannedInterventionsSection.querySelector('h2');
+            if(titolo) titolo.innerHTML = `<span class="btn-icon">📅</span> Interventi del ${selectedCalendarDate.split('-').reverse().join('/')}`;
+            const filteredByDate = visibiliProg.filter(p => p.dataPrevista === selectedCalendarDate);
+            renderPlannedInterventions(filteredByDate, [], []);
+        } else {
+            plannedInterventionsSection.classList.add('hidden');
+        }
+        return;
+    }
+    
+    const titoloProg = plannedInterventionsSection.querySelector('h2');
+    if(titoloProg) titoloProg.innerHTML = `<span class="btn-icon">📅</span> Tutti i Programmati`;
     
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -423,22 +567,45 @@ function renderSpecialPlannedList(container, filteredData) {
         const index = plannedInterventions.indexOf(p);
         
         const div = document.createElement('div');
-        div.style.cssText = "background:white; padding:12px; border-radius:8px; border:1px solid #ddd; display:flex; flex-direction:column; gap:10px;";
+        div.className = "card-item-container";
         
         let dateStr = p.dataPrevista ? p.dataPrevista.split('-').reverse().join('/') : 'N/D';
+        let attachBadge = (p.fileUrlsProgrammati && p.fileUrlsProgrammati.length > 0) ? `<span style="font-size:0.8rem; background:var(--orange-light); color:white; padding:2px 5px; border-radius:4px; margin-left:5px;">📎</span>` : '';
+
+        let attachHtml = '';
+        if (p.fileUrlsProgrammati && p.fileUrlsProgrammati.length > 0) {
+            attachHtml = `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dotted #ccc;">
+                <strong>📎 Allegati Sede:</strong><br>
+                ${p.fileUrlsProgrammati.map((url, i) => `<a href="${url}" target="_blank" style="color: var(--blue-primary); font-size: 0.85rem; text-decoration: underline;">Allegato ${i+1}</a>`).join('<br>')}
+            </div>`;
+        }
 
         div.innerHTML = `
-            <div>
-                <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${p.paziente}</div>
-                <div style="font-size:0.85rem; color:#555;">📍 ${p.localita || p.destinazione} - ${p.indirizzo || ''} | 🔧 ${p.tipo}</div>
-                <div style="font-size:0.80rem; color:#555;">📞 ${p.telefono || '-'}</div>
-                <div style="font-size:0.80rem; color:var(--orange); font-weight:600; margin-top:4px;">🗓 Data Prevista: ${dateStr}</div>
+            <div class="card-compact-view">
+                <div style="flex:1;">
+                    <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${p.paziente} ${attachBadge}</div>
+                    <div style="font-size:0.85rem; color:#555;">📍 ${p.localita || p.destinazione} | 🔧 ${p.tipo}</div>
+                    <div style="font-size:0.80rem; color:var(--orange); font-weight:600; margin-top:4px;">🗓 Data Prevista: ${dateStr}</div>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center; padding-left: 10px;">
+                    <button class="btn btn-primary btn-orange btn-sm" style="padding:6px 10px; font-size:0.8rem; line-height:1; min-width:auto;" data-action="avvia" data-index="${index}">▶ AVVIA</button>
+                    <span class="expand-icon" style="font-size:1.2rem; color:var(--blue-light); padding:10px;">▼</span>
+                </div>
             </div>
-            <div style="display:flex; gap:10px;">
-                <button class="btn btn-danger btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="justify" data-index="${index}">✖ Non Eseguito</button>
-                <button class="btn btn-primary btn-orange btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="avvia" data-index="${index}">▶ INVIA</button>
+            
+            <div class="card-expanded-view hidden">
+                <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${p.indirizzo || ''}</div>
+                <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${p.telefono || '-'}</div>
+                <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${p.dispositivi || 'Nessuno'}</div>
+                <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${p.note || 'Nessuna'}</div>
+                ${attachHtml}
+                <div style="display:flex; gap:10px; margin-top: 15px;">
+                    <button class="btn btn-danger btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="justify" data-index="${index}">✖ Non Eseguito</button>
+                </div>
             </div>
         `;
+        
+        setupAccordionCard(div);
         
         div.querySelector('button[data-action="avvia"]').addEventListener('click', (e) => {
             const idx = e.target.getAttribute('data-index');
@@ -512,22 +679,43 @@ function renderNpInterventions() {
         const index = plannedInterventions.indexOf(p);
         
         const div = document.createElement('div');
-        div.style.cssText = "background:white; padding:12px; border-radius:8px; border:1px solid #ddd; display:flex; flex-direction:column; gap:10px;";
+        div.className = "card-item-container";
+        div.style.borderLeft = "4px solid #ef4444";
         
         let noteStr = p.note || p.dispositivi || 'Nessuna nota';
+        let attachBadge = (p.fileUrlsProgrammati && p.fileUrlsProgrammati.length > 0) ? `<span style="font-size:0.8rem; background:var(--orange-light); color:white; padding:2px 5px; border-radius:4px; margin-left:5px;">📎</span>` : '';
+
+        let attachHtml = '';
+        if (p.fileUrlsProgrammati && p.fileUrlsProgrammati.length > 0) {
+            attachHtml = `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dotted #ccc;">
+                <strong>📎 Allegati Sede:</strong><br>
+                ${p.fileUrlsProgrammati.map((url, i) => `<a href="${url}" target="_blank" style="color: var(--blue-primary); font-size: 0.85rem; text-decoration: underline;">Allegato ${i+1}</a>`).join('<br>')}
+            </div>`;
+        }
 
         div.innerHTML = `
-            <div>
-                <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${p.paziente}</div>
-                <div style="font-size:0.85rem; color:#555;">📍 ${p.localita || p.destinazione} - ${p.indirizzo || ''} | 🔧 ${p.tipo}</div>
-                <div style="font-size:0.80rem; color:#555;">📞 ${p.telefono || '-'}</div>
-                <div style="font-size:0.80rem; color:#ef4444; font-weight:600; margin-top:4px;">⏳ Da Programmare</div>
-                <div style="font-size:0.75rem; color:#777; margin-top:4px;">${noteStr}</div>
+            <div class="card-compact-view">
+                <div style="flex:1;">
+                    <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${p.paziente} ${attachBadge}</div>
+                    <div style="font-size:0.85rem; color:#555;">📍 ${p.localita || p.destinazione} | 🔧 ${p.tipo}</div>
+                    <div style="font-size:0.80rem; color:#ef4444; font-weight:600; margin-top:4px;">⏳ Da Programmare</div>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center; padding-left: 10px;">
+                    <button class="btn btn-primary btn-orange btn-sm" style="padding:6px 10px; font-size:0.8rem; line-height:1; min-width:auto;" data-action="avvia" data-index="${index}">▶ AVVIA</button>
+                    <span class="expand-icon" style="font-size:1.2rem; color:var(--blue-light); padding:10px;">▼</span>
+                </div>
             </div>
-            <div style="display:flex; gap:10px;">
-                <button class="btn btn-primary btn-orange btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="avvia" data-index="${index}">▶ INVIA</button>
+            
+            <div class="card-expanded-view hidden">
+                <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${p.indirizzo || ''}</div>
+                <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${p.telefono || '-'}</div>
+                <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${p.dispositivi || 'Nessuno'}</div>
+                <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${noteStr}</div>
+                ${attachHtml}
             </div>
         `;
+        
+        setupAccordionCard(div);
         
         div.querySelector('button[data-action="avvia"]').addEventListener('click', (e) => {
             const idx = e.target.getAttribute('data-index');
@@ -1352,9 +1540,6 @@ function renderActivitiesList() {
     // 1. Interventi Programmati (Da fare oggi) - Rossi
     const toDO = plannedInterventions.filter(inv => {
         if (inv.status !== 'planned') return false;
-        // Se non ha data ma era per oggi manuale o l'ha salvato con dProgrammata odierna
-        // Assumiamo che se non ha dataPrevista, non lo mostriamo nel recap odierno (o sì?). 
-        // L'utente vuole vedere quelli previsti perOggi.
         if (inv.dataPrevista) {
             const dp = new Date(inv.dataPrevista).getTime();
             return (dp >= startOfToday && dp <= endOfToday);
@@ -1383,26 +1568,44 @@ function renderActivitiesList() {
         toDO.forEach((inv, index) => {
             const origIndex = plannedInterventions.findIndex(p => p.id === inv.id);
             const div = document.createElement('div');
-            div.style.cssText = "background:white; padding:10px; margin-bottom:10px; border-radius:6px; border-left:4px solid #ef4444; box-shadow:0 1px 3px rgba(0,0,0,0.1); display:flex; flex-direction:column;";
+            div.className = "card-item-container";
+            div.style.borderLeft = "4px solid #ef4444";
             
-            let fileBadget = (inv.fileUrlsProgrammati && inv.fileUrlsProgrammati.length > 0) ? `<span style="font-size:0.8rem; background:var(--orange-light); color:white; padding:2px 5px; border-radius:4px; margin-left:5px;">📎 Allegati Sede</span>` : '';
+            let fileBadget = (inv.fileUrlsProgrammati && inv.fileUrlsProgrammati.length > 0) ? `<span style="font-size:0.8rem; background:var(--orange-light); color:white; padding:2px 5px; border-radius:4px; margin-left:5px;">📎</span>` : '';
             
+            let attachHtml = '';
+            if (inv.fileUrlsProgrammati && inv.fileUrlsProgrammati.length > 0) {
+                attachHtml = `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dotted #ccc;">
+                    <strong>📎 Allegati Sede:</strong><br>
+                    ${inv.fileUrlsProgrammati.map((url, i) => `<a href="${url}" target="_blank" style="color: var(--blue-primary); font-size: 0.85rem; text-decoration: underline;">Allegato ${i+1}</a>`).join('<br>')}
+                </div>`;
+            }
+
             div.innerHTML = `
-                <div style="font-size:0.85rem; color:gray; margin-bottom:4px; display:flex; justify-content:space-between;">
-                    <span>⏳ PROGRAMMATO ${fileBadget}</span>
+                <div class="card-compact-view">
+                    <div style="flex:1;">
+                        <div style="font-size:0.80rem; color:red; margin-bottom:4px;"><strong>⏳ PROGRAMMATO</strong></div>
+                        <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${inv.paziente} ${fileBadget}</div>
+                        <div style="font-size:0.85rem; color:#555;">📍 ${inv.localita || inv.destinazione} | 🔧 ${inv.tipo}</div>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center; padding-left: 10px;">
+                        <button class="btn btn-primary btn-orange btn-sm" style="padding:6px 10px; font-size:0.8rem; line-height:1; min-width:auto;" data-action="avvia" data-index="${origIndex}">▶ AVVIA</button>
+                        <span class="expand-icon" style="font-size:1.2rem; color:var(--blue-light); padding:10px;">▼</span>
+                    </div>
                 </div>
-                <div style="font-weight:600; color:#333;">${inv.tipo}</div>
-                <div style="font-size:0.95rem; margin:3px 0;"><strong>Paz/Ente:</strong> ${inv.paziente}</div>
-                <div style="font-size:0.9rem;"><strong>Disp:</strong> ${inv.dispositivi}</div>
-                <div style="font-size:0.85rem; color:#666; margin-top:5px;">📍 ${inv.localita || inv.destinazione} - ${inv.indirizzo || ''}</div>
-                <div style="font-size:0.80rem; color:#666;">📞 ${inv.telefono || '-'}</div>
+                
+                <div class="card-expanded-view hidden">
+                    <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${inv.indirizzo || ''}</div>
+                    <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${inv.telefono || '-'}</div>
+                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${inv.dispositivi || 'Nessuno'}</div>
+                    <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${inv.note || 'Nessuna'}</div>
+                    ${attachHtml}
+                </div>
             `;
             
-            const btnAvvia = document.createElement('button');
-            btnAvvia.className = "btn btn-primary btn-orange";
-            btnAvvia.style.cssText = "margin-top: 10px; font-size: 0.8rem; padding: 8px;";
-            btnAvvia.innerHTML = "▶️ CARICA DATI SUL FORM";
-            btnAvvia.onclick = () => {
+            setupAccordionCard(div);
+            
+            div.querySelector('button[data-action="avvia"]').addEventListener('click', () => {
                 const dataToLoad = plannedInterventions[origIndex];
                 iTipo.value = dataToLoad.tipo;
                 iPaziente.value = dataToLoad.paziente;
@@ -1427,9 +1630,8 @@ function renderActivitiesList() {
                 btnViewActivities.innerHTML = `<span class="btn-icon">📅</span> INTERVENTI DELLA GIORNATA`;
                 window.scrollTo({ top: 0, behavior: 'smooth' });
                 alert("Dati caricati nel form! Adesso clicca su 'TERMINA ATTIVITA'' quando finisci il lavoro.");
-            };
+            });
             
-            div.appendChild(btnAvvia);
             activitiesList.appendChild(div);
         });
     }
@@ -1447,21 +1649,43 @@ function renderActivitiesList() {
             const d = new Date(inv.startTime);
             const e = new Date(inv.endTime);
             const div = document.createElement('div');
-            div.style.cssText = "background:white; padding:10px; margin-bottom:10px; border-radius:6px; border-left:4px solid #22c55e; box-shadow:0 1px 3px rgba(0,0,0,0.1);";
+            div.className = "card-item-container";
+            div.style.borderLeft = "4px solid #22c55e";
             
-            let fileBadget = inv.haAllegato ? `<span style="font-size:0.8rem; background:var(--blue-light); color:white; padding:2px 5px; border-radius:4px; margin-left:5px;">📎 Allegato</span>` : '';
+            let fileBadget = inv.haAllegato ? `<span style="font-size:0.8rem; background:var(--blue-light); color:white; padding:2px 5px; border-radius:4px; margin-left:5px;">📎</span>` : '';
             
+            let attachHtml = '';
+            if (inv.fileUrls && inv.fileUrls.length > 0) {
+                attachHtml = `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dotted #ccc;">
+                    <strong>📎 Allegati:</strong><br>
+                    ${inv.fileUrls.map((url, i) => `<a href="${url}" target="_blank" style="color: var(--blue-primary); font-size: 0.85rem; text-decoration: underline;">Allegato ${i+1}</a>`).join('<br>')}
+                </div>`;
+            }
+
             div.innerHTML = `
-                <div style="font-size:0.85rem; color:gray; margin-bottom:4px;">
-                    Dalle ${padZ(d.getHours())}:${padZ(d.getMinutes())} alle ${padZ(e.getHours())}:${padZ(e.getMinutes())}
-                    ${fileBadget}
+                <div class="card-compact-view">
+                    <div style="flex:1;">
+                        <div style="font-size:0.80rem; color:#22c55e; margin-bottom:4px;"><strong>✅ Dalle ${padZ(d.getHours())}:${padZ(d.getMinutes())} alle ${padZ(e.getHours())}:${padZ(e.getMinutes())}</strong></div>
+                        <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${inv.paziente} ${fileBadget}</div>
+                        <div style="font-size:0.85rem; color:#555;">📍 ${inv.localita || inv.destinazione} | 🔧 ${inv.tipo}</div>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center; padding-left: 10px;">
+                        <span class="expand-icon" style="font-size:1.2rem; color:var(--blue-light); padding:10px;">▼</span>
+                    </div>
                 </div>
-                <div style="font-weight:600; color:#333;">${inv.tipo}</div>
-                <div style="font-size:0.95rem; margin:3px 0;"><strong>Paz/Ente:</strong> ${inv.paziente}</div>
-                <div style="font-size:0.9rem;"><strong>Disp:</strong> ${inv.dispositivi}</div>
-                <div style="font-size:0.85rem; color:#666; margin-top:5px;">📍 ${inv.localita || inv.destinazione} - ${inv.indirizzo || ''}</div>
-                <div style="font-size:0.80rem; color:#666;">📞 ${inv.telefono || '-'}</div>
+                
+                <div class="card-expanded-view hidden">
+                    <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${inv.indirizzo || ''}</div>
+                    <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${inv.telefono || '-'}</div>
+                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${inv.dispositivi || 'Nessuno'}</div>
+                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Matricola:</strong> ${inv.matricola || 'N/D'}</div>
+                    <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${inv.note || 'Nessuna'}</div>
+                    <div style="font-size:0.85rem; color:#15803d; margin-top:5px;"><strong>Km A/R:</strong> ${inv.kmPercorsi || '0'}</div>
+                    ${attachHtml}
+                </div>
             `;
+            
+            setupAccordionCard(div);
             activitiesList.appendChild(div);
         });
     }
