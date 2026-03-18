@@ -845,18 +845,32 @@ function renderSpecialPlannedList(container, filteredData) {
             const dataToLoad = plannedInterventions[idx];
             
             // Popoliamo il form
-            iTipo.value = dataToLoad.tipo;
+            function setSelectMultipleValues(selectEl, strValues) {
+                Array.from(selectEl.options).forEach(opt => opt.selected = false);
+                if(!strValues) return;
+                const vals = strValues.split(',').map(s => s.trim());
+                Array.from(selectEl.options).forEach(opt => {
+                    if(vals.includes(opt.value)) opt.selected = true;
+                });
+            }
+            
+            setSelectMultipleValues(iTipo, dataToLoad.tipo);
             iPaziente.value = dataToLoad.paziente;
             if(iLocalita) iLocalita.value = dataToLoad.localita || dataToLoad.destinazione || "";
             if(iIndirizzo) iIndirizzo.value = dataToLoad.indirizzo || "";
             if(iTelefono) iTelefono.value = dataToLoad.telefono || "";
-            if(customDevices.includes(dataToLoad.dispositivi) || Array.from(iDispositiviSelect.options).some(o=>o.value===dataToLoad.dispositivi)) {
-                iDispositiviSelect.value = dataToLoad.dispositivi;
-                iNuovoDispositivo.classList.add('hidden');
-            } else {
-                iDispositiviSelect.value = "_AZI_NUOVO_";
-                iNuovoDispositivo.classList.remove('hidden');
-                iNuovoDispositivo.value = dataToLoad.dispositivi;
+            
+            setSelectMultipleValues(iDispositiviSelect, dataToLoad.dispositivi);
+            
+            // Gestione custom devices se non trovati
+            if(dataToLoad.dispositivi) {
+                const devs = dataToLoad.dispositivi.split(',').map(s=>s.trim());
+                if(devs.some(d => !Array.from(iDispositiviSelect.options).some(o=>o.value===d))) {
+                    iNuovoDispositivo.classList.remove('hidden');
+                    iNuovoDispositivo.value = devs.filter(d => !Array.from(iDispositiviSelect.options).some(o=>o.value===d)).join(', ');
+                } else {
+                    iNuovoDispositivo.classList.add('hidden');
+                }
             }
             iNote.value = dataToLoad.note;
             pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
@@ -1401,12 +1415,16 @@ iDispositiviSelect.addEventListener('change', (e) => {
 });
 
 btnPlanIntervention.addEventListener('click', async () => {
-    if(!iTipo.value || !iPaziente.value || !iLocalita.value || !iIndirizzo.value) {
+    let tipiSelezionati = Array.from(iTipo.selectedOptions).map(o => o.value).filter(v => v).join(', ');
+    if(!tipiSelezionati || !iPaziente.value || !iLocalita.value || !iIndirizzo.value) {
         return alert("Compila Tipo, Paziente, Località e Indirizzo per salvare l'intervento programmato!");
     }
     
-    let dispFinale = iDispositiviSelect.value;
-    if(dispFinale === "_AZI_NUOVO_") dispFinale = iNuovoDispositivo.value.trim();
+    let dispFinale = Array.from(iDispositiviSelect.selectedOptions).map(o => o.value).filter(v => v !== '_AZI_NUOVO_' && v).join(', ');
+    if(Array.from(iDispositiviSelect.selectedOptions).some(o => o.value === '_AZI_NUOVO_')) {
+        let dispNuovo = iNuovoDispositivo.value.trim();
+        if(dispNuovo) dispFinale = dispFinale ? dispFinale + ', ' + dispNuovo : dispNuovo;
+    }
     if(!dispFinale) dispFinale = "Nessuno";
 
     // Calcola data prevista (default: domani)
@@ -1447,7 +1465,7 @@ btnPlanIntervention.addEventListener('click', async () => {
 
     const planned = {
         id: plannedId,
-        tipo: iTipo.value,
+        tipo: tipiSelezionati,
         paziente: iPaziente.value,
         localita: iLocalita.value,
         indirizzo: iIndirizzo.value,
@@ -1512,18 +1530,24 @@ newInterventionForm.addEventListener('submit', async (e) => {
         return alert("Inserisci i Km percorsi prima di salvare l'attività (Obbligatorio dalle Impostazioni).");
     }
     
-    let dispFinale = iDispositiviSelect.value;
-    if(dispFinale === "_AZI_NUOVO_") {
-        dispFinale = iNuovoDispositivo.value.trim();
-        if(!dispFinale) return alert("Scrivi il nome del nuovo dispositivo!");
-        if(!customDevices.includes(dispFinale)) {
-            customDevices.push(dispFinale);
-            const opt = document.createElement('option');
-            opt.value = dispFinale; opt.textContent = dispFinale;
-            iDispositiviSelect.insertBefore(opt, iDispositiviSelect.lastElementChild);
+    let tipiSelezionati = Array.from(iTipo.selectedOptions).map(o => o.value).filter(v => v).join(', ');
+    if(!tipiSelezionati) return alert("Seleziona almeno un Tipo di Intervento!");
+
+    let dispFinale = Array.from(iDispositiviSelect.selectedOptions).map(o => o.value).filter(v => v !== '_AZI_NUOVO_' && v).join(', ');
+    if(Array.from(iDispositiviSelect.selectedOptions).some(o => o.value === '_AZI_NUOVO_')) {
+        let dispNuovo = iNuovoDispositivo.value.trim();
+        if(!dispNuovo && iDispositiviSelect.selectedOptions.length === 1) return alert("Scrivi il nome del nuovo dispositivo!");
+        if(dispNuovo) {
+            dispFinale = dispFinale ? dispFinale + ', ' + dispNuovo : dispNuovo;
+            if(!customDevices.includes(dispNuovo)) {
+                customDevices.push(dispNuovo);
+                const opt = document.createElement('option');
+                opt.value = dispNuovo; opt.textContent = dispNuovo;
+                iDispositiviSelect.insertBefore(opt, iDispositiviSelect.lastElementChild);
+            }
         }
     } else if(!dispFinale) {
-        return alert("Seleziona un dispositivo!");
+        return alert("Seleziona almeno un dispositivo (o scegli 'Nessuno')!");
     }
 
     // UI Loading state indication
@@ -1535,7 +1559,7 @@ newInterventionForm.addEventListener('submit', async (e) => {
     let invToSave = {
         id: Date.now().toString(),
         dataObj: new Date().getTime(),
-        tipo: iTipo.value,
+        tipo: tipiSelezionati,
         paziente: iPaziente.value,
         localita: iLocalita.value,
         indirizzo: iIndirizzo.value,
@@ -1846,19 +1870,34 @@ function renderActivitiesList() {
             
             div.querySelector('button[data-action="avvia"]').addEventListener('click', () => {
                 const dataToLoad = plannedInterventions[origIndex];
-                iTipo.value = dataToLoad.tipo;
-                iPaziente.value = dataToLoad.paziente;
-                iLocalita.value = dataToLoad.localita || dataToLoad.destinazione;
-                iIndirizzo.value = dataToLoad.indirizzo || "";
-                if(iTelefono) iTelefono.value = dataToLoad.telefono || "";
-                
-                if(Array.from(iDispositiviSelect.options).some(opt => opt.value === dataToLoad.dispositivi)) {
-                    iDispositiviSelect.value = dataToLoad.dispositivi;
-                } else {
-                    iDispositiviSelect.value = "_AZI_NUOVO_";
+            function setSelectMultipleValues(selectEl, strValues) {
+                Array.from(selectEl.options).forEach(opt => opt.selected = false);
+                if(!strValues) return;
+                const vals = strValues.split(',').map(s => s.trim());
+                Array.from(selectEl.options).forEach(opt => {
+                    if(vals.includes(opt.value)) opt.selected = true;
+                });
+            }
+            
+            setSelectMultipleValues(iTipo, dataToLoad.tipo);
+            iPaziente.value = dataToLoad.paziente;
+            if(iLocalita) iLocalita.value = dataToLoad.localita || dataToLoad.destinazione || "";
+            if(iIndirizzo) iIndirizzo.value = dataToLoad.indirizzo || "";
+            if(iTelefono) iTelefono.value = dataToLoad.telefono || "";
+            
+            setSelectMultipleValues(iDispositiviSelect, dataToLoad.dispositivi);
+            
+            // Gestione custom devices se non trovati negli option o se tra le virgole ci sono custom
+            if(dataToLoad.dispositivi) {
+                const devs = dataToLoad.dispositivi.split(',').map(s=>s.trim());
+                if(devs.some(d => !Array.from(iDispositiviSelect.options).some(o=>o.value===d))) {
                     iNuovoDispositivo.classList.remove('hidden');
-                    iNuovoDispositivo.value = dataToLoad.dispositivi;
+                    // mettiamo solo l'ultimo mancante per semplificare il form
+                    iNuovoDispositivo.value = devs.filter(d => !Array.from(iDispositiviSelect.options).some(o=>o.value===d)).join(', ');
+                } else {
+                    iNuovoDispositivo.classList.add('hidden');
                 }
+            }
                 iNote.value = dataToLoad.note || "";
                 pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
 
@@ -1928,6 +1967,94 @@ function renderActivitiesList() {
             activitiesList.appendChild(div);
         });
     }
+}
+
+// --- RUBRICA SMS IPHONE / ANDROID ---
+const btnOpenRubrica = document.getElementById('btnOpenRubrica');
+const rubricaModal = document.getElementById('rubricaModal');
+const btnCloseRubrica = document.getElementById('btnCloseRubrica');
+const newRubricaForm = document.getElementById('newRubricaForm');
+const rubricaNome = document.getElementById('rubricaNome');
+const rubricaTelefono = document.getElementById('rubricaTelefono');
+const rubricaList = document.getElementById('rubricaList');
+
+let localeRubrica = JSON.parse(localStorage.getItem('antimo_rubrica')) || [];
+
+function renderRubrica() {
+    if(!rubricaList) return;
+    rubricaList.innerHTML = '';
+    if(localeRubrica.length === 0) {
+        rubricaList.innerHTML = '<div style="text-align: center; color: #666; font-size: 0.9rem; padding: 10px;">Nessun contatto salvato in rubrica. Aggiungine uno qui sopra!</div>';
+        return;
+    }
+    
+    localeRubrica.forEach((contatto, i) => {
+        const div = document.createElement('div');
+        div.style.cssText = "display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; background: #f9fafb; border-radius: 6px;";
+        div.innerHTML = `
+            <div style="flex: 1;">
+                <strong style="color: var(--blue-dark); font-size: 1rem;">${contatto.nome}</strong><br>
+                <a href="tel:${contatto.numero}" style="font-size: 0.85rem; color: #555; text-decoration: none;">📞 ${contatto.numero}</a>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn btn-primary btn-sm btn-invia-sms" style="background:var(--orange); border:none; padding:8px 12px; font-weight: bold;" data-tel="${contatto.numero}">InvSMS</button>
+                <button class="btn btn-danger btn-sm btn-elimina-rubrica" style="padding:8px 12px; font-weight: bold;" data-index="${i}">✖</button>
+            </div>
+        `;
+        rubricaList.appendChild(div);
+    });
+    
+    document.querySelectorAll('.btn-elimina-rubrica').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const idx = e.target.getAttribute('data-index');
+            if(confirm('Eliminare questo contatto dalla rubrica?')) {
+                localeRubrica.splice(idx, 1);
+                localStorage.setItem('antimo_rubrica', JSON.stringify(localeRubrica));
+                renderRubrica();
+            }
+        });
+    });
+    
+    document.querySelectorAll('.btn-invia-sms').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const tel = e.target.getAttribute('data-tel');
+            const msgT = document.getElementById('msgText');
+            let bodyText = encodeURIComponent(msgT && msgT.value.trim() ? msgT.value.trim() : "Notifica dall'app.");
+            
+            const os = navigator.userAgent.toLowerCase();
+            if(os.includes("iphone") || os.includes("ipad")) {
+                 window.location.href = `sms:${tel}&body=${bodyText}`;
+            } else {
+                 window.location.href = `sms:${tel}?body=${bodyText}`;
+            }
+        });
+    });
+}
+
+if(btnOpenRubrica) {
+    btnOpenRubrica.addEventListener('click', () => {
+        renderRubrica();
+        rubricaModal.classList.remove('hidden');
+    });
+}
+if(btnCloseRubrica) {
+    btnCloseRubrica.addEventListener('click', () => {
+        rubricaModal.classList.add('hidden');
+    });
+}
+
+if(newRubricaForm) {
+    newRubricaForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        localeRubrica.push({
+            nome: rubricaNome.value.trim(),
+            numero: rubricaTelefono.value.trim()
+        });
+        localStorage.setItem('antimo_rubrica', JSON.stringify(localeRubrica));
+        rubricaNome.value = '';
+        rubricaTelefono.value = '';
+        renderRubrica();
+    });
 }
 
 // Inizializzazione Globale

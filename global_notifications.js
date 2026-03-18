@@ -58,8 +58,10 @@ if(db) {
                     ${activeNotes.length > 1 ? `(${activeNotes.length}) ` : ''}${activeNotes[0]}
                 </div>
             `;
+            if (navigator.setAppBadge) navigator.setAppBadge(activeNotes.length).catch(e => console.error("AppBadge error", e));
         } else {
             badge.style.display = 'none';
+            if (navigator.clearAppBadge) navigator.clearAppBadge().catch(e => console.error("AppBadge error", e));
         }
     });
 }
