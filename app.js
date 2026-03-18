@@ -213,7 +213,9 @@ if(btnMostraEseguiti) btnMostraEseguiti.addEventListener('click', () => toggleTa
 if(btnToggleMessages) {
     btnToggleMessages.addEventListener('click', () => {
         messagesContainer.classList.toggle('hidden');
-        btnToggleMessages.textContent = messagesContainer.classList.contains('hidden') ? 'Mostra' : 'Nascondi';
+        let badgeSpan = btnToggleMessages.querySelector('span');
+        let noteBadge = badgeSpan ? ' ' + badgeSpan.outerHTML : '';
+        btnToggleMessages.innerHTML = (messagesContainer.classList.contains('hidden') ? 'Mostra' : 'Nascondi') + noteBadge;
     });
 }
 
@@ -266,12 +268,13 @@ async function loadMessages() {
                 const div = document.createElement('div');
                 div.style.padding = "10px";
                 div.style.borderRadius = "8px";
-                div.style.backgroundColor = data.isNotification ? "#fffbeb" : "#f1f5f9";
+                div.style.backgroundColor = data.isNotification ? "#fffbeb" : (data.letto ? "#f8fafc" : "#f1f5f9");
                 div.style.borderLeft = data.isNotification ? "4px solid #f59e0b" : "4px solid #cbd5e1";
                 div.style.fontSize = "0.9rem";
                 div.style.display = "flex";
                 div.style.flexDirection = "column";
                 div.style.gap = "5px";
+                if(data.letto && !data.isNotification) div.style.opacity = "0.6";
 
                 let timeStr = "--/--/---- --:--";
                 if(data.timestamp) {
@@ -282,19 +285,23 @@ async function loadMessages() {
                 div.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                         <span style="font-size: 0.75rem; color: #666; font-weight: 600;">⏰ ${timeStr} </span>
-                        ${data.isNotification ? '<span style="font-size:0.75rem; background:#f59e0b; color:white; padding:2px 6px; border-radius:12px; font-weight:bold;">📌 NOTIFICA</span>' : ''}
+                        <div>
+                            ${data.presoInCarico ? '<span style="font-size:0.75rem; background:#3b82f6; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">👷 Preso in Carico</span>' : ''}
+                            ${data.isNotification ? '<span style="font-size:0.75rem; background:#f59e0b; color:white; padding:2px 6px; border-radius:12px; font-weight:bold;">📌 NOTIFICA</span>' : ''}
+                        </div>
                     </div>
-                    <div style="color: #333; line-height: 1.4; white-space: pre-wrap;">${data.text}</div>
+                    <div style="color: #333; line-height: 1.4; white-space: pre-wrap; margin-top:5px; ${data.letto ? 'text-decoration: line-through; color: #777;' : ''}">${data.text}</div>
                 `;
                 
                 const actionDiv = document.createElement('div');
                 actionDiv.style.display = "flex";
-                actionDiv.style.gap = "10px";
-                actionDiv.style.marginTop = "5px";
+                actionDiv.style.gap = "8px";
+                actionDiv.style.marginTop = "8px";
+                actionDiv.style.flexWrap = "wrap";
 
                 const toggleBtn = document.createElement('button');
-                toggleBtn.innerHTML = data.isNotification ? "🔕 Rimuovi Notifica" : "🔔 Setta Promemoria";
-                toggleBtn.style.cssText = "background: none; border: 1px solid #b8b8b8; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; cursor: pointer; color: #555; background-color: rgba(255,255,255,0.5);";
+                toggleBtn.innerHTML = data.isNotification ? "🔕 Annulla Notifica" : "🔔 Setta Promemoria";
+                toggleBtn.style.cssText = "background: none; border: 1px solid #b8b8b8; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #555; background-color: rgba(255,255,255,0.5);";
                 toggleBtn.onclick = async () => {
                     try {
                         const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
@@ -302,6 +309,28 @@ async function loadMessages() {
                     } catch(err) { console.error("Errore toggle", err); }
                 };
                 actionDiv.appendChild(toggleBtn);
+
+                const toggleReadBtn = document.createElement('button');
+                toggleReadBtn.innerHTML = data.letto ? "📖 Da Leggere" : "✔️ Letto";
+                toggleReadBtn.style.cssText = "background: none; border: 1px solid #b8b8b8; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #555; background-color: rgba(255,255,255,0.5);";
+                toggleReadBtn.onclick = async () => {
+                    try {
+                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                        await updateDoc(doc(db, "messaggi", docSnap.id), { letto: !data.letto });
+                    } catch(err) { console.error("Errore letto", err); }
+                };
+                actionDiv.appendChild(toggleReadBtn);
+                
+                const toggleCaricoBtn = document.createElement('button');
+                toggleCaricoBtn.innerHTML = data.presoInCarico ? "❌ Annulla Incarico" : "👷 Prendi in Carico";
+                toggleCaricoBtn.style.cssText = "background: none; border: 1px solid #3b82f6; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #1d4ed8; background-color: rgba(59,130,246,0.1);";
+                toggleCaricoBtn.onclick = async () => {
+                    try {
+                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                        await updateDoc(doc(db, "messaggi", docSnap.id), { presoInCarico: !data.presoInCarico });
+                    } catch(err) { console.error("Errore carico", err); }
+                };
+                actionDiv.appendChild(toggleCaricoBtn);
 
                 const deleteBtn = document.createElement('button');
                 deleteBtn.innerHTML = "🗑️ Elimina";
@@ -320,16 +349,20 @@ async function loadMessages() {
                 messagesList.appendChild(div);
             });
             
-            // Aggiorna Pulsante Globale Notifiche
+            // Aggiorna Pulsante Globale Notifiche e Testo "Mostra/Nascondi"
             if(activeNotes.length > 0 && btnTopNotification) {
                 btnTopNotification.classList.remove('hidden');
                 topNotificationText.textContent = `${activeNotes.length > 1 ? `(${activeNotes.length}) ` : ''}${activeNotes[0]}`;
-                btnToggleMessages.innerHTML = `Nascondi <span style="background:var(--orange);color:white;padding:2px 6px;border-radius:12px;font-size:0.7rem;">${activeNotes.length}</span>`;
             } else if(btnTopNotification) {
                 btnTopNotification.classList.add('hidden');
-                btnToggleMessages.textContent = messagesContainer.classList.contains('hidden') ? 'Mostra' : 'Nascondi';
             }
             
+            if(btnToggleMessages) {
+                const isHidden = messagesContainer.classList.contains('hidden');
+                let noteBadge = activeNotes.length > 0 ? ` <span style="background:var(--orange);color:white;padding:2px 6px;border-radius:12px;font-size:0.7rem;">${activeNotes.length}</span>` : '';
+                btnToggleMessages.innerHTML = (isHidden ? 'Mostra' : 'Nascondi') + noteBadge;
+            }
+
             if(count === 0) {
                 messagesList.innerHTML = '<div style="text-align: center; font-size: 0.9rem; color: #666; padding: 10px;">Nessun messaggio in bacheca.</div>';
             }
@@ -399,7 +432,7 @@ if(newMessageForm) {
             await processMessageSave(pendingMessageText, pendingMessageIsNotification);
             
             document.getElementById('msgText').value = '';
-            if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = false;
+            if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = true;
             btn.innerHTML = oldHtml; btn.disabled = false;
         }
     });
@@ -416,7 +449,7 @@ if(btnWaSkip) {
         btnWaSkip.disabled = true; btnWaSkip.innerHTML = '...';
         await processMessageSave(pendingMessageText, pendingMessageIsNotification);
         document.getElementById('msgText').value = '';
-        if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = false;
+        if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = true;
         
         waSelectModal.classList.add('hidden');
         btnWaSkip.disabled = false; btnWaSkip.innerHTML = 'Solo Bacheca';
@@ -430,7 +463,7 @@ if(btnWaSend) {
         btnWaSend.disabled = true; btnWaSend.innerHTML = '...';
         await processMessageSave(pendingMessageText, pendingMessageIsNotification);
         document.getElementById('msgText').value = '';
-        if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = false;
+        if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = true;
         
         waSelectModal.classList.add('hidden');
         btnWaSend.disabled = false; btnWaSend.innerHTML = 'Procedi su WA';
