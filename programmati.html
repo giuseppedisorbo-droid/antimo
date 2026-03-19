@@ -96,7 +96,7 @@
 
                     <div class="form-group" style="margin-bottom: 0;">
                         <label for="tipoAttivita">Tipo Intervento</label>
-                        <select id="tipoAttivita">
+                        <select id="tipoAttivita" multiple style="height: 120px;">
                             <option value="Sostituzione">Sostituzione</option>
                             <option value="Installazione">Installazione</option>
                             <option value="Visita">Visita</option>
@@ -109,9 +109,15 @@
                         </select>
                     </div>
 
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label for="dataProgrammata">Data Prevista (Vuota = In Attesa)</label>
-                        <input type="date" id="dataProgrammata">
+                    <div style="display: flex; gap: 10px; margin-bottom: 0;">
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label for="dataProgrammata">Data Prevista</label>
+                            <input type="date" id="dataProgrammata">
+                        </div>
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label for="oraProgrammata">Ora Prevista</label>
+                            <input type="time" id="oraProgrammata" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
+                        </div>
                     </div>
                 </div>
 
@@ -123,7 +129,12 @@
     
                     <div class="form-group" style="flex: 1; margin-top: 10px; min-width: 140px;">
                         <label for="dispositivi">Dispositivi / Note</label>
-                        <input type="text" id="dispositivi" placeholder="Quali dispositivi o note...">
+                        <textarea id="dispositivi" rows="2" placeholder="Quali dispositivi o note..."></textarea>
+                    </div>
+                    
+                    <div class="form-group" style="flex: 1; margin-top: 10px; min-width: 140px;">
+                        <label for="matricola">Matricole</label>
+                        <textarea id="matricola" rows="2" placeholder="Matricole separate da virgola..."></textarea>
                     </div>
                 </div>
 
@@ -219,15 +230,25 @@
                 </div>
                 <div class="form-group">
                     <label>Tipo Intervento</label>
-                    <input type="text" id="editProgTipo">
+                    <textarea id="editProgTipo" rows="2"></textarea>
                 </div>
                 <div class="form-group">
                     <label>Dispositivi / Note</label>
-                    <input type="text" id="editProgDispositivi">
+                    <textarea id="editProgDispositivi" rows="2"></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Data Prevista</label>
-                    <input type="date" id="editProgData">
+                    <label>Matricole</label>
+                    <textarea id="editProgMatricola" rows="2"></textarea>
+                </div>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <div style="flex: 1;">
+                        <label>Data Prevista</label>
+                        <input type="date" id="editProgData" style="width: 100%;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label>Ora Prevista</label>
+                        <input type="time" id="editProgOra" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
+                    </div>
                 </div>
                 <button type="button" id="btnSaveEditProg" class="btn btn-primary btn-large" style="width: 100%; margin-top: 10px;">SALVA MODIFICHE</button>
             </form>

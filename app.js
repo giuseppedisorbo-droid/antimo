@@ -2248,6 +2248,58 @@ if(btnCloseRubrica) {
     });
 }
 
+const btnOpenUsersList = document.getElementById('btnOpenUsersList');
+const appUsersModal = document.getElementById('appUsersModal');
+const btnCloseUsersList = document.getElementById('btnCloseUsersList');
+const appUsersList = document.getElementById('appUsersList');
+
+async function renderAppUsersList() {
+    if (!appUsersList) return;
+    appUsersList.innerHTML = '<div style="text-align: center; color: #666; font-size: 0.9rem;">Caricamento dipendenti in corso...</div>';
+    try {
+        if (!isFirebaseConfigured) {
+            appUsersList.innerHTML = '<div style="text-align: center; color: red; font-size: 0.9rem;">Firebase non configurato.</div>';
+            return;
+        }
+        const { collection, getDocs, query, where } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        const q = query(collection(db, "anagrafiche"), where("localita", "==", "App (Dipendente)"));
+        const snap = await getDocs(q);
+        
+        let usersHtml = '';
+        snap.forEach(doc => {
+            const data = doc.data();
+            usersHtml += `
+            <div style="padding: 10px; border-bottom: 1px solid #eee; background: #f9fafb; border-radius: 6px; display:flex; flex-direction:column; gap:4px;">
+                <strong style="color: var(--blue-dark); font-size: 1rem;">${data.nome} ${data.cognome}</strong>
+                <a href="mailto:${data.email}" style="font-size: 0.85rem; color: var(--blue-primary); text-decoration: none;">📧 ${data.email}</a>
+                <a href="tel:${data.telefono1 || ''}" style="font-size: 0.85rem; color: #555; text-decoration: none;">📞 ${data.telefono1 || 'Nessun Telefono'}</a>
+            </div>
+            `;
+        });
+        
+        if (!usersHtml) {
+            appUsersList.innerHTML = '<div style="text-align: center; color: #666; font-size: 0.9rem;">Nessun dipendente registrato.</div>';
+        } else {
+            appUsersList.innerHTML = usersHtml;
+        }
+    } catch(err) {
+        console.error("Errore caricamento utenti", err);
+        appUsersList.innerHTML = '<div style="text-align: center; color: red; font-size: 0.9rem;">Errore caricamento.</div>';
+    }
+}
+
+if(btnOpenUsersList) {
+    btnOpenUsersList.addEventListener('click', () => {
+        appUsersModal.classList.remove('hidden');
+        renderAppUsersList();
+    });
+}
+if(btnCloseUsersList) {
+    btnCloseUsersList.addEventListener('click', () => {
+        appUsersModal.classList.add('hidden');
+    });
+}
+
 if(newRubricaForm) {
     newRubricaForm.addEventListener('submit', (e) => {
         e.preventDefault();

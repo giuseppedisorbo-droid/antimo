@@ -18,8 +18,10 @@
                 <button id="btnSettings" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: white;" title="Impostazioni">⚙️</button>
                 <button id="btnTogglePC" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; cursor: pointer; font-weight: bold; font-size: 0.8rem;">PC</button>
                 <a href="admin.html" id="btnOpenDashboard" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; cursor: pointer; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: flex; align-items: center;">💻 Dashboard</a>
+                <button id="btnOpenUsersList" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; cursor: pointer; font-weight: bold; font-size: 0.8rem;">👥 Dipendenti</button>
             </div>
-            <div style="font-size: 0.75rem; color: rgba(255,255,255,0.9); margin-top: 8px; cursor: pointer; font-weight: 600;" id="appVersionStamp" onclick="nukeCache()">v24.6 - Filtri Admin</div>
+            <div style="font-size: 0.75rem; color: rgba(255,255,255,0.9); margin-top: 8px; cursor: pointer; font-weight: 600;" id="appVersionStamp" onclick="nukeCache()">v24.7 - Utenti</div>
+            <div id="loggedInUserDisplay" style="font-size: 0.8rem; color: #fcd34d; font-weight: bold; margin-top: 4px;"></div>
             <button id="btnTopNotification" class="hidden" style="margin-top: 5px; background: #e11d48; color: white; border-radius: 6px; padding: 4px 8px; border: 1px solid rgba(255,255,255,0.5); cursor: pointer; font-weight: 600; font-size: 0.75rem; display: flex; align-items: center; max-width: 250px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
                 🔔 <span id="topNotificationText" style="margin-left: 5px; overflow:hidden; text-overflow:ellipsis; white-space: nowrap;"></span>
             </button>
@@ -243,8 +245,16 @@
             </button>
                     
                     <div style="border-top: 1px dashed #ccc; margin-top: 10px; padding-top: 10px;">
-                        <label for="dataProgrammata"><strong>Data Programmazione (Opzionale)</strong></label>
-                        <input type="date" id="dataProgrammata" style="margin-bottom: 10px;">
+                        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                            <div style="flex: 1;">
+                                <label for="dataProgrammata"><strong>Data Prevista</strong></label>
+                                <input type="date" id="dataProgrammata" style="width: 100%;">
+                            </div>
+                            <div style="flex: 1;">
+                                <label for="oraProgrammata"><strong>Ora Prevista</strong></label>
+                                <input type="time" id="oraProgrammata" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
+                            </div>
+                        </div>
                         <button type="button" class="btn" id="btnPlanIntervention" style="background-color: #e2e8f0; color: var(--blue-dark); font-weight: 600; padding: 12px; border: 1px solid #cbd5e1; width: 100%;">
                              <span class="btn-icon">📅</span> SALVA IN PROGRAMMATI
                         </button>
@@ -385,15 +395,25 @@
                     </div>
                     <div class="form-group">
                         <label>Tipo Intervento</label>
-                        <input type="text" id="editTipo">
+                        <textarea id="editTipo" rows="2"></textarea>
                     </div>
                     <div class="form-group">
                         <label>Dispositivi</label>
-                        <input type="text" id="editDispositivi">
+                        <textarea id="editDispositivi" rows="2"></textarea>
                     </div>
                     <div class="form-group">
-                        <label>Date (Vuoto = NP)</label>
-                        <input type="date" id="editDataPrevista">
+                        <label>Matricole</label>
+                        <textarea id="editMatricola" rows="2"></textarea>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <div style="flex: 1;">
+                            <label>Data Prevista</label>
+                            <input type="date" id="editDataPrevista" style="width: 100%;">
+                        </div>
+                        <div style="flex: 1;">
+                            <label>Ora Prevista</label>
+                            <input type="time" id="editOraPrevista" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>Note</label>
@@ -594,10 +614,23 @@
                 </form>
             </div>
         </div>
+        
+        <!-- MODAL UTENTI APP -->
+        <div id="appUsersModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2500; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
+                    <span><span class="btn-icon">👥</span> Dipendenti Registrati</span>
+                    <button id="btnCloseUsersList" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                </h3>
+                <div id="appUsersList" style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto;">
+                    <div style="text-align: center; color: #666; font-size: 0.9rem;">Caricamento dipendenti...</div>
+                </div>
+            </div>
+        </div>
 
     </main>
-    <script type="module" src="app.js?v=27"></script>
-    <script type="module" src="global_notifications.js"></script>
+    <script type="module" src="app.js?v=28"></script>
+    <script type="module" src="global_notifications.js?v=28"></script>
     <script>
       // Gestione layout PC
       document.addEventListener('DOMContentLoaded', () => {
