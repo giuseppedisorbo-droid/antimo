@@ -572,8 +572,31 @@
             </div>
         </div>
 
+        <!-- MODAL LOGIN (OBBLIGATORIO) -->
+        <div id="loginModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
+            <div style="background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.15); border: 2px solid var(--blue-light);">
+                <div style="font-size: 3rem; margin-bottom: 10px;">🔐</div>
+                <h2 style="color: var(--blue-primary); margin-bottom: 15px;">Accesso Riservato</h2>
+                <p style="font-size: 0.9rem; color: #555; margin-bottom: 25px;">Inserisci le tue credenziali aziendali per accedere. L'accesso è consentito solo con email <strong>@eubios.it</strong>.</p>
+                <form id="loginForm" style="display: flex; flex-direction: column; gap: 15px;">
+                    <div style="text-align: left;">
+                        <label for="loginEmail" style="font-weight: bold; font-size: 0.85rem; color: var(--blue-dark);">Email Aziendale *</label>
+                        <input type="email" id="loginEmail" placeholder="nome.cognome@eubios.it" required style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; margin-top: 5px; font-size: 1rem;">
+                    </div>
+                    <div style="text-align: left;">
+                        <label for="loginPhone" style="font-weight: bold; font-size: 0.85rem; color: var(--blue-dark);">Cellulare (per Anagrafica) *</label>
+                        <input type="tel" id="loginPhone" placeholder="Es. 3331234567" required style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; margin-top: 5px; font-size: 1rem;">
+                    </div>
+                    <div id="loginError" style="color: #dc2626; font-size: 0.85rem; font-weight: bold; display: none; background: #fee2e2; padding: 10px; border-radius: 6px;">Errore: formato email non valido.</div>
+                    <button type="submit" class="btn btn-primary btn-blue" style="width: 100%; padding: 15px; font-size: 1.1rem; font-weight: bold; margin-top: 10px; margin-bottom: 0;" id="btnLoginSubmit">
+                        AUTENTICATI
+                    </button>
+                </form>
+            </div>
+        </div>
+
     </main>
-    <script type="module" src="app.js?v=26"></script>
+    <script type="module" src="app.js?v=27"></script>
     <script type="module" src="global_notifications.js"></script>
     <script>
       // Gestione layout PC

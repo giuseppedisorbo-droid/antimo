@@ -266,6 +266,7 @@ async function loadMessages() {
                 if(data.isNotification) activeNotes.push(data.text);
                 
                 const div = document.createElement('div');
+                div.setAttribute('data-id', docSnap.id);
                 div.style.padding = "10px";
                 div.style.borderRadius = "8px";
                 div.style.backgroundColor = data.isNotification ? "#fffbeb" : (data.letto ? "#f8fafc" : "#f1f5f9");
@@ -274,6 +275,7 @@ async function loadMessages() {
                 div.style.display = "flex";
                 div.style.flexDirection = "column";
                 div.style.gap = "5px";
+                div.style.transition = "background-color 1s ease";
                 if(data.letto && !data.isNotification) div.style.opacity = "0.6";
 
                 let timeStr = "--/--/---- --:--";
@@ -366,6 +368,24 @@ async function loadMessages() {
             if(count === 0) {
                 messagesList.innerHTML = '<div style="text-align: center; font-size: 0.9rem; color: #666; padding: 10px;">Nessun messaggio in bacheca.</div>';
             }
+            
+            // In caso di link WhatsApp con msgId
+            const urlParams = new URLSearchParams(window.location.search);
+            const msgId = urlParams.get('msgId');
+            if(msgId) {
+                const targetMsg = messagesList.querySelector(`div[data-id="${msgId}"]`);
+                if(targetMsg) {
+                    messagesContainer.classList.remove('hidden');
+                    if(btnToggleMessages) btnToggleMessages.textContent = 'Nascondi';
+                    setTimeout(() => {
+                        targetMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        const originalBg = targetMsg.style.backgroundColor;
+                        targetMsg.style.backgroundColor = '#dbeafe';
+                        setTimeout(() => { targetMsg.style.backgroundColor = originalBg; }, 3000);
+                    }, 500);
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            }
         }, (error) => {
             console.error("Errore snapshot messaggi", error);
             if(messagesList) messagesList.innerHTML = '<div style="color:red; font-size:0.85rem; text-align:center;">Errore caricamento messaggi.</div>';
@@ -387,19 +407,19 @@ const waQueueList = document.getElementById('waQueueList');
 const btnCloseWaQueue = document.getElementById('btnCloseWaQueue');
 
 async function processMessageSave(text, isNotif) {
-    if(!isFirebaseConfigured) return false;
+    if(!isFirebaseConfigured) return null;
     try {
         const { collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        await addDoc(collection(db, "messaggi"), {
+        const docRef = await addDoc(collection(db, "messaggi"), {
             text: text,
             isNotification: isNotif,
             timestamp: serverTimestamp()
         });
-        return true;
+        return docRef.id;
     } catch(err) {
         console.error("Errore invio msg", err);
         alert("Errore invio messaggio.");
-        return false;
+        return null;
     }
 }
 
@@ -461,14 +481,14 @@ if(btnWaSend) {
         const selectedIndexes = Array.from(document.querySelectorAll('.wa-contact-cb:checked')).map(cb => parseInt(cb.value));
         
         btnWaSend.disabled = true; btnWaSend.innerHTML = '...';
-        await processMessageSave(pendingMessageText, pendingMessageIsNotification);
+        const msgId = await processMessageSave(pendingMessageText, pendingMessageIsNotification);
         document.getElementById('msgText').value = '';
         if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = true;
         
         waSelectModal.classList.add('hidden');
         btnWaSend.disabled = false; btnWaSend.innerHTML = 'Procedi su WA';
         
-        if(selectedIndexes.length > 0) {
+        if(selectedIndexes.length > 0 && msgId) {
             waQueueList.innerHTML = '';
             selectedIndexes.forEach(idx => {
                 const c = localeRubrica[idx];
@@ -479,9 +499,12 @@ if(btnWaSend) {
                 
                 let cleanNum = c.numero.replace(/\s+/g, '');
                 if(!cleanNum.startsWith('+') && cleanNum.length <= 10) cleanNum = "39" + cleanNum;
-                else cleanNum = cleanNum.replace('+', ''); // WhatsApp links do not require +
+                else cleanNum = cleanNum.replace('+', '');
                 
-                btn.href = `https://wa.me/${cleanNum}?text=${encodeURIComponent(pendingMessageText)}`;
+                let appLink = window.location.origin + window.location.pathname + '?msgId=' + msgId;
+                let textWithLink = pendingMessageText + "\n\nApri nell'App: " + appLink;
+                
+                btn.href = `https://wa.me/${cleanNum}?text=${encodeURIComponent(textWithLink)}`;
                 btn.innerHTML = `<span style="font-size:1.2rem;">💬</span> WhatsApp per ${c.nome}`;
                 btn.onclick = () => { 
                     btn.style.opacity = '0.5'; 
@@ -2212,6 +2235,75 @@ if(newRubricaForm) {
         renderRubrica();
     });
 }
+
+// Auth Check e Login Aziendale
+async function checkLoginStatus() {
+    const userEmail = localStorage.getItem('antimo_user_email');
+    if (!userEmail) {
+        document.getElementById('loginModal').classList.remove('hidden');
+    }
+}
+
+const loginForm = document.getElementById('loginForm');
+if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+        const phone = document.getElementById('loginPhone').value.trim();
+        const errDiv = document.getElementById('loginError');
+        const btnLoginSubmit = document.getElementById('btnLoginSubmit');
+        
+        const emailRegex = /^[a-z]+\.[a-z]+@eubios\.it$/;
+        
+        if (!emailRegex.test(email)) {
+            errDiv.textContent = "Accesso negato. Usa formato valido: nome.cognome@eubios.it";
+            errDiv.style.display = "block";
+            return;
+        }
+        
+        errDiv.style.display = "none";
+        btnLoginSubmit.disabled = true;
+        btnLoginSubmit.innerHTML = "VERIFICA IN CORSO...";
+        
+        try {
+            const parts = email.split('@')[0].split('.');
+            let nome = parts[0];
+            let cognome = parts[1];
+            
+            if (isFirebaseConfigured) {
+                const { collection, query, where, getDocs, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                const q = query(collection(db, "anagrafiche"), where("email", "==", email));
+                const snap = await getDocs(q);
+                
+                if (snap.empty) {
+                    await addDoc(collection(db, "anagrafiche"), {
+                        id: Date.now().toString(),
+                        timestamp: serverTimestamp(),
+                        nome: nome.charAt(0).toUpperCase() + nome.slice(1),
+                        cognome: cognome.charAt(0).toUpperCase() + cognome.slice(1),
+                        email: email,
+                        telefono1: phone,
+                        localita: "App (Dipendente)",
+                        indirizzo: "-",
+                        codiceFiscale: "",
+                        provincia: ""
+                    });
+                }
+            }
+            localStorage.setItem('antimo_user_email', email);
+            localStorage.setItem('antimo_user_phone', phone);
+            
+            document.getElementById('loginModal').classList.add('hidden');
+        } catch(err) {
+            console.error("Errore login / anagrafiche", err);
+            errDiv.textContent = "Errore di connessione al database.";
+            errDiv.style.display = "block";
+            btnLoginSubmit.disabled = false;
+            btnLoginSubmit.innerHTML = "AUTENTICATI";
+        }
+    });
+}
+checkLoginStatus();
 
 // Inizializzazione Globale
 initApp();
