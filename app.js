@@ -284,6 +284,9 @@ async function loadMessages() {
                     timeStr = `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
                 }
 
+                let sN = data.sender || "Sconosciuto";
+                let rN = data.recipients || "Bacheca (Tutti)";
+
                 div.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                         <span style="font-size: 0.75rem; color: #666; font-weight: 600;">⏰ ${timeStr} </span>
@@ -291,6 +294,9 @@ async function loadMessages() {
                             ${data.presoInCarico ? '<span style="font-size:0.75rem; background:#3b82f6; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">👷 Preso in Carico</span>' : ''}
                             ${data.isNotification ? '<span style="font-size:0.75rem; background:#f59e0b; color:white; padding:2px 6px; border-radius:12px; font-weight:bold;">📌 NOTIFICA</span>' : ''}
                         </div>
+                    </div>
+                    <div style="margin-top:5px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; font-size: 0.8rem; color: var(--blue-dark);">
+                        <strong>Da:</strong> ${sN} &nbsp;|&nbsp; <strong>A:</strong> ${rN}
                     </div>
                     <div style="color: #333; line-height: 1.4; white-space: pre-wrap; margin-top:5px; ${data.letto ? 'text-decoration: line-through; color: #777;' : ''}">${data.text}</div>
                 `;
@@ -406,13 +412,16 @@ const waQueueModal = document.getElementById('waQueueModal');
 const waQueueList = document.getElementById('waQueueList');
 const btnCloseWaQueue = document.getElementById('btnCloseWaQueue');
 
-async function processMessageSave(text, isNotif) {
+async function processMessageSave(text, isNotif, recipients = "Bacheca (Tutti)") {
     if(!isFirebaseConfigured) return null;
     try {
+        const senderName = localStorage.getItem('antimo_user_name') || "Sconosciuto";
         const { collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
         const docRef = await addDoc(collection(db, "messaggi"), {
             text: text,
             isNotification: isNotif,
+            sender: senderName,
+            recipients: recipients,
             timestamp: serverTimestamp()
         });
         return docRef.id;
@@ -439,7 +448,7 @@ if(newMessageForm) {
             localeRubrica.forEach((c, i) => {
                 const div = document.createElement('label');
                 div.style.cssText = "display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: #f9f9f9; border-radius: 6px; border: 1px solid #eee;";
-                div.innerHTML = `<input type="checkbox" class="wa-contact-cb" value="${i}" style="transform: scale(1.2);"> <span style="font-weight:bold; color:var(--blue-dark);">${c.nome}</span> <span style="color:#666; font-size:0.85rem;">(${c.numero})</span>`;
+                div.innerHTML = `<input type="checkbox" class="wa-contact-cb" value="${i}" data-name="${c.nome}" style="transform: scale(1.2);"> <span style="font-weight:bold; color:var(--blue-dark);">${c.nome}</span> <span style="color:#666; font-size:0.85rem;">(${c.numero})</span>`;
                 waContactsList.appendChild(div);
             });
             waSelectAll.checked = false;
@@ -449,7 +458,7 @@ if(newMessageForm) {
             const oldHtml = btn.innerHTML;
             btn.innerHTML = '...'; btn.disabled = true;
             
-            await processMessageSave(pendingMessageText, pendingMessageIsNotification);
+            await processMessageSave(pendingMessageText, pendingMessageIsNotification, "Bacheca (Tutti)");
             
             document.getElementById('msgText').value = '';
             if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = true;
@@ -467,7 +476,7 @@ if(waSelectAll) {
 if(btnWaSkip) {
     btnWaSkip.addEventListener('click', async () => {
         btnWaSkip.disabled = true; btnWaSkip.innerHTML = '...';
-        await processMessageSave(pendingMessageText, pendingMessageIsNotification);
+        await processMessageSave(pendingMessageText, pendingMessageIsNotification, "Bacheca (Tutti)");
         document.getElementById('msgText').value = '';
         if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = true;
         
@@ -478,10 +487,14 @@ if(btnWaSkip) {
 
 if(btnWaSend) {
     btnWaSend.addEventListener('click', async () => {
-        const selectedIndexes = Array.from(document.querySelectorAll('.wa-contact-cb:checked')).map(cb => parseInt(cb.value));
+        const checkedBoxes = Array.from(document.querySelectorAll('.wa-contact-cb:checked'));
+        const selectedIndexes = checkedBoxes.map(cb => parseInt(cb.value));
+        
+        let recNames = checkedBoxes.map(cb => cb.getAttribute('data-name')).join(', ');
+        if(!recNames) recNames = "Bacheca (Tutti)";
         
         btnWaSend.disabled = true; btnWaSend.innerHTML = '...';
-        const msgId = await processMessageSave(pendingMessageText, pendingMessageIsNotification);
+        const msgId = await processMessageSave(pendingMessageText, pendingMessageIsNotification, recNames);
         document.getElementById('msgText').value = '';
         if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = true;
         
@@ -620,7 +633,9 @@ function editProgrammatoAppJs(index) {
     document.getElementById('editTelefono').value = p.telefono || "";
     document.getElementById('editTipo').value = p.tipo || "";
     document.getElementById('editDispositivi').value = p.dispositivi || "";
+    document.getElementById('editMatricola').value = p.matricola || "";
     document.getElementById('editDataPrevista').value = p.dataPrevista || "";
+    document.getElementById('editOraPrevista').value = p.oraPrevista || "";
     document.getElementById('editNote').value = p.note || "";
     
     editInterventionModal.classList.remove('hidden');
@@ -642,7 +657,9 @@ if(btnSaveEdit) {
         p.telefono = document.getElementById('editTelefono').value;
         p.tipo = document.getElementById('editTipo').value;
         p.dispositivi = document.getElementById('editDispositivi').value;
+        p.matricola = document.getElementById('editMatricola').value;
         p.dataPrevista = document.getElementById('editDataPrevista').value;
+        p.oraPrevista = document.getElementById('editOraPrevista').value;
         p.note = document.getElementById('editNote').value;
         p.status = p.dataPrevista ? 'planned' : 'in_attesa';
         
@@ -1608,6 +1625,11 @@ btnPlanIntervention.addEventListener('click', async () => {
         domani.setDate(domani.getDate() + 1);
         dProgrammata = domani.toISOString().split('T')[0];
     }
+    const inputOraProgrammata = document.getElementById('oraProgrammata');
+    let oProgrammata = inputOraProgrammata ? inputOraProgrammata.value : "";
+    
+    const inputMatricolaP = document.getElementById('inputMatricola');
+    let matricolaText = inputMatricolaP ? inputMatricolaP.value.trim() : "";
 
     const plannedId = "plan_" + Date.now().toString();
 
@@ -1645,8 +1667,10 @@ btnPlanIntervention.addEventListener('click', async () => {
         indirizzo: iIndirizzo.value,
         telefono: iTelefono ? iTelefono.value : "",
         dispositivi: dispFinale,
+        matricola: matricolaText,
         note: iNote.value,
         dataPrevista: dProgrammata,
+        oraPrevista: oProgrammata,
         status: 'planned',
         timestamp: new Date().getTime(),
         fileUrlsProgrammati: fileUrlsProgrammati
@@ -2022,10 +2046,11 @@ function renderActivitiesList() {
                 </div>`;
             }
 
+            const showOra = inv.oraPrevista ? ` ore ${inv.oraPrevista}` : '';
             div.innerHTML = `
                 <div class="card-compact-view">
                     <div style="flex:1;">
-                        <div style="font-size:0.80rem; color:red; margin-bottom:4px;"><strong>⏳ PROGRAMMATO</strong></div>
+                        <div style="font-size:0.80rem; color:red; margin-bottom:4px;"><strong>⏳ PROGRAMMATO${showOra}</strong></div>
                         <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${inv.paziente} ${fileBadget}</div>
                         <div style="font-size:0.85rem; color:#555;">📍 ${inv.localita || inv.destinazione} | 🔧 ${inv.tipo}</div>
                     </div>
@@ -2039,6 +2064,7 @@ function renderActivitiesList() {
                     <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${inv.indirizzo || ''}</div>
                     <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${inv.telefono || '-'}</div>
                     <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${inv.dispositivi || 'Nessuno'}</div>
+                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Matricola:</strong> ${inv.matricola || 'N/D'}</div>
                     <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${inv.note || 'Nessuna'}</div>
                     ${attachHtml}
                 </div>
@@ -2241,6 +2267,12 @@ async function checkLoginStatus() {
     const userEmail = localStorage.getItem('antimo_user_email');
     if (!userEmail) {
         document.getElementById('loginModal').classList.remove('hidden');
+    } else {
+        const userNameDisp = document.getElementById('loggedInUserDisplay');
+        if (userNameDisp) {
+            const userName = localStorage.getItem('antimo_user_name') || userEmail;
+            userNameDisp.innerText = `👤 ${userName}`;
+        }
     }
 }
 
@@ -2292,6 +2324,7 @@ if (loginForm) {
             }
             localStorage.setItem('antimo_user_email', email);
             localStorage.setItem('antimo_user_phone', phone);
+            localStorage.setItem('antimo_user_name', nome.charAt(0).toUpperCase() + nome.slice(1) + ' ' + cognome.charAt(0).toUpperCase() + cognome.slice(1));
             
             document.getElementById('loginModal').classList.add('hidden');
         } catch(err) {
