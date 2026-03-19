@@ -443,26 +443,35 @@ if(newMessageForm) {
         pendingMessageText = testoS;
         pendingMessageIsNotification = isNotif;
         
-        if (localeRubrica.length > 0) {
+        // Load employees from Firebase
+        waContactsList.innerHTML = '<div style="text-align: center; color: #666; font-size: 0.9rem;">Caricamento dipendenti...</div>';
+        waSelectAll.checked = false;
+        waSelectModal.classList.remove('hidden');
+
+        try {
+            const { collection, getDocs, query, where } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            const q = query(collection(db, "anagrafiche"), where("localita", "==", "App (Dipendente)"));
+            const snap = await getDocs(q);
+            
             waContactsList.innerHTML = '';
-            localeRubrica.forEach((c, i) => {
-                const div = document.createElement('label');
-                div.style.cssText = "display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: #f9f9f9; border-radius: 6px; border: 1px solid #eee;";
-                div.innerHTML = `<input type="checkbox" class="wa-contact-cb" value="${i}" data-name="${c.nome}" style="transform: scale(1.2);"> <span style="font-weight:bold; color:var(--blue-dark);">${c.nome}</span> <span style="color:#666; font-size:0.85rem;">(${c.numero})</span>`;
-                waContactsList.appendChild(div);
-            });
-            waSelectAll.checked = false;
-            waSelectModal.classList.remove('hidden');
-        } else {
-            const btn = newMessageForm.querySelector('button[type="submit"]');
-            const oldHtml = btn.innerHTML;
-            btn.innerHTML = '...'; btn.disabled = true;
+            let dipendenti = [];
+            snap.forEach(doc => dipendenti.push(doc.data()));
             
-            await processMessageSave(pendingMessageText, pendingMessageIsNotification, "Bacheca (Tutti)");
-            
-            document.getElementById('msgText').value = '';
-            if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = true;
-            btn.innerHTML = oldHtml; btn.disabled = false;
+            if (dipendenti.length > 0) {
+                dipendenti.forEach((c, i) => {
+                    const cbValue = c.telefono1 || c.telefono || "";
+                    const cbName = `${c.nome} ${c.cognome || ''}`.trim();
+                    const div = document.createElement('label');
+                    div.style.cssText = "display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: #f9f9f9; border-radius: 6px; border: 1px solid #eee;";
+                    div.innerHTML = `<input type="checkbox" class="wa-contact-cb" value="${i}" data-name="${cbName}" data-phone="${cbValue}" style="transform: scale(1.2);"> <span style="font-weight:bold; color:var(--blue-dark);">${cbName}</span> <span style="color:#666; font-size:0.85rem;">(${cbValue || 'Nessun num'})</span>`;
+                    waContactsList.appendChild(div);
+                });
+            } else {
+                waContactsList.innerHTML = '<div style="text-align: center; color: #666; font-size: 0.9rem;">Nessun dipendente trovato.</div>';
+            }
+        } catch(err) {
+            console.error("Errore fetch dipendenti per WA:", err);
+            waContactsList.innerHTML = '<div style="text-align: center; color: red; font-size: 0.9rem;">Errore caricamento.</div>';
         }
     });
 }
@@ -501,16 +510,19 @@ if(btnWaSend) {
         waSelectModal.classList.add('hidden');
         btnWaSend.disabled = false; btnWaSend.innerHTML = 'Procedi su WA';
         
-        if(selectedIndexes.length > 0 && msgId) {
+        if(checkedBoxes.length > 0 && msgId) {
             waQueueList.innerHTML = '';
-            selectedIndexes.forEach(idx => {
-                const c = localeRubrica[idx];
+            checkedBoxes.forEach(cb => {
+                const cNome = cb.getAttribute('data-name');
+                const cNumero = cb.getAttribute('data-phone');
+                if(!cNumero) return; // Salta se non ha il numero
+
                 const btn = document.createElement('a');
                 btn.className = "btn btn-primary";
                 btn.style.cssText = "background: #25D366; border: none; padding: 12px; text-decoration: none; color: white; display: flex; justify-content: center; align-items: center; gap: 8px; font-weight: bold; border-radius: 8px;";
                 btn.target = "_blank";
                 
-                let cleanNum = c.numero.replace(/\s+/g, '');
+                let cleanNum = cNumero.replace(/\s+/g, '');
                 if(!cleanNum.startsWith('+') && cleanNum.length <= 10) cleanNum = "39" + cleanNum;
                 else cleanNum = cleanNum.replace('+', '');
                 
@@ -518,14 +530,16 @@ if(btnWaSend) {
                 let textWithLink = pendingMessageText + "\n\nApri nell'App: " + appLink;
                 
                 btn.href = `https://wa.me/${cleanNum}?text=${encodeURIComponent(textWithLink)}`;
-                btn.innerHTML = `<span style="font-size:1.2rem;">💬</span> WhatsApp per ${c.nome}`;
+                btn.innerHTML = `<span style="font-size:1.2rem;">💬</span> WhatsApp per ${cNome}`;
                 btn.onclick = () => { 
                     btn.style.opacity = '0.5'; 
-                    btn.innerHTML = `<span style="font-size:1.2rem;">✅</span> Inviato a ${c.nome}`;
+                    btn.innerHTML = `<span style="font-size:1.2rem;">✅</span> Inviato a ${cNome}`;
                 };
                 waQueueList.appendChild(btn);
             });
-            waQueueModal.classList.remove('hidden');
+            if (waQueueList.innerHTML !== '') {
+                waQueueModal.classList.remove('hidden');
+            }
         }
     });
 }
