@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getStorage, ref, uploadString } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
 // ====== CONFIGURAZIONE FIREBASE ======
 // Riusiamo le chiavi fornite dall'utente in app.js
@@ -23,6 +24,41 @@ let isAdminLogged = false;
 // DOM Auth
 const btnLoginAdmin = document.getElementById('btnLoginAdmin');
 
+// BACKUP AUTOMATICO SILENZIOSO
+async function automaticFirebaseBackup() {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const lastBackup = localStorage.getItem('antimo_lastCloudBackup');
+    
+    if (lastBackup === todayStr) {
+        console.log("Backup automatico già eseguito oggi.");
+        return;
+    }
+    
+    try {
+        console.log("Inizio backup automatico silenzioso su Firebase Storage...");
+        const storage = getStorage(app);
+        const collectionsToExport = ["interventi", "programmati", "messaggi", "anagrafiche"];
+        const exportData = {};
+        
+        for(let collName of collectionsToExport) {
+            exportData[collName] = [];
+            const snap = await getDocs(collection(db, collName));
+            snap.forEach(d => {
+                exportData[collName].push({ __firebaseDocId: d.id, ...d.data() });
+            });
+        }
+        
+        const jsonStr = JSON.stringify(exportData);
+        const backupRef = ref(storage, `backups_giornalieri/backup_antimo_${todayStr}.json`);
+        await uploadString(backupRef, jsonStr, 'raw', { contentType: 'application/json' });
+        
+        console.log("Backup automatico completato con successo!");
+        localStorage.setItem('antimo_lastCloudBackup', todayStr);
+    } catch (err) {
+        console.error("Errore durante il backup automatico silenzioso:", err);
+    }
+}
+
 onAuthStateChanged(auth, (user) => {
     if (user && user.email === 'giuseppedisorbo@gmail.com') {
         isAdminLogged = true;
@@ -31,6 +67,9 @@ onAuthStateChanged(auth, (user) => {
             btnLoginAdmin.style.backgroundColor = "var(--red)";
             btnLoginAdmin.style.color = "white";
         }
+        
+        // Lancia il backup automatico in background
+        automaticFirebaseBackup();
     } else {
         isAdminLogged = false;
         if (btnLoginAdmin) {
