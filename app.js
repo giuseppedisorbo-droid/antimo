@@ -668,7 +668,7 @@ const iPaziente = document.getElementById('paziente');
 const iLocalita = document.getElementById('localita');
 const iIndirizzo = document.getElementById('indirizzo');
 const iTelefono = document.getElementById('telefono');
-const iDispositiviSelect = document.getElementById('dispositiviSelect');
+
 const iNuovoDispositivo = document.getElementById('nuovoDispositivo');
 const iNote = document.getElementById('note');
 const inputKmPercorsi = document.getElementById('kmPercorsi');
@@ -817,11 +817,6 @@ if(btnSaveEdit) {
 }
 
 function initApp() {
-    customDevices.forEach(d => {
-        const opt = document.createElement('option');
-        opt.value = d; opt.textContent = d;
-        iDispositiviSelect.insertBefore(opt, iDispositiviSelect.lastElementChild);
-    });
 
     updateUI();
     updateInterventiCount();
@@ -1159,35 +1154,24 @@ function renderSpecialPlannedList(container, filteredData) {
             const idx = e.target.getAttribute('data-index');
             const dataToLoad = plannedInterventions[idx];
             
-            // Popoliamo il form
-            function setSelectMultipleValues(selectEl, strValues) {
-                Array.from(selectEl.options).forEach(opt => opt.selected = false);
-                if(!strValues) return;
-                const vals = strValues.split(',').map(s => s.trim());
-                Array.from(selectEl.options).forEach(opt => {
-                    if(vals.includes(opt.value)) opt.selected = true;
-                });
+            // Popoliamo il form coi blocchi dinamici
+            const container = document.getElementById('dynamicInterventionsContainer');
+            if (container) {
+                const hooks = initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
+                container.innerHTML = '';
+                if (dataToLoad.interventiList && dataToLoad.interventiList.length > 0) {
+                    dataToLoad.interventiList.forEach(item => hooks.addBlock(item));
+                } else {
+                    hooks.addBlock({ tipo: dataToLoad.tipo, disp: dataToLoad.dispositivi, mat: dataToLoad.matricola||"" });
+                }
             }
             
-            setSelectMultipleValues(iTipo, dataToLoad.tipo);
-            iPaziente.value = dataToLoad.paziente;
+            iPaziente.value = dataToLoad.paziente || "";
             if(iLocalita) iLocalita.value = dataToLoad.localita || dataToLoad.destinazione || "";
             if(iIndirizzo) iIndirizzo.value = dataToLoad.indirizzo || "";
             if(iTelefono) iTelefono.value = dataToLoad.telefono || "";
             
-            setSelectMultipleValues(iDispositiviSelect, dataToLoad.dispositivi);
-            
-            // Gestione custom devices se non trovati
-            if(dataToLoad.dispositivi) {
-                const devs = dataToLoad.dispositivi.split(',').map(s=>s.trim());
-                if(devs.some(d => !Array.from(iDispositiviSelect.options).some(o=>o.value===d))) {
-                    iNuovoDispositivo.classList.remove('hidden');
-                    iNuovoDispositivo.value = devs.filter(d => !Array.from(iDispositiviSelect.options).some(o=>o.value===d)).join(', ');
-                } else {
-                    iNuovoDispositivo.classList.add('hidden');
-                }
-            }
-            iNote.value = dataToLoad.note;
+            iNote.value = dataToLoad.note || "";
             pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
 
             plannedInterventions.splice(idx, 1);
@@ -1290,14 +1274,16 @@ function renderNpInterventions() {
             const idx = e.target.getAttribute('data-index');
             const dataToLoad = plannedInterventions[idx];
             
-            // Popoliamo il form e le checklist
-            iTipo.value = dataToLoad.tipo || "";
-            document.querySelectorAll('.cb-tipo-idx').forEach(cb => cb.checked = false);
-            if(dataToLoad.tipo) {
-                dataToLoad.tipo.split(',').forEach(t => {
-                    const cb = document.querySelector(`.cb-tipo-idx[value="${t.trim()}"]`);
-                    if(cb) cb.checked = true;
-                });
+            // Popoliamo il form coi blocchi dinamici
+            const container = document.getElementById('dynamicInterventionsContainer');
+            if (container) {
+                const hooks = initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
+                container.innerHTML = '';
+                if (dataToLoad.interventiList && dataToLoad.interventiList.length > 0) {
+                    dataToLoad.interventiList.forEach(item => hooks.addBlock(item));
+                } else {
+                    hooks.addBlock({ tipo: dataToLoad.tipo, disp: dataToLoad.dispositivi, mat: dataToLoad.matricola||"" });
+                }
             }
 
             iPaziente.value = dataToLoad.paziente || "";
@@ -1305,18 +1291,7 @@ function renderNpInterventions() {
             if(iIndirizzo) iIndirizzo.value = dataToLoad.indirizzo || "";
             if(iTelefono) iTelefono.value = dataToLoad.telefono || "";
             
-            iDispositiviSelect.value = dataToLoad.dispositivi || "";
-            document.querySelectorAll('.cb-disp-idx').forEach(cb => cb.checked = false);
-            if(dataToLoad.dispositivi) {
-                dataToLoad.dispositivi.split(',').forEach(d => {
-                    const dTrim = d.trim();
-                    const cb = document.querySelector('.cb-disp-idx[value="'+dTrim+'"]');
-                    if(cb) cb.checked = true;
-                });
-            }
-            if(iNuovoDispositivo) iNuovoDispositivo.classList.add('hidden');
-            
-            iNote.value = dataToLoad.note;
+            iNote.value = dataToLoad.note || "";
             pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
 
             plannedInterventions.splice(idx, 1);
@@ -1734,14 +1709,7 @@ inputAllegatoProgrammazione.addEventListener('change', (e) => {
     inputAllegatoProgrammazione.value = "";
 });
 
-iDispositiviSelect.addEventListener('change', (e) => {
-    if(e.target.value === "_AZI_NUOVO_") {
-        if(iNuovoDispositivo) iNuovoDispositivo.classList.remove('hidden');
-        if(iNuovoDispositivo) iNuovoDispositivo.focus();
-    } else {
-        if(iNuovoDispositivo) iNuovoDispositivo.classList.add('hidden');
-    }
-});
+
 
 // Logic for Multi-Select Checklists
 function setupCustomChecklist(btnAddId, inputId, wrapperClass) {
@@ -1864,8 +1832,6 @@ btnPlanIntervention.addEventListener('click', async () => {
     
     // Reset form
     newInterventionForm.reset();
-    iDispositiviSelect.value = "";
-    iNuovoDispositivo.classList.add('hidden');
     inputAllegato.value = ""; 
     currentAttachments = [];
     filePreviewContainer.innerHTML = '';
@@ -2004,10 +1970,11 @@ newInterventionForm.addEventListener('submit', async (e) => {
     // Reset Globale della Form e Componenti
     newInterventionForm.reset();
     inputKmPercorsi.value = ""; 
-    iDispositiviSelect.value = "";
-    inputMatricola.value = "";
-    iNuovoDispositivo.classList.add('hidden');
-    iNuovoDispositivo.value = "";
+    const dynamicContainer = document.getElementById('dynamicInterventionsContainer');
+    if (dynamicContainer) {
+        // Reinserisci il blocco iniziale vuoto sfruttando la funziona di init
+        initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
+    }
     inputAllegato.value = ""; 
     currentAttachments = [];
     filePreviewContainer.innerHTML = '';
@@ -2227,20 +2194,25 @@ function renderActivitiesList() {
             div.querySelector('button[data-action="avvia"]').addEventListener('click', () => {
                 const dataToLoad = plannedInterventions[origIndex];
             
-            iTipo.value = dataToLoad.tipo || "";
+            // Popoliamo il form coi blocchi dinamici
+            const container = document.getElementById('dynamicInterventionsContainer');
+            if (container) {
+                const hooks = initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
+                container.innerHTML = '';
+                if (dataToLoad.interventiList && dataToLoad.interventiList.length > 0) {
+                    dataToLoad.interventiList.forEach(item => hooks.addBlock(item));
+                } else {
+                    hooks.addBlock({ tipo: dataToLoad.tipo, disp: dataToLoad.dispositivi, mat: dataToLoad.matricola||"" });
+                }
+            }
+
             iPaziente.value = dataToLoad.paziente || "";
             if(iLocalita) iLocalita.value = dataToLoad.localita || dataToLoad.destinazione || "";
             if(iIndirizzo) iIndirizzo.value = dataToLoad.indirizzo || "";
             if(iTelefono) iTelefono.value = dataToLoad.telefono || "";
             
-            iDispositiviSelect.value = dataToLoad.dispositivi || "";
-            
-            // iNuovoDispositivo non è più necessario ma la eliminiamo visualmente se esiste
-            if(iNuovoDispositivo) iNuovoDispositivo.classList.add('hidden');
-            
             if(iNote) iNote.value = dataToLoad.note || "";
-            if(inputMatricola) inputMatricola.value = dataToLoad.matricola || "";
-                pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
+            pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
 
                 plannedInterventions.splice(origIndex, 1);
                 saveState();
