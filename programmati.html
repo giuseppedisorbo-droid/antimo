@@ -95,21 +95,8 @@
                     </div>
 
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label>Tipo Intervento / Attività</label>
-                        <div style="border: 1px solid #cbd5e1; border-radius: 12px; background: white; padding: 10px; max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
-                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Visita" class="cb-tipo-prog"> Visita</label>
-                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Sostituzione" class="cb-tipo-prog"> Sostituzione</label>
-                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Ritiro" class="cb-tipo-prog"> Ritiro</label>
-                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Consegna" class="cb-tipo-prog"> Consegna</label>
-                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Manutenzione" class="cb-tipo-prog"> Manutenzione</label>
-                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Installazione" class="cb-tipo-prog"> Installazione</label>
-                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Riparazione" class="cb-tipo-prog"> Riparazione</label>
-                            <div style="display: flex; gap: 5px; margin-top: 5px;">
-                                <input type="text" id="altroTipoProg" placeholder="Altro..." style="padding: 4px; font-size: 0.85rem; flex: 1; border: 1px solid #ccc; border-radius: 4px;">
-                                <button type="button" id="btnAddAltroTipoProg" class="btn btn-secondary btn-sm" style="width: auto; padding: 4px 8px;">+</button>
-                            </div>
-                        </div>
-                        <input type="hidden" id="tipoAttivita">
+                        <label for="telefono">Recapito Telefonico</label>
+                        <input type="tel" id="telefono" placeholder="Es. 3331234567">
                     </div>
 
                     <div style="display: flex; gap: 10px; margin-bottom: 0;">
@@ -124,36 +111,13 @@
                     </div>
                 </div>
 
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <div class="form-group" style="flex: 1; margin-top: 10px; min-width: 140px;">
-                        <label for="telefono">Recapito Telefonico</label>
-                        <input type="tel" id="telefono" placeholder="Es. 3331234567">
-                    </div>
-    
-                    <div class="form-group" style="flex: 1; margin-top: 10px; min-width: 140px;">
-                        <label>Dispositivi / Note</label>
-                        <div style="border: 1px solid #cbd5e1; border-radius: 12px; background: white; padding: 10px; max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
-                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Concentratore" class="cb-disp-prog"> Concentratore</label>
-                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Ventilatore" class="cb-disp-prog"> Ventilatore</label>
-                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Aspiratore" class="cb-disp-prog"> Aspiratore</label>
-                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="D3" class="cb-disp-prog"> D3</label>
-                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Stativo" class="cb-disp-prog"> Stativo</label>
-                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Cpap" class="cb-disp-prog"> Cpap</label>
-                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="AutoCpap" class="cb-disp-prog"> AutoCpap</label>
-                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Saturimetro" class="cb-disp-prog"> Saturimetro</label>
-                            <div style="display: flex; gap: 5px; margin-top: 5px;">
-                                <input type="text" id="altroDispProg" placeholder="Altro dispositivo..." style="padding: 4px; font-size: 0.85rem; flex: 1; border: 1px solid #ccc; border-radius: 4px;">
-                                <button type="button" id="btnAddAltroDispProg" class="btn btn-secondary btn-sm" style="width: auto; padding: 4px 8px;">+</button>
-                            </div>
-                        </div>
-                        <input type="hidden" id="dispositivi">
-                    </div>
-                    
-                    <div class="form-group" style="flex: 1; margin-top: 10px; min-width: 140px;">
-                        <label for="matricola">Matricole</label>
-                        <textarea id="matricola" rows="2" placeholder="Matricole separate da virgola..."></textarea>
-                    </div>
+                <!-- Dynamic Interventions Array Block -->
+                <div id="dynamicProgInterventionsContainer" style="margin-top: 15px;">
+                    <!-- Dynamic Blocks injected by JS -->
                 </div>
+                <button type="button" id="btnAddProgInterventionBlock" class="btn btn-secondary" style="margin-bottom: 15px; width: 100%; background: #fff7ed; color: #ea580c; border: 1px dashed #f97316; padding: 10px; border-radius: 8px; font-weight: bold;">
+                    ➕ Aggiungi Dispositivo / Intervento
+                </button>
 
                 <div style="display: flex; gap: 10px; margin-top: 10px;">
                     <button type="submit" class="btn btn-primary btn-orange" style="flex: 1;" id="btnPlanIntervention">

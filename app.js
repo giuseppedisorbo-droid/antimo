@@ -244,6 +244,118 @@ if(btnCloseInterventionSection) {
     });
 }
 
+// --- LOGICA BLOCCHI DINAMICI ---
+function createInterventionBlockHTML() {
+    const types = ['Visita', 'Sostituzione', 'Ritiro', 'Consegna', 'Manutenzione', 'Installazione', 'Riparazione'];
+    const devices = ['Concentratore', 'Ventilatore', 'Aspiratore', 'D3', 'Stativo', 'Cpap', 'AutoCpap', 'Saturimetro'];
+    
+    let typeOptions = types.map(t => `<option value="${t}">${t}</option>`).join('');
+    let devOptions = devices.map(d => `<option value="${d}">${d}</option>`).join('');
+    
+    return `
+        <div class="dynamic-intervention-block" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 15px; background: #f8fafc; position: relative;">
+            <button type="button" class="btn-remove-block" style="position: absolute; top: -10px; right: -10px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">×</button>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 8px;">
+                    <label style="font-size: 0.8rem; color: #475569;">Tipo Intervento *</label>
+                    <select class="block-tipo" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: white;">
+                        <option value="">Seleziona...</option>
+                        ${typeOptions}
+                        <option value="Altro">Altro...</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 8px;">
+                    <label style="font-size: 0.8rem; color: #475569;">Dispositivo</label>
+                    <select class="block-disp" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: white;">
+                        <option value="">Nessuno</option>
+                        ${devOptions}
+                        <option value="Altro">Altro...</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 0.8rem; color: #475569;">Matricola / Note Extra</label>
+                <input type="text" class="block-mat" placeholder="Es. SN123456" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: white;">
+            </div>
+        </div>
+    `;
+}
+
+function initDynamicBlocks(containerId, addBtnId) {
+    const container = document.getElementById(containerId);
+    const btnAdd = document.getElementById(addBtnId);
+    
+    if(!container || !btnAdd) return;
+
+    // Configura blocco singolo
+    const addBlock = (data = null) => {
+        const div = document.createElement('div');
+        div.innerHTML = createInterventionBlockHTML();
+        const block = div.firstElementChild;
+        
+        block.querySelector('.btn-remove-block').addEventListener('click', () => {
+            if(container.children.length > 1) { 
+                block.remove();
+            } else {
+                alert("Devi mantenere almeno un blocco intervento.");
+            }
+        });
+
+        if(data) {
+            block.querySelector('.block-tipo').value = data.tipo || "";
+            let dispSelect = block.querySelector('.block-disp');
+            let dispMatched = Array.from(dispSelect.options).some(o => o.value === data.disp);
+            if(data.disp && !dispMatched) {
+                const opt = document.createElement('option');
+                opt.value = data.disp;
+                opt.textContent = data.disp;
+                dispSelect.insertBefore(opt, dispSelect.querySelector('option[value="Altro"]'));
+            }
+            dispSelect.value = data.disp || "";
+            block.querySelector('.block-mat').value = data.mat || "";
+        }
+        
+        container.appendChild(block);
+    };
+
+    // Assicurati che lo svuotamento parta pulito e con un blocco ready
+    container.innerHTML = '';
+    addBlock();
+
+    // Event listener per il pulsante
+    btnAdd.addEventListener('click', () => addBlock());
+    
+    return { addBlock, container }; // Export hook se necessario altrove
+}
+
+// Inizializza i due form principali
+setTimeout(() => {
+    initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
+    initDynamicBlocks('dynamicProgInterventionsContainer', 'btnAddProgInterventionBlock');
+}, 100);
+
+// Helper per leggere i dati al submit
+function extractDynamicBlocksData(containerId) {
+    const container = document.getElementById(containerId);
+    if(!container) return { array: [], tipoStr: "", dispStr: "", matStr: "" };
+    
+    let blocks = [];
+    container.querySelectorAll('.dynamic-intervention-block').forEach(b => {
+        let t = b.querySelector('.block-tipo').value.trim();
+        let d = b.querySelector('.block-disp').value.trim();
+        let m = b.querySelector('.block-mat').value.trim();
+        if(t || d || m) blocks.push({ tipo: t, disp: d, mat: m });
+    });
+    
+    return {
+        array: blocks,
+        tipoStr: blocks.map(b => b.tipo).filter(x=>x).join(', '),
+        dispStr: blocks.map(b => b.disp).filter(x=>x).join(', '),
+        matStr: blocks.map(b => b.mat).filter(x=>x).join(', ')
+    };
+}
+// --- FINE LOGICA BLOCCHI DINAMICI ---
+
 // LOGICA MESSAGGISTICA E NOTIFICHE
 async function loadMessages() {
     if (!isFirebaseConfigured) {
@@ -1660,17 +1772,14 @@ function getChecklistValues(className) {
 
 
 btnPlanIntervention.addEventListener('click', async () => {
-    // Aggiorna hidden inputs dalle checklist prima di procedere
-    iTipo.value = getChecklistValues('cb-tipo-idx');
-    iDispositiviSelect.value = getChecklistValues('cb-disp-idx');
-
-    let tipiSelezionati = iTipo.value.trim();
-    if(!tipiSelezionati || !iPaziente.value || !iLocalita.value || !iIndirizzo.value) {
-        return alert("Compila Tipo, Paziente, Località e Indirizzo per salvare l'intervento programmato!");
+    const blocksData = extractDynamicBlocksData('dynamicInterventionsContainer');
+    if(!blocksData.tipoStr || !iPaziente.value || !iLocalita.value || !iIndirizzo.value) {
+        return alert("Compila Tipo intervento, Paziente, Località e Indirizzo per salvare l'intervento programmato!");
     }
     
-    let dispFinale = iDispositiviSelect.value.trim();
-    if(!dispFinale) dispFinale = "Nessuno";
+    let tipiSelezionati = blocksData.tipoStr;
+    let dispFinale = blocksData.dispStr || "Nessuno";
+    let matricolaText = blocksData.matStr;
 
     // Calcola data prevista (default: domani)
     let dProgrammata = inputDataProgrammata.value;
@@ -1681,9 +1790,6 @@ btnPlanIntervention.addEventListener('click', async () => {
     }
     const inputOraProgrammata = document.getElementById('oraProgrammata');
     let oProgrammata = inputOraProgrammata ? inputOraProgrammata.value : "";
-    
-    const inputMatricolaP = document.getElementById('inputMatricola');
-    let matricolaText = inputMatricolaP ? inputMatricolaP.value.trim() : "";
 
     const plannedId = "plan_" + Date.now().toString();
 
@@ -1722,6 +1828,7 @@ btnPlanIntervention.addEventListener('click', async () => {
         telefono: iTelefono ? iTelefono.value : "",
         dispositivi: dispFinale,
         matricola: matricolaText,
+        interventiList: blocksData.array, // Nuovo payload strutturato
         note: iNote.value,
         dataPrevista: dProgrammata,
         oraPrevista: oProgrammata,
@@ -1779,22 +1886,19 @@ btnPlanIntervention.addEventListener('click', async () => {
 newInterventionForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
-    // Aggiorna hidden inputs dalle checklist prima di procedere
-    iTipo.value = getChecklistValues('cb-tipo-idx');
-    iDispositiviSelect.value = getChecklistValues('cb-disp-idx');
-
     // Validazione KM (Obbligatori se impostato su ON nelle Impostazioni)
     if (requireKm && !inputKmPercorsi.value) {
         return alert("Inserisci i Km percorsi prima di salvare l'attività (Obbligatorio dalle Impostazioni).");
     }
-    
-    let tipiSelezionati = iTipo.value.trim();
-    if(!tipiSelezionati) return alert("Inserisci almeno un Tipo di Intervento!");
 
-    let dispFinale = iDispositiviSelect.value.trim();
-    if(!dispFinale) {
-        return alert("Inserisci i dispositivi o la dicitura 'Nessuno'!");
+    const blocksData = extractDynamicBlocksData('dynamicInterventionsContainer');
+    if(blocksData.array.length === 0 || !blocksData.tipoStr) {
+        return alert("Devi inserire almeno un intervento compilando la tipologia.");
     }
+    
+    let tipiSelezionati = blocksData.tipoStr;
+    let dispFinale = blocksData.dispStr || "Nessuno";
+    let matricolaTxt = blocksData.matStr;
 
     // UI Loading state indication
     const oldBtnText = btnStartIntervention.innerHTML;
@@ -1811,7 +1915,8 @@ newInterventionForm.addEventListener('submit', async (e) => {
         indirizzo: iIndirizzo.value,
         telefono: iTelefono ? iTelefono.value : "",
         dispositivi: dispFinale,
-        matricola: inputMatricola.value.trim(),
+        matricola: matricolaTxt,
+        interventiList: blocksData.array,
         note: iNote.value,
         attachments: currentAttachments, // Base64 Array se offline
         fileUrlsProgrammati: pendingFileUrlsProgrammati, 
@@ -1861,6 +1966,7 @@ newInterventionForm.addEventListener('submit', async (e) => {
                 telefono: invToSave.telefono || "",
                 dispositivi: invToSave.dispositivi || "",
                 matricola: invToSave.matricola || "",
+                interventiList: invToSave.interventiList || [], 
                 note: invToSave.note || "",
                 startTime: invToSave.startTime,
                 endTime: invToSave.endTime,

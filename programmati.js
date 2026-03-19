@@ -208,43 +208,118 @@ function renderCalendar() {
     });
 }
 
-// Logic for Multi-Select Checklists
-function setupCustomChecklist(btnAddId, inputId, wrapperClass) {
-    const btnAdd = document.getElementById(btnAddId);
-    const input = document.getElementById(inputId);
-    if(btnAdd && input) {
-        btnAdd.addEventListener('click', () => {
-            const val = input.value.trim();
-            if(val) {
-                const label = document.createElement('label');
-                label.style.cssText = "display:flex; align-items:center; gap:8px; cursor:pointer;";
-                label.innerHTML = `<input type="checkbox" value="${val}" class="${wrapperClass}" checked> ${val}`;
-                input.parentElement.parentElement.insertBefore(label, input.parentElement);
-                input.value = '';
+// --- LOGICA BLOCCHI DINAMICI ---
+function createInterventionBlockHTML() {
+    const types = ['Visita', 'Sostituzione', 'Ritiro', 'Consegna', 'Manutenzione', 'Installazione', 'Riparazione'];
+    const devices = ['Concentratore', 'Ventilatore', 'Aspiratore', 'D3', 'Stativo', 'Cpap', 'AutoCpap', 'Saturimetro'];
+    
+    let typeOptions = types.map(t => `<option value="${t}">${t}</option>`).join('');
+    let devOptions = devices.map(d => `<option value="${d}">${d}</option>`).join('');
+    
+    return `
+        <div class="dynamic-intervention-block" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 15px; background: #f8fafc; position: relative;">
+            <button type="button" class="btn-remove-block" style="position: absolute; top: -10px; right: -10px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">×</button>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 8px;">
+                    <label style="font-size: 0.8rem; color: #475569;">Tipo Intervento *</label>
+                    <select class="block-tipo" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: white;">
+                        <option value="">Seleziona...</option>
+                        ${typeOptions}
+                        <option value="Altro">Altro...</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 8px;">
+                    <label style="font-size: 0.8rem; color: #475569;">Dispositivo</label>
+                    <select class="block-disp" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: white;">
+                        <option value="">Nessuno</option>
+                        ${devOptions}
+                        <option value="Altro">Altro...</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 0.8rem; color: #475569;">Matricola / Note Extra</label>
+                <input type="text" class="block-mat" placeholder="Es. SN123456" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: white;">
+            </div>
+        </div>
+    `;
+}
+
+function initDynamicBlocks(containerId, addBtnId) {
+    const container = document.getElementById(containerId);
+    const btnAdd = document.getElementById(addBtnId);
+    
+    if(!container || !btnAdd) return;
+
+    const addBlock = (data = null) => {
+        const div = document.createElement('div');
+        div.innerHTML = createInterventionBlockHTML();
+        const block = div.firstElementChild;
+        
+        block.querySelector('.btn-remove-block').addEventListener('click', () => {
+            if(container.children.length > 1) { 
+                block.remove();
+            } else {
+                alert("Devi mantenere almeno un blocco intervento.");
             }
         });
-        input.addEventListener('keypress', (e) => {
-            if(e.key === 'Enter') { e.preventDefault(); btnAdd.click(); }
-        });
-    }
-}
-setupCustomChecklist('btnAddAltroTipoProg', 'altroTipoProg', 'cb-tipo-prog');
-setupCustomChecklist('btnAddAltroDispProg', 'altroDispProg', 'cb-disp-prog');
 
-function getChecklistValues(className) {
-    return Array.from(document.querySelectorAll('.' + className + ':checked')).map(cb => cb.value).join(', ');
+        if(data) {
+            block.querySelector('.block-tipo').value = data.tipo || "";
+            let dispSelect = block.querySelector('.block-disp');
+            let dispMatched = Array.from(dispSelect.options).some(o => o.value === data.disp);
+            if(data.disp && !dispMatched) {
+                const opt = document.createElement('option');
+                opt.value = data.disp;
+                opt.textContent = data.disp;
+                dispSelect.insertBefore(opt, dispSelect.querySelector('option[value="Altro"]'));
+            }
+            dispSelect.value = data.disp || "";
+            block.querySelector('.block-mat').value = data.mat || "";
+        }
+        
+        container.appendChild(block);
+    };
+
+    container.innerHTML = '';
+    addBlock();
+
+    btnAdd.addEventListener('click', () => addBlock());
 }
+
+setTimeout(() => {
+    initDynamicBlocks('dynamicProgInterventionsContainer', 'btnAddProgInterventionBlock');
+}, 100);
+
+function extractDynamicBlocksData(containerId) {
+    const container = document.getElementById(containerId);
+    if(!container) return { array: [], tipoStr: "", dispStr: "", matStr: "" };
+    
+    let blocks = [];
+    container.querySelectorAll('.dynamic-intervention-block').forEach(b => {
+        let t = b.querySelector('.block-tipo').value.trim();
+        let d = b.querySelector('.block-disp').value.trim();
+        let m = b.querySelector('.block-mat').value.trim();
+        if(t || d || m) blocks.push({ tipo: t, disp: d, mat: m });
+    });
+    
+    return {
+        array: blocks,
+        tipoStr: blocks.map(b => b.tipo).filter(x=>x).join(', '),
+        dispStr: blocks.map(b => b.disp).filter(x=>x).join(', '),
+        matStr: blocks.map(b => b.mat).filter(x=>x).join(', ')
+    };
+}
+// --- FINE LOGICA BLOCCHI DINAMICI ---
 
 // Submit Nuovo Programmazione
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    // Aggiorna hidden inputs
-    iTipoAttivita.value = getChecklistValues('cb-tipo-prog');
-    iDispositivi.value = getChecklistValues('cb-disp-prog');
+    const blocksData = extractDynamicBlocksData('dynamicProgInterventionsContainer');
 
-    if(!iPaziente.value || !iLocalita.value || !iIndirizzo.value || !iData.value) {
-        return alert("Compila tutti i campi obbligatori (Paziente, Località, Indirizzo e Data) per PROGRAMMARE! Altrimenti salva in attesa.");
+    if(!blocksData.tipoStr || !iPaziente.value || !iLocalita.value || !iIndirizzo.value || !iData.value) {
+        return alert("Compila Tipo Intervento, Paziente, Località, Indirizzo e Data per PROGRAMMARE! Altrimenti salva in attesa.");
     }
 
     const btn = document.getElementById('btnPlanIntervention');
@@ -255,13 +330,16 @@ form.addEventListener('submit', async (e) => {
     const plannedId = "plan_" + Date.now().toString();
     const planned = {
         id: plannedId,
-        tipo: iTipoAttivita.value,
+        tipo: blocksData.tipoStr,
         paziente: iPaziente.value,
         localita: iLocalita.value,
         indirizzo: iIndirizzo.value,
         telefono: iTelefono ? iTelefono.value : "",
-        dispositivi: iDispositivi.value,
+        dispositivi: blocksData.dispStr,
+        matricola: blocksData.matStr,
+        interventiList: blocksData.array,
         dataPrevista: iData.value,
+        oraPrevista: document.getElementById('oraProgrammata') ? document.getElementById('oraProgrammata').value : "",
         status: 'planned',
         timestamp: new Date().getTime()
     };
@@ -299,9 +377,7 @@ btnToggleWaiting.addEventListener('click', () => {
 
 // Submit Nuovo "In Attesa"
 btnSaveWaiting.addEventListener('click', async () => {
-    // Aggiorna hidden inputs
-    iTipoAttivita.value = getChecklistValues('cb-tipo-prog');
-    iDispositivi.value = getChecklistValues('cb-disp-prog');
+    const blocksData = extractDynamicBlocksData('dynamicProgInterventionsContainer');
 
     if(!iPaziente.value || !iLocalita.value || !iIndirizzo.value) {
         return alert("Compila Paziente, Località e Indirizzo per salvare l'intervento in attesa!");
@@ -314,13 +390,16 @@ btnSaveWaiting.addEventListener('click', async () => {
     const plannedId = "plan_" + Date.now().toString();
     const waitingEvent = {
         id: plannedId,
-        tipo: iTipoAttivita.value,
+        tipo: blocksData.tipoStr || "",
         paziente: iPaziente.value,
         localita: iLocalita.value,
         indirizzo: iIndirizzo.value,
         telefono: iTelefono ? iTelefono.value : "",
-        dispositivi: iDispositivi.value,
+        dispositivi: blocksData.dispStr || "",
+        matricola: blocksData.matStr || "",
+        interventiList: blocksData.array,
         dataPrevista: "",
+        oraPrevista: "",
         status: 'in_attesa',
         timestamp: new Date().getTime()
     };
@@ -382,7 +461,9 @@ window.editProgrammato = function(idFb) {
     document.getElementById('editProgTelefono').value = p.telefono || "";
     document.getElementById('editProgTipo').value = p.tipo || "";
     document.getElementById('editProgDispositivi').value = p.dispositivi || p.note || "";
+    document.getElementById('editProgMatricola').value = p.matricola || "";
     document.getElementById('editProgData').value = p.dataPrevista || "";
+    document.getElementById('editProgOra').value = p.oraPrevista || "";
     
     document.getElementById('editProgrammatoModal').classList.remove('hidden');
 };
@@ -409,7 +490,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 telefono: document.getElementById('editProgTelefono').value,
                 tipo: document.getElementById('editProgTipo').value,
                 dispositivi: document.getElementById('editProgDispositivi').value,
+                matricola: document.getElementById('editProgMatricola').value,
                 dataPrevista: newD,
+                oraPrevista: document.getElementById('editProgOra').value,
                 status: newD ? 'planned' : 'in_attesa' // revaluta status in base a se c'è data o no
             });
             modal.classList.add('hidden');
