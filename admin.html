@@ -138,32 +138,34 @@
 
     <main class="admin-container">
         
-        <div class="controls-card" style="align-items: flex-start; flex-direction: column;">
-            <div style="width: 100%; display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
-                <span style="font-size: 0.85rem; font-weight: bold; color: #555; align-self: center;">Filtri Rapidi:</span>
-                <button class="btn btn-secondary btn-sm filter-quick" data-range="week" style="padding: 5px 10px; font-size: 0.8rem;">Ultima Settimana</button>
-                <button class="btn btn-secondary btn-sm filter-quick" data-range="month" style="padding: 5px 10px; font-size: 0.8rem;">Mese in Corso</button>
-                <button class="btn btn-secondary btn-sm filter-quick" data-range="last_month" style="padding: 5px 10px; font-size: 0.8rem;">Mese Prec.</button>
-                <button class="btn btn-secondary btn-sm filter-quick" data-range="trim" style="padding: 5px 10px; font-size: 0.8rem;">Trimestre</button>
-                <button class="btn btn-secondary btn-sm filter-quick" data-range="year" style="padding: 5px 10px; font-size: 0.8rem;">Anno</button>
-            </div>
-            
-            <div style="width: 100%; display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-end;">
-                <div class="control-group">
-                    <label for="filterDateStart">Da Data</label>
-                    <input type="date" id="filterDateStart">
+        <div id="filtersWrapper" class="hidden">
+            <div class="controls-card" style="align-items: flex-start; flex-direction: column;">
+                <div style="width: 100%; display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                    <span style="font-size: 0.85rem; font-weight: bold; color: #555; align-self: center;">Filtri Rapidi:</span>
+                    <button class="btn btn-secondary btn-sm filter-quick" data-range="week" style="padding: 5px 10px; font-size: 0.8rem;">Ultima Settimana</button>
+                    <button class="btn btn-secondary btn-sm filter-quick" id="btnFilterMonth" data-range="month" style="padding: 5px 10px; font-size: 0.8rem;">Mese in Corso</button>
+                    <button class="btn btn-secondary btn-sm filter-quick" data-range="last_month" style="padding: 5px 10px; font-size: 0.8rem;">Mese Prec.</button>
+                    <button class="btn btn-secondary btn-sm filter-quick" data-range="trim" style="padding: 5px 10px; font-size: 0.8rem;">Trimestre</button>
+                    <button class="btn btn-secondary btn-sm filter-quick" data-range="year" style="padding: 5px 10px; font-size: 0.8rem;">Anno</button>
                 </div>
-                <div class="control-group">
-                    <label for="filterDateEnd">A Data</label>
-                    <input type="date" id="filterDateEnd">
-                </div>
-                <div class="control-group">
-                    <label for="filterSearch">Cerca (Paziente/Città)</label>
-                    <input type="text" id="filterSearch" placeholder="Es. Mario Rossi...">
-                </div>
-                <div class="control-group" style="flex-grow: 1; text-align: right;">
-                    <button class="btn btn-primary btn-orange btn-sm" id="btnApplyFilters">Conferma Cerca</button>
-                    <button class="btn btn-danger btn-sm" id="btnResetFilters" style="margin-left: 10px;">Reset</button>
+                
+                <div style="width: 100%; display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-end;">
+                    <div class="control-group">
+                        <label for="filterDateStart">Da Data</label>
+                        <input type="date" id="filterDateStart">
+                    </div>
+                    <div class="control-group">
+                        <label for="filterDateEnd">A Data</label>
+                        <input type="date" id="filterDateEnd">
+                    </div>
+                    <div class="control-group">
+                        <label for="filterSearch">Cerca (Paziente/Città)</label>
+                        <input type="text" id="filterSearch" placeholder="Es. Mario Rossi...">
+                    </div>
+                    <div class="control-group" style="flex-grow: 1; text-align: right;">
+                        <button class="btn btn-primary btn-orange btn-sm" id="btnApplyFilters">Conferma Cerca</button>
+                        <button class="btn btn-danger btn-sm" id="btnResetFilters" style="margin-left: 10px;">Reset</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -191,9 +193,12 @@
         </div>
 
         <div class="table-container">
-            <h2 id="toggleStoricoHeader" style="padding: 1rem 1.5rem; margin: 0; background: #f8fafc; color: var(--blue-dark); border-bottom: 1px solid #eee; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+            <h2 id="toggleStoricoHeader" style="padding: 1rem 1.5rem; margin: 0; background: #f8fafc; color: var(--blue-dark); border-bottom: 1px solid #eee; cursor: pointer; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <span>✅ Storico Interventi (Eseguiti)</span>
-                <button id="storicoToggleIcon" class="btn btn-secondary btn-sm" style="margin:0; font-size:0.85rem; padding: 5px 10px;">Apri Storico ⬇️</button>
+                <div>
+                    <button id="btnToggleFilters" class="btn btn-primary btn-sm" style="margin:0; font-size:0.85rem; padding: 5px 10px; background: #b45309; border: none; margin-right: 5px;">⚙️ Filtri</button>
+                    <button id="storicoToggleIcon" class="btn btn-secondary btn-sm" style="margin:0; font-size:0.85rem; padding: 5px 10px;">Apri Storico ⬇️</button>
+                </div>
             </h2>
             <div id="storicoWrapper" class="hidden">
                 <table id="interventiTable">

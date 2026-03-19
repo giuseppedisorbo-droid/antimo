@@ -2215,3 +2215,119 @@ if(newRubricaForm) {
 
 // Inizializzazione Globale
 initApp();
+
+// ========================================================
+// REPARTO DATA BACKUP & RIPRISTINO (Esportazione Cloud .json)
+// ========================================================
+const btnOpenDataBackup = document.getElementById('btnOpenDataBackup');
+const dataBackupModal = document.getElementById('dataBackupModal');
+const btnCloseDataBackup = document.getElementById('btnCloseDataBackup');
+const btnExportDataJson = document.getElementById('btnExportDataJson');
+const btnImportDataJson = document.getElementById('btnImportDataJson');
+const importDataFile = document.getElementById('importDataFile');
+
+if(btnOpenDataBackup) {
+    btnOpenDataBackup.addEventListener('click', () => {
+        if(dataBackupModal) dataBackupModal.classList.remove('hidden');
+        const settingsModal = document.getElementById('settingsModal');
+        if(settingsModal) settingsModal.classList.add('hidden');
+    });
+}
+if(btnCloseDataBackup) {
+    btnCloseDataBackup.addEventListener('click', () => {
+        if(dataBackupModal) dataBackupModal.classList.add('hidden');
+    });
+}
+
+if(btnExportDataJson) {
+    btnExportDataJson.addEventListener('click', async () => {
+        if(!isFirebaseConfigured) { alert("Firebase non configurato! Nessun database reperibile."); return; }
+        try {
+            btnExportDataJson.textContent = "Elaborazione in corso...";
+            btnExportDataJson.disabled = true;
+            
+            const { getDocs, collection } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            
+            const collectionsToExport = ["interventi", "programmati", "messaggi", "anagrafiche"];
+            const exportData = {};
+            
+            for(let collName of collectionsToExport) {
+                exportData[collName] = [];
+                const snap = await getDocs(collection(db, collName));
+                snap.forEach(d => {
+                    exportData[collName].push({ __firebaseDocId: d.id, ...d.data() });
+                });
+            }
+            
+            const jsonStr = JSON.stringify(exportData, null, 2);
+            const blob = new Blob([jsonStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            const now = new Date();
+            const pdZ = n => n.toString().padStart(2, '0');
+            a.download = `Backup_Antimo_${now.getFullYear()}${pdZ(now.getMonth()+1)}${pdZ(now.getDate())}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            btnExportDataJson.innerHTML = `<span class="btn-icon">⬇️</span> Scarica Database (.json)`;
+            btnExportDataJson.disabled = false;
+        } catch(e) {
+            alert("Errore esportazione dati: " + e.message);
+            btnExportDataJson.innerHTML = `<span class="btn-icon">⬇️</span> Scarica Database (.json)`;
+            btnExportDataJson.disabled = false;
+        }
+    });
+}
+
+if(btnImportDataJson) {
+    btnImportDataJson.addEventListener('click', async () => {
+        if(!isFirebaseConfigured) { alert("Firebase non è configurato per il ripristino!"); return; }
+        
+        if(!importDataFile || !importDataFile.files[0]) {
+            alert("Devi prima selezionare un file JSON usando il tasto Scegli File!");
+            return;
+        }
+        
+        if(!confirm("ATTENZIONE CRITICA: Stai per inviare i dati di questo file JSON sul Server Cloud.\n\nQuesta operazione non cancellerà i dati esistenti che non sono nel file, ma AGGIUNGERÀ o SOVRASCRIVERÀ i documenti che hanno lo stesso ID. Continuare?")) return;
+        
+        const file = importDataFile.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = async (e) => {
+            try {
+                btnImportDataJson.textContent = "Ripristino in corso...";
+                btnImportDataJson.disabled = true;
+                
+                const data = JSON.parse(e.target.result);
+                const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                
+                let successCount = 0;
+                for(let collName of Object.keys(data)) {
+                    for(let item of data[collName]) {
+                        // Identifichiamo l'ID del documento Firestore salvato precedentemente
+                        const itemFbId = item.__firebaseDocId || item.id || item.fbId || Date.now().toString();
+                        
+                        let payload = {...item};
+                        delete payload.__firebaseDocId; // rimuovo la traccia interna
+                        
+                        await setDoc(doc(db, collName, itemFbId), payload, { merge: true });
+                        successCount++;
+                    }
+                }
+                
+                alert(`✅ Ripristino Database Completato!\nSono stati letti ed elaborati ${successCount} record.\nL'applicazione si aggiornerà ora per mostrare i dati ripristinati.`);
+                
+                // Forza reinizializzazione per leggere il nuovo db
+                window.location.reload(true);
+            } catch(err) {
+                alert("Errore nel ripristino o formato file JSON non valido:\n" + err.message);
+                btnImportDataJson.innerHTML = `<span class="btn-icon">⬆️</span> Ripristina da File .json`;
+                btnImportDataJson.disabled = false;
+            }
+        };
+        reader.readAsText(file);
+    });
+}

@@ -75,6 +75,9 @@ const toggleStoricoHeader = document.getElementById('toggleStoricoHeader');
 const storicoWrapper = document.getElementById('storicoWrapper');
 const storicoToggleIcon = document.getElementById('storicoToggleIcon');
 const quickFilters = document.querySelectorAll('.filter-quick');
+const btnToggleFilters = document.getElementById('btnToggleFilters');
+const filtersWrapper = document.getElementById('filtersWrapper');
+const btnFilterMonth = document.getElementById('btnFilterMonth');
 
 let tuttiGliInterventi = [];
 
@@ -106,16 +109,10 @@ async function loadData() {
     // Carica anche la sezione Non Eseguiti
     await loadNonEseguiti();
     
-    // Filtro Oggi automatico
-    const urlParams = new URLSearchParams(window.location.search);
-    if (!window.filterAppliedOnce && urlParams.get('filter') === 'oggi') {
+    // Auto trigger Mese in Corso al caricamento
+    if (!window.filterAppliedOnce) {
         window.filterAppliedOnce = true;
-        const oggi = new Date();
-        const pdZ = n => n.toString().padStart(2, '0');
-        const dStr = `${oggi.getFullYear()}-${pdZ(oggi.getMonth() + 1)}-${pdZ(oggi.getDate())}`;
-        filterDateStart.value = dStr;
-        filterDateEnd.value = dStr;
-        applyFilters();
+        if(btnFilterMonth) btnFilterMonth.click();
     }
 }
 
@@ -420,13 +417,22 @@ btnResetFilters.addEventListener('click', () => {
 btnExportExcel.addEventListener('click', esporterCSV);
 
 if (toggleStoricoHeader) {
-    toggleStoricoHeader.addEventListener('click', () => {
+    toggleStoricoHeader.addEventListener('click', (e) => {
+        // Se ho cliccato proprio sul bottone filtri, ignoro l'apertura intera
+        if (e.target.closest('#btnToggleFilters')) return;
+        
         storicoWrapper.classList.toggle('hidden');
         if (storicoWrapper.classList.contains('hidden')) {
             storicoToggleIcon.textContent = "Apri Storico ⬇️";
         } else {
             storicoToggleIcon.textContent = "Chiudi Storico ⬆️";
         }
+    });
+}
+
+if (btnToggleFilters) {
+    btnToggleFilters.addEventListener('click', (e) => {
+        if(filtersWrapper) filtersWrapper.classList.toggle('hidden');
     });
 }
 
