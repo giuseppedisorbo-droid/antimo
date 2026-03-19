@@ -59,6 +59,7 @@ const interventionSection = document.getElementById('interventionSection');
 const activeInterventionSection = document.getElementById('activeInterventionSection');
 const interventiCount = document.getElementById('interventiCount');
 const programmatiCount = document.getElementById('programmatiCount');
+const filterTecnicoOggi = document.getElementById('filterTecnicoOggi');
 
 const newInterventionForm = document.getElementById('newInterventionForm');
 const btnToggleNuovoIntervento = document.getElementById('btnToggleNuovoIntervento');
@@ -1174,6 +1175,7 @@ async function syncLocalDataToCloud() {
                 dispositivi: inv.dispositivi || "",
                 matricola: inv.matricola || "",
                 note: inv.note || "",
+                operatore: inv.operatore || localStorage.getItem('antimo_user_name') || "Sconosciuto",
                 startTime: inv.startTime || Date.now(),
                 endTime: inv.endTime || Date.now(),
                 kmPercorsi: inv.kmPercorsi || "0",
@@ -1308,7 +1310,51 @@ async function updateInterventiCount() {
     // Filter completedInterventions for today only
     const doneToday = completedInterventions.filter(inv => inv.startTime >= startOfToday.getTime() && inv.startTime <= endOfToday);
     
-    interventiCount.textContent = doneToday.length;
+    // Gestione Multi-Tenant (Tutti vs MIO)
+    const targetFilter = filterTecnicoOggi ? filterTecnicoOggi.value : "MIO";
+    const myName = localStorage.getItem('antimo_user_name') || "";
+    
+    if (targetFilter === "MIO" || targetFilter === "" || !isFirebaseConfigured) {
+        interventiCount.textContent = doneToday.length;
+    } else {
+        // Fetch dal DB chiunque oppure un utente specifico
+        try {
+            const q = query(collection(db, "interventi"), where("startTime", ">=", startOfToday.getTime()));
+            const snap = await getDocs(q);
+            window.firebaseEseguitiOggi = [];
+            snap.forEach(d => window.firebaseEseguitiOggi.push(d.data()));
+            
+            if (targetFilter === "TUTTI") {
+                interventiCount.textContent = window.firebaseEseguitiOggi.length;
+            } else {
+                interventiCount.textContent = window.firebaseEseguitiOggi.filter(x => x.operatore === targetFilter).length;
+            }
+        } catch(e) {
+            console.error(e);
+            interventiCount.textContent = doneToday.length; // fallback
+        }
+    }
+}
+
+if(filterTecnicoOggi) {
+    // Aggiungiamo i nomi di tutti i dipendenti al dropdown
+    if (window.anagrafiche && window.anagrafiche.length > 0) {
+        const dipendenti = window.anagrafiche.filter(d => d.qualifica === "Dipendente").map(d => d.ragioneSociale).sort();
+        dipendenti.forEach(nome => {
+            const opt = document.createElement('option');
+            opt.value = nome;
+            opt.style.color = "black";
+            opt.textContent = `👤 Solo: ${nome}`;
+            filterTecnicoOggi.appendChild(opt);
+        });
+    }
+
+    filterTecnicoOggi.addEventListener('change', () => {
+        updateInterventiCount();
+        if(!activitiesListContainer.classList.contains('hidden')) {
+            renderActivitiesList();
+        }
+    });
 }
 
 function renderSpecialPlannedList(container, filteredData) {
@@ -2099,6 +2145,7 @@ newInterventionForm.addEventListener('submit', async (e) => {
         matricola: matricolaTxt,
         interventiList: blocksData.array,
         note: iNote.value,
+        operatore: localStorage.getItem('antimo_user_name') || "Sconosciuto",
         attachments: currentAttachments, // Base64 Array se offline
         fileUrlsProgrammati: pendingFileUrlsProgrammati, 
         startTime: new Date().getTime(),
@@ -2149,6 +2196,7 @@ newInterventionForm.addEventListener('submit', async (e) => {
                 matricola: invToSave.matricola || "",
                 interventiList: invToSave.interventiList || [], 
                 note: invToSave.note || "",
+                operatore: invToSave.operatore || "Sconosciuto",
                 startTime: invToSave.startTime,
                 endTime: invToSave.endTime,
                 kmPercorsi: invToSave.kmPercorsi,
@@ -2347,10 +2395,24 @@ function renderActivitiesList() {
     });
 
     // 2. Interventi Completati (Eseguiti oggi) - Verdi
-    const done = completedInterventions.filter(inv => {
-        const d = new Date(inv.startTime).getTime();
-        return (d >= startOfToday && d <= endOfToday);
-    });
+    const targetFilter = filterTecnicoOggi ? filterTecnicoOggi.value : "MIO";
+    const myName = localStorage.getItem('antimo_user_name') || "";
+    
+    let done = [];
+    if (targetFilter === "MIO" || targetFilter === "" || !window.firebaseEseguitiOggi) {
+        done = completedInterventions.filter(inv => {
+            const d = new Date(inv.startTime).getTime();
+            return (d >= startOfToday && d <= endOfToday);
+        });
+    } else {
+        if (targetFilter === "TUTTI") {
+            done = window.firebaseEseguitiOggi;
+        } else {
+            done = window.firebaseEseguitiOggi.filter(inv => inv.operatore === targetFilter);
+        }
+        // Ordiniamo
+        done.sort((a,b) => a.startTime - b.startTime);
+    }
 
     if(toDO.length === 0 && done.length === 0) {
         activitiesList.innerHTML = '<p style="text-align:center; color:gray; font-size:0.9rem;">Nessuna attività programmata o eseguita per oggi.</p>';
@@ -2475,6 +2537,7 @@ function renderActivitiesList() {
                         <div style="font-size:0.80rem; color:#22c55e; margin-bottom:4px;"><strong>✅ Dalle ${padZ(d.getHours())}:${padZ(d.getMinutes())} alle ${padZ(e.getHours())}:${padZ(e.getMinutes())}</strong></div>
                         <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${inv.paziente} ${fileBadget}</div>
                         <div style="font-size:0.85rem; color:#555;">📍 ${inv.localita || inv.destinazione} | 🔧 ${inv.tipo}</div>
+                        ${inv.operatore && inv.operatore !== myName ? `<div style="font-size:0.80rem; color:#8b5cf6; margin-top:2px;">👨‍🔧 Eseguito da: <strong>${inv.operatore}</strong></div>` : ''}
                     </div>
                     <div style="display: flex; gap: 8px; align-items: center; padding-left: 10px;">
                         <span class="expand-icon" style="font-size:1.2rem; color:var(--blue-light); padding:10px;">▼</span>

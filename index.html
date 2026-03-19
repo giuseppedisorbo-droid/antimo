@@ -26,6 +26,15 @@
             </button>
         </div>
 
+        <!-- Selettore Multi-Tenant (Visualizzazione Eseguiti) -->
+        <div style="margin-top: 5px; margin-bottom: 5px; text-align: center;">
+            <select id="filterTecnicoOggi" style="width: 100%; max-width: 400px; padding: 6px 15px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.5); background: rgba(0,0,0,0.2); color: white; font-weight: bold; font-size: 0.85rem; outline: none; cursor: pointer; text-align: center;">
+                <option value="" style="color: black;">Mostra Interventi in base a...</option>
+                <option value="MIO" style="color: black;" selected>👨‍🔧 Solo i miei</option>
+                <option value="TUTTI" style="color: black;">🌍 Tutti i Tecnici (Cloud)</option>
+            </select>
+        </div>
+
         <!-- Lato Destro: Griglia Badge Statistici -->
         <div class="header-stats-grid">
             <div style="display: flex; gap: 4px;">
@@ -617,8 +626,8 @@
         </div>
 
     </main>
-    <script type="module" src="app.js?v=37"></script>
-    <script type="module" src="global_notifications.js?v=37"></script>
+    <script type="module" src="app.js?v=38"></script>
+    <script type="module" src="global_notifications.js?v=38"></script>
     <script>
       // Gestione layout PC
       document.addEventListener('DOMContentLoaded', () => {
