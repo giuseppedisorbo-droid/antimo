@@ -23,7 +23,9 @@ if(db) {
         let activeNotes = [];
         snapshot.forEach(docSnap => {
             const data = docSnap.data();
-            if(data.isNotification) activeNotes.push(data.text);
+            if(data.isNotification && !data.eliminato && !data.letto && !data.presoInCarico) {
+                activeNotes.push(data.text);
+            }
         });
         
         let badge = document.getElementById('globalFloatingNotification');

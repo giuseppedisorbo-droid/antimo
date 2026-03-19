@@ -571,7 +571,11 @@ function renderMessagesUI() {
             count++;
             const data = item.data;
             const docSnapId = item.id;
-            if(data.isNotification && !data.eliminato) activeNotes.push(data.text);
+            
+            // Notification badge condition: only brand new untouched messages
+            if(data.isNotification && !data.eliminato && !data.letto && !data.presoInCarico) {
+                activeNotes.push(data.text);
+            }
             
             const div = document.createElement('div');
             div.setAttribute('data-id', docSnapId);
@@ -1296,31 +1300,15 @@ async function updateInterventiCount() {
     if (domaniCount) domaniCount.textContent = cDomani;
     if (npCount) npCount.textContent = soloNP;
     
-    if (!isFirebaseConfigured) {
-        interventiCount.textContent = completedInterventions.length; 
-        return;
-    }
+    // Calculate start and end of today
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = startOfToday.getTime() + 24 * 60 * 60 * 1000 - 1;
 
-    try {
-        // Calcola l'inizio e la fine di oggi
-        const startOfToday = new Date();
-        startOfToday.setHours(0, 0, 0, 0);
-        
-        const q = query(
-            collection(db, "interventi"), 
-            where("startTime", ">=", startOfToday.getTime())
-        );
-        
-        const snap = await getDocs(q);
-        
-        // Contiamo quanti ne sono stati registrati oggi da chiunque
-        interventiCount.textContent = snap.size; 
-        
-    } catch(e) {
-        console.error("Errore fetch conteggi oggi", e);
-        // Fallback: mostra il numero locale in caso di errore
-        interventiCount.textContent = completedInterventions.length; 
-    }
+    // Filter completedInterventions for today only
+    const doneToday = completedInterventions.filter(inv => inv.startTime >= startOfToday.getTime() && inv.startTime <= endOfToday);
+    
+    interventiCount.textContent = doneToday.length;
 }
 
 function renderSpecialPlannedList(container, filteredData) {
