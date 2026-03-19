@@ -1606,16 +1606,12 @@ iDispositiviSelect.addEventListener('change', (e) => {
 });
 
 btnPlanIntervention.addEventListener('click', async () => {
-    let tipiSelezionati = Array.from(iTipo.selectedOptions).map(o => o.value).filter(v => v).join(', ');
+    let tipiSelezionati = iTipo.value.trim();
     if(!tipiSelezionati || !iPaziente.value || !iLocalita.value || !iIndirizzo.value) {
         return alert("Compila Tipo, Paziente, Località e Indirizzo per salvare l'intervento programmato!");
     }
     
-    let dispFinale = Array.from(iDispositiviSelect.selectedOptions).map(o => o.value).filter(v => v !== '_AZI_NUOVO_' && v).join(', ');
-    if(Array.from(iDispositiviSelect.selectedOptions).some(o => o.value === '_AZI_NUOVO_')) {
-        let dispNuovo = iNuovoDispositivo.value.trim();
-        if(dispNuovo) dispFinale = dispFinale ? dispFinale + ', ' + dispNuovo : dispNuovo;
-    }
+    let dispFinale = iDispositiviSelect.value.trim();
     if(!dispFinale) dispFinale = "Nessuno";
 
     // Calcola data prevista (default: domani)
@@ -1730,24 +1726,12 @@ newInterventionForm.addEventListener('submit', async (e) => {
         return alert("Inserisci i Km percorsi prima di salvare l'attività (Obbligatorio dalle Impostazioni).");
     }
     
-    let tipiSelezionati = Array.from(iTipo.selectedOptions).map(o => o.value).filter(v => v).join(', ');
-    if(!tipiSelezionati) return alert("Seleziona almeno un Tipo di Intervento!");
+    let tipiSelezionati = iTipo.value.trim();
+    if(!tipiSelezionati) return alert("Inserisci almeno un Tipo di Intervento!");
 
-    let dispFinale = Array.from(iDispositiviSelect.selectedOptions).map(o => o.value).filter(v => v !== '_AZI_NUOVO_' && v).join(', ');
-    if(Array.from(iDispositiviSelect.selectedOptions).some(o => o.value === '_AZI_NUOVO_')) {
-        let dispNuovo = iNuovoDispositivo.value.trim();
-        if(!dispNuovo && iDispositiviSelect.selectedOptions.length === 1) return alert("Scrivi il nome del nuovo dispositivo!");
-        if(dispNuovo) {
-            dispFinale = dispFinale ? dispFinale + ', ' + dispNuovo : dispNuovo;
-            if(!customDevices.includes(dispNuovo)) {
-                customDevices.push(dispNuovo);
-                const opt = document.createElement('option');
-                opt.value = dispNuovo; opt.textContent = dispNuovo;
-                iDispositiviSelect.insertBefore(opt, iDispositiviSelect.lastElementChild);
-            }
-        }
-    } else if(!dispFinale) {
-        return alert("Seleziona almeno un dispositivo (o scegli 'Nessuno')!");
+    let dispFinale = iDispositiviSelect.value.trim();
+    if(!dispFinale) {
+        return alert("Inserisci i dispositivi o la dicitura 'Nessuno'!");
     }
 
     // UI Loading state indication
@@ -2074,35 +2058,20 @@ function renderActivitiesList() {
             
             div.querySelector('button[data-action="avvia"]').addEventListener('click', () => {
                 const dataToLoad = plannedInterventions[origIndex];
-            function setSelectMultipleValues(selectEl, strValues) {
-                Array.from(selectEl.options).forEach(opt => opt.selected = false);
-                if(!strValues) return;
-                const vals = strValues.split(',').map(s => s.trim());
-                Array.from(selectEl.options).forEach(opt => {
-                    if(vals.includes(opt.value)) opt.selected = true;
-                });
-            }
             
-            setSelectMultipleValues(iTipo, dataToLoad.tipo);
-            iPaziente.value = dataToLoad.paziente;
+            iTipo.value = dataToLoad.tipo || "";
+            iPaziente.value = dataToLoad.paziente || "";
             if(iLocalita) iLocalita.value = dataToLoad.localita || dataToLoad.destinazione || "";
             if(iIndirizzo) iIndirizzo.value = dataToLoad.indirizzo || "";
             if(iTelefono) iTelefono.value = dataToLoad.telefono || "";
             
-            setSelectMultipleValues(iDispositiviSelect, dataToLoad.dispositivi);
+            iDispositiviSelect.value = dataToLoad.dispositivi || "";
             
-            // Gestione custom devices se non trovati negli option o se tra le virgole ci sono custom
-            if(dataToLoad.dispositivi) {
-                const devs = dataToLoad.dispositivi.split(',').map(s=>s.trim());
-                if(devs.some(d => !Array.from(iDispositiviSelect.options).some(o=>o.value===d))) {
-                    iNuovoDispositivo.classList.remove('hidden');
-                    // mettiamo solo l'ultimo mancante per semplificare il form
-                    iNuovoDispositivo.value = devs.filter(d => !Array.from(iDispositiviSelect.options).some(o=>o.value===d)).join(', ');
-                } else {
-                    iNuovoDispositivo.classList.add('hidden');
-                }
-            }
-                iNote.value = dataToLoad.note || "";
+            // iNuovoDispositivo non è più necessario ma la eliminiamo visualmente se esiste
+            if(iNuovoDispositivo) iNuovoDispositivo.classList.add('hidden');
+            
+            if(iNote) iNote.value = dataToLoad.note || "";
+            if(inputMatricola) inputMatricola.value = dataToLoad.matricola || "";
                 pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
 
                 plannedInterventions.splice(origIndex, 1);
@@ -2320,9 +2289,27 @@ async function checkLoginStatus() {
     if (!userEmail) {
         document.getElementById('loginModal').classList.remove('hidden');
     } else {
+        let userName = localStorage.getItem('antimo_user_name');
+        
+        // MIGRATION: Retroactively assign antimo_user_name for users logged in before the update
+        if (!userName && userEmail.includes('@eubios.it')) {
+            try {
+                const parts = userEmail.split('@')[0].split('.');
+                let nome = parts[0] || '';
+                let cognome = parts.length > 1 ? parts[1] : '';
+                nome = nome ? nome.charAt(0).toUpperCase() + nome.slice(1) : '';
+                cognome = cognome ? cognome.charAt(0).toUpperCase() + cognome.slice(1) : '';
+                userName = (nome + ' ' + cognome).trim();
+                if(userName) localStorage.setItem('antimo_user_name', userName);
+            } catch(e) {
+                console.error("Migration error user name", e);
+            }
+        }
+        
+        if (!userName) userName = userEmail;
+
         const userNameDisp = document.getElementById('loggedInUserDisplay');
         if (userNameDisp) {
-            const userName = localStorage.getItem('antimo_user_name') || userEmail;
             userNameDisp.innerText = `👤 ${userName}`;
         }
     }
@@ -2351,8 +2338,12 @@ if (loginForm) {
         
         try {
             const parts = email.split('@')[0].split('.');
-            let nome = parts[0];
-            let cognome = parts[1];
+            let nome = parts[0] || '';
+            let cognome = parts.length > 1 ? parts[1] : '';
+            
+            nome = nome ? nome.charAt(0).toUpperCase() + nome.slice(1) : '';
+            cognome = cognome ? cognome.charAt(0).toUpperCase() + cognome.slice(1) : '';
+            const fullName = (nome + ' ' + cognome).trim();
             
             if (isFirebaseConfigured) {
                 const { collection, query, where, getDocs, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
@@ -2363,8 +2354,8 @@ if (loginForm) {
                     await addDoc(collection(db, "anagrafiche"), {
                         id: Date.now().toString(),
                         timestamp: serverTimestamp(),
-                        nome: nome.charAt(0).toUpperCase() + nome.slice(1),
-                        cognome: cognome.charAt(0).toUpperCase() + cognome.slice(1),
+                        nome: nome,
+                        cognome: cognome,
                         email: email,
                         telefono1: phone,
                         localita: "App (Dipendente)",
@@ -2376,7 +2367,7 @@ if (loginForm) {
             }
             localStorage.setItem('antimo_user_email', email);
             localStorage.setItem('antimo_user_phone', phone);
-            localStorage.setItem('antimo_user_name', nome.charAt(0).toUpperCase() + nome.slice(1) + ' ' + cognome.charAt(0).toUpperCase() + cognome.slice(1));
+            localStorage.setItem('antimo_user_name', fullName);
             
             document.getElementById('loginModal').classList.add('hidden');
         } catch(err) {

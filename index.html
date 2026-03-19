@@ -20,7 +20,7 @@
                 <a href="admin.html" id="btnOpenDashboard" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; cursor: pointer; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: flex; align-items: center;">💻 Dashboard</a>
                 <button id="btnOpenUsersList" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; cursor: pointer; font-weight: bold; font-size: 0.8rem;">👥 Dipendenti</button>
             </div>
-            <div style="font-size: 0.75rem; color: rgba(255,255,255,0.9); margin-top: 8px; cursor: pointer; font-weight: 600;" id="appVersionStamp" onclick="nukeCache()">v24.7 - Utenti</div>
+            <div style="font-size: 0.75rem; color: rgba(255,255,255,0.9); margin-top: 8px; cursor: pointer; font-weight: 600;" id="appVersionStamp" onclick="nukeCache()">v24.9 - Chat Fix</div>
             <div id="loggedInUserDisplay" style="font-size: 0.8rem; color: #fcd34d; font-weight: bold; margin-top: 4px;"></div>
             <button id="btnTopNotification" class="hidden" style="margin-top: 5px; background: #e11d48; color: white; border-radius: 6px; padding: 4px 8px; border: 1px solid rgba(255,255,255,0.5); cursor: pointer; font-weight: 600; font-size: 0.75rem; display: flex; align-items: center; max-width: 250px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
                 🔔 <span id="topNotificationText" style="margin-left: 5px; overflow:hidden; text-overflow:ellipsis; white-space: nowrap;"></span>
@@ -152,19 +152,7 @@
             <form id="newInterventionForm">
                 <div class="form-group">
                     <label for="tipoAttivita">Tipo Intervento (Partenza) *</label>
-                    <select id="tipoAttivita" multiple required style="height: 120px;">
-                        <option value="" disabled>Seleziona una o più tipologie...</option>
-                        <option value="Sostituzione">Sostituzione</option>
-                        <option value="Installazione">Installazione</option>
-                        <option value="Visita">Visita</option>
-                        <option value="Controllo periodico">Controllo periodico</option>
-                        <option value="Valutazione">Valutazione</option>
-                        <option value="Consegna">Consegna</option>
-                        <option value="Ritiro">Ritiro</option>
-                        <option value="Formazione">Formazione</option>
-                        <option value="Attività interna SAT">Attività interna SAT (c/o struttura)</option>
-                        <option value="Altro">Altro</option>
-                    </select>
+                    <textarea id="tipoAttivita" rows="2" placeholder="Es. Sostituzione, Visita... (Separati da virgola o a capo)" required></textarea>
                 </div>
 
                 <div class="form-group">
@@ -198,22 +186,7 @@
 
                 <div class="form-group">
                     <label for="dispositiviSelect">Dispositivi</label>
-                    <select id="dispositiviSelect" multiple style="height: 120px;">
-                        <option value="" disabled>Seleziona uno o più dispositivi...</option>
-                        <option value="D3">D3</option>
-                        <option value="DPad / DPad Max">DPad / DPad Max</option>
-                        <option value="Matrix">Matrix</option>
-                        <option value="Aspiratore">Aspiratore</option>
-                        <option value="PrismaVENT">PrismaVENT</option>
-                        <option value="O2 (Bombola/Concentratore)">O2 (Bombola/Concentratore)</option>
-                        <option value="Stativo">Stativo</option>
-                        <option value="Comunicatore Dinamico">Comunicatore Dinamico</option>
-                        <option value="Stabilizzatore di Corrente">Stabilizzatore di Corrente</option>
-                        <option value="CPAP / AutoCPAP">CPAP / AutoCPAP</option>
-                        <option value="Nessuno">Nessuno</option>
-                        <option value="_AZI_NUOVO_">➕ Aggiungi Nuovo...</option>
-                    </select>
-                    <input type="text" id="nuovoDispositivo" class="hidden" placeholder="Scrivi il nuovo dispositivo..." style="margin-top: 8px;">
+                    <textarea id="dispositiviSelect" rows="2" placeholder="Es. D3, Stativo... (Separati da virgola o a capo)"></textarea>
                 </div>
 
                 <div class="form-group">
@@ -629,8 +602,8 @@
         </div>
 
     </main>
-    <script type="module" src="app.js?v=28"></script>
-    <script type="module" src="global_notifications.js?v=28"></script>
+    <script type="module" src="app.js?v=30"></script>
+    <script type="module" src="global_notifications.js?v=30"></script>
     <script>
       // Gestione layout PC
       document.addEventListener('DOMContentLoaded', () => {
