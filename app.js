@@ -424,7 +424,11 @@ async function loadMessages() {
                 messagesDataCache.push({ id: docSnap.id, data: d });
                 if(d.sender && d.sender !== "Sconosciuto") uniqueUsers.add(d.sender);
                 if(d.recipients && d.recipients !== "Bacheca (Tutti)") {
-                    d.recipients.split(',').forEach(r => uniqueUsers.add(r.trim()));
+                    if (typeof d.recipients === 'string') {
+                        d.recipients.split(',').forEach(r => uniqueUsers.add(r.trim()));
+                    } else if (Array.isArray(d.recipients)) {
+                        d.recipients.forEach(r => uniqueUsers.add(r));
+                    }
                 }
             });
 
@@ -456,7 +460,7 @@ function renderMessagesUI() {
     let count = 0;
     let activeNotes = [];
 
-    const currentUser = antimo_user_name || "Sconosciuto";
+    const currentUser = localStorage.getItem('antimo_user_name') || "Sconosciuto";
     const searchText = (msgSearchText && msgSearchText.value) ? msgSearchText.value.toLowerCase() : "";
     const searchUser = (msgSearchUser && msgSearchUser.value) ? msgSearchUser.value : "";
     const searchDate = (msgSearchDate && msgSearchDate.value) ? msgSearchDate.value : "";
@@ -465,6 +469,7 @@ function renderMessagesUI() {
         const d = item.data;
         let sN = d.sender || "Sconosciuto";
         let rN = d.recipients || "Bacheca (Tutti)";
+        if (Array.isArray(rN)) rN = rN.join(', ');
 
         if (currentMsgTab === 'deleted') {
             if (d.eliminato !== true) return false;
