@@ -71,6 +71,11 @@ const filterDateStart = document.getElementById('filterDateStart');
 const filterDateEnd = document.getElementById('filterDateEnd');
 const filterSearch = document.getElementById('filterSearch');
 
+const toggleStoricoHeader = document.getElementById('toggleStoricoHeader');
+const storicoWrapper = document.getElementById('storicoWrapper');
+const storicoToggleIcon = document.getElementById('storicoToggleIcon');
+const quickFilters = document.querySelectorAll('.filter-quick');
+
 let tuttiGliInterventi = [];
 
 // Helper
@@ -391,14 +396,92 @@ if (btnSaveEdit) btnSaveEdit.addEventListener('click', async () => {
     }
 });
 
-btnApplyFilters.addEventListener('click', applyFilters);
+btnApplyFilters.addEventListener('click', () => {
+    quickFilters.forEach(b => { b.classList.remove('btn-orange'); b.classList.add('btn-secondary'); }); // Reset stile bottoni rapidi se si cerca manuale
+    applyFilters();
+    if (storicoWrapper && storicoWrapper.classList.contains('hidden')) {
+        storicoWrapper.classList.remove('hidden');
+        if(storicoToggleIcon) storicoToggleIcon.textContent = "Chiudi Storico ⬆️";
+    }
+});
+
 btnResetFilters.addEventListener('click', () => {
     filterDateStart.value = '';
     filterDateEnd.value = '';
     filterSearch.value = '';
+    quickFilters.forEach(b => { b.classList.remove('btn-orange'); b.classList.add('btn-secondary'); });
     renderTable(tuttiGliInterventi);
+    // Auto Collapse quando si fa Reset
+    if (storicoWrapper && !storicoWrapper.classList.contains('hidden')) {
+        storicoWrapper.classList.add('hidden');
+        if(storicoToggleIcon) storicoToggleIcon.textContent = "Apri Storico ⬇️";
+    }
 });
 btnExportExcel.addEventListener('click', esporterCSV);
+
+if (toggleStoricoHeader) {
+    toggleStoricoHeader.addEventListener('click', () => {
+        storicoWrapper.classList.toggle('hidden');
+        if (storicoWrapper.classList.contains('hidden')) {
+            storicoToggleIcon.textContent = "Apri Storico ⬇️";
+        } else {
+            storicoToggleIcon.textContent = "Chiudi Storico ⬆️";
+        }
+    });
+}
+
+quickFilters.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const range = e.currentTarget.getAttribute('data-range');
+        const today = new Date();
+        const pdZ = n => n.toString().padStart(2, '0');
+        const formatD = d => `${d.getFullYear()}-${pdZ(d.getMonth() + 1)}-${pdZ(d.getDate())}`; // "YYYY-MM-DD" per l'input date
+        
+        let startD, endD;
+        endD = formatD(today); // quasi tutti finiscono oggi a parte 'last_month'
+
+        if (range === 'week') {
+            let s = new Date(today);
+            s.setDate(s.getDate() - 7);
+            startD = formatD(s);
+        } else if (range === 'month') {
+            let s = new Date(today.getFullYear(), today.getMonth(), 1);
+            startD = formatD(s);
+        } else if (range === 'last_month') {
+            let s = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            let eD = new Date(today.getFullYear(), today.getMonth(), 0); // last day of prev month
+            startD = formatD(s);
+            endD = formatD(eD);
+        } else if (range === 'trim') {
+            let currentMonth = today.getMonth();
+            let startMonth = currentMonth - (currentMonth % 3);
+            let s = new Date(today.getFullYear(), startMonth, 1);
+            startD = formatD(s);
+        } else if (range === 'year') {
+            let s = new Date(today.getFullYear(), 0, 1);
+            startD = formatD(s);
+        }
+        
+        filterDateStart.value = startD;
+        filterDateEnd.value = endD;
+        
+        quickFilters.forEach(b => {
+             b.classList.remove('btn-orange'); 
+             b.classList.add('btn-secondary'); 
+             b.style.color = "";
+        });
+        e.currentTarget.classList.remove('btn-secondary');
+        e.currentTarget.classList.add('btn-orange');
+        e.currentTarget.style.color = "white";
+
+        applyFilters();
+        
+        if (storicoWrapper && storicoWrapper.classList.contains('hidden')) {
+            storicoWrapper.classList.remove('hidden');
+            if(storicoToggleIcon) storicoToggleIcon.textContent = "Chiudi Storico ⬆️";
+        }
+    });
+});
 
 if (btnManualSync) {
     btnManualSync.addEventListener('click', async () => {
