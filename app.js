@@ -58,6 +58,7 @@ if (requireKm === null) requireKm = false; // default
 const interventionSection = document.getElementById('interventionSection');
 const activeInterventionSection = document.getElementById('activeInterventionSection');
 const interventiCount = document.getElementById('interventiCount');
+const nesegCount = document.getElementById('nesegCount');
 const programmatiCount = document.getElementById('programmatiCount');
 const filterTecnicoOggi = document.getElementById('filterTecnicoOggi');
 
@@ -86,6 +87,7 @@ const btnMostraP = document.getElementById('btnMostraP');
 const btnCalendar = document.getElementById('btnCalendarLink'); // changed to Link!
 const btnMostraEseguiti = document.getElementById('btnMostraEseguiti');
 const btnMostraNP = document.getElementById('btnMostraNP');
+const btnMostraNeseguiti = document.getElementById('btnMostraNeseguiti');
 const npCount = document.getElementById('npCount');
 const btnMostraOggi = document.getElementById('btnMostraOggi');
 const btnMostraDomani = document.getElementById('btnMostraDomani');
@@ -118,6 +120,7 @@ let currentMsgTab = 'all'; // 'all', 'received', 'sent', 'unread', 'deleted'
 // Nuovi Toggles Logic
 let isPlannedVisible = false;
 let isNpVisible = false;
+let isNesegVisible = false;
 let isOggiVisible = false;
 let isDomaniVisible = false;
 let isEseguitiVisible = false;
@@ -202,6 +205,7 @@ function toggleTarget(target) {
         if(target === 'planned') return isPlannedVisible;
         if(target === 'np') return isNpVisible;
         if(target === 'eseguiti') return isEseguitiVisible;
+        if(target === 'neseg') return isNesegVisible;
         return false;
     })();
 
@@ -211,6 +215,7 @@ function toggleTarget(target) {
     isPlannedVisible = false;
     isNpVisible = false;
     isEseguitiVisible = false;
+    isNesegVisible = false;
     selectedCalendarDate = null;
 
     // Se non era già attivo, allora attivalo (effetto toggle esclusivo)
@@ -220,9 +225,10 @@ function toggleTarget(target) {
         if (target === 'planned') isPlannedVisible = true;
         if (target === 'np') isNpVisible = true;
         if (target === 'eseguiti') isEseguitiVisible = true;
+        if (target === 'neseg') isNesegVisible = true;
     }
 
-    if (isEseguitiVisible) {
+    if (isEseguitiVisible || isOggiVisible || isNesegVisible) {
         activitiesListContainer.classList.remove('hidden');
         if(btnViewActivities) btnViewActivities.innerHTML = `<span class="btn-icon">🙈</span> NASCONDI ATTIVITÀ`;
         renderActivitiesList();
@@ -241,6 +247,7 @@ if(btnMostraProgrammati) btnMostraProgrammati.addEventListener('click', () => to
 if(btnMostraP) btnMostraP.addEventListener('click', () => toggleTarget('planned'));
 if(btnMostraNP) btnMostraNP.addEventListener('click', () => toggleTarget('np'));
 if(btnMostraEseguiti) btnMostraEseguiti.addEventListener('click', () => toggleTarget('eseguiti'));
+if(btnMostraNeseguiti) btnMostraNeseguiti.addEventListener('click', () => toggleTarget('neseg'));
 
 if(btnToggleMessages) {
     btnToggleMessages.addEventListener('click', () => {
@@ -1289,10 +1296,12 @@ async function updateInterventiCount() {
 
     // Aggiorna contatori
     const soloPlanned = plannedInterventions.filter(p => !p.status || p.status === 'planned');
-    let cOggi = 0, cDomani = 0;
+    let cOggi = 0, cDomani = 0, cNeseg = 0;
     soloPlanned.forEach(p => {
         if(p.dataPrevista === todayStr) cOggi++;
         else if(p.dataPrevista === tomorrowStr) cDomani++;
+        
+        if(p.dataPrevista && p.dataPrevista <= todayStr) cNeseg++;
     });
 
     const soloNP = plannedInterventions.filter(p => p.status === 'in_attesa').length;
@@ -1301,6 +1310,7 @@ async function updateInterventiCount() {
     if (oggiCount) oggiCount.textContent = cOggi;
     if (domaniCount) domaniCount.textContent = cDomani;
     if (npCount) npCount.textContent = soloNP;
+    if (nesegCount) nesegCount.textContent = cNeseg;
     
     // Calculate start and end of today
     const startOfToday = new Date();
@@ -1337,6 +1347,11 @@ async function updateInterventiCount() {
 }
 
 if(filterTecnicoOggi) {
+    const defaultName = localStorage.getItem('antimo_user_name') || "";
+    if (defaultName.toLowerCase().includes("giuseppe")) {
+        filterTecnicoOggi.value = "TUTTI";
+    }
+
     // Aggiungiamo i nomi di tutti i dipendenti al dropdown
     if (window.anagrafiche && window.anagrafiche.length > 0) {
         const dipendenti = window.anagrafiche.filter(d => d.qualifica === "Dipendente").map(d => d.ragioneSociale).sort();
@@ -2388,8 +2403,15 @@ function renderActivitiesList() {
     const toDO = plannedInterventions.filter(inv => {
         if (inv.status !== 'planned') return false;
         if (inv.dataPrevista) {
-            const dp = new Date(inv.dataPrevista).getTime();
-            return (dp >= startOfToday && dp <= endOfToday);
+            const dpString = inv.dataPrevista; // "YYYY-MM-DD"
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            if (isNesegVisible) {
+                // Return all past and present missed
+                return dpString <= todayStr;
+            } else {
+                // Default Oggi view
+                return dpString === todayStr;
+            }
         }
         return false;
     });
@@ -2399,19 +2421,25 @@ function renderActivitiesList() {
     const myName = localStorage.getItem('antimo_user_name') || "";
     
     let done = [];
-    if (targetFilter === "MIO" || targetFilter === "" || !window.firebaseEseguitiOggi) {
-        done = completedInterventions.filter(inv => {
-            const d = new Date(inv.startTime).getTime();
-            return (d >= startOfToday && d <= endOfToday);
-        });
-    } else {
-        if (targetFilter === "TUTTI") {
-            done = window.firebaseEseguitiOggi;
+    if (!isNesegVisible) {
+        if (targetFilter === "MIO" || targetFilter === "" || !window.firebaseEseguitiOggi) {
+            done = completedInterventions.filter(inv => {
+                const d = new Date(inv.startTime).getTime();
+                return (d >= startOfToday && d <= endOfToday);
+            });
         } else {
-            done = window.firebaseEseguitiOggi.filter(inv => inv.operatore === targetFilter);
+            if (targetFilter === "TUTTI") {
+                done = window.firebaseEseguitiOggi;
+            } else {
+                done = window.firebaseEseguitiOggi.filter(inv => inv.operatore === targetFilter);
+            }
+            // Ordiniamo
+            done.sort((a,b) => a.startTime - b.startTime);
         }
-        // Ordiniamo
-        done.sort((a,b) => a.startTime - b.startTime);
+    }
+
+    if (isEseguitiVisible) {
+        toDO.length = 0; // Svuotiamo Rossi
     }
 
     if(toDO.length === 0 && done.length === 0) {
