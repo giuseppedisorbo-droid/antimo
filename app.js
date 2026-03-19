@@ -1062,6 +1062,7 @@ function initApp() {
     
     // Inizializza Listeners Real-time e sync
     loadMessages();
+    syncAssistitiDatabase();
     
     // Proviamo a sincronizzare i dati locali vecchi/offline non ancora sul cloud
     setTimeout(syncLocalDataToCloud, 2000);
@@ -1094,6 +1095,28 @@ async function syncPlannedInterventions() {
         console.log("Interventi programmati sincronizzati dal Cloud (filtrati 'da fare').");
     } catch(e) {
         console.error("Errore fetch programmati da Firebase:", e);
+    }
+}
+
+// Nuova funzione per ascoltare e sincronizzare il DB degli Assistiti
+async function syncAssistitiDatabase() {
+    if (!isFirebaseConfigured) return;
+    try {
+        const { doc, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        const docRef = doc(db, "shared_data", "assistiti");
+        onSnapshot(docRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                if (data.list) {
+                    localStorage.setItem('antimo_assistiti', JSON.stringify(data.list));
+                    if(typeof window.renderAssistitiDatalist === 'function') {
+                        window.renderAssistitiDatalist();
+                    }
+                }
+            }
+        });
+    } catch(e) {
+        console.error("Errore attivazione listener Assistiti", e);
     }
 }
 
@@ -2945,3 +2968,47 @@ if(btnImportDataJson) {
         reader.readAsText(file);
     });
 }
+
+// ==========================================
+// AUTO-COMPLETAMENTO ASSISTITI E DATALIST
+// ==========================================
+window.renderAssistitiDatalist = function() {
+    const dlist = document.getElementById('assistitiDatalist');
+    if(!dlist) return;
+    const assistiti = JSON.parse(localStorage.getItem('antimo_assistiti') || '[]');
+    dlist.innerHTML = '';
+    assistiti.forEach(a => {
+        let opt = document.createElement('option');
+        opt.value = a.paziente;
+        dlist.appendChild(opt);
+    });
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    window.renderAssistitiDatalist(); // Run at startup
+});
+
+// Event Delegation for Autofill
+document.addEventListener('input', (e) => {
+    if (e.target.tagName === 'INPUT' && e.target.getAttribute('list') === 'assistitiDatalist') {
+        const assistiti = JSON.parse(localStorage.getItem('antimo_assistiti') || '[]');
+        const val = e.target.value.trim();
+        const found = assistiti.find(a => a.paziente === val);
+        
+        if (found) {
+            let prefix = "";
+            if (e.target.id.startsWith("editProg")) prefix = "editProg";
+            else if (e.target.id.startsWith("edit")) prefix = "edit";
+            else prefix = "";
+
+            const disEl = document.getElementById(prefix ? prefix + "Dispositivi" : "dispositivi");
+            const locEl = document.getElementById(prefix ? prefix + "Localita" : "localita");
+            const indEl = document.getElementById(prefix ? prefix + "Indirizzo" : "indirizzo");
+
+            // Solo auto-fill se sono vuoti (per non sovrascrivere roba scritta a mano)
+            if(disEl && found.dispositivi && !disEl.value) disEl.value = found.dispositivi;
+            if(locEl && found.localita && !locEl.value) locEl.value = found.localita;
+            if(indEl && found.indirizzo && !indEl.value) indEl.value = found.indirizzo;
+        }
+    }
+});

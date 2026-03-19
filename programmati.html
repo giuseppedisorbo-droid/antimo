@@ -73,6 +73,13 @@
 
     <main class="container" style="max-width: 900px;">
         
+        <!-- IMPORT ASSISTITI BUTTON & DATALIST -->
+        <div style="text-align: right; margin-bottom: 15px;">
+            <input type="file" id="uploadAssistitiExcel" accept=".csv, .xls, .xlsx" style="display:none;" />
+            <button id="btnImportAssistiti" class="btn btn-secondary" style="background:#10b981; border:none; color:white; font-weight:bold;"><span class="btn-icon">👥</span> Importa Rubrica Assistiti (Excel)</button>
+        </div>
+        <datalist id="assistitiDatalist"></datalist>
+
         <!-- INSERIMENTO PROGRAMMATO -->
         <section class="card glass-card">
             <h2><span class="btn-icon">➕</span> Nuova Programmazione</h2>
@@ -80,7 +87,7 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div class="form-group" style="margin-bottom: 0;">
                         <label for="paziente">Paziente / Ente *</label>
-                        <input type="text" id="paziente" placeholder="Nominativo" required>
+                        <input type="text" id="paziente" placeholder="Nominativo" list="assistitiDatalist" required>
                     </div>
                     
                     <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 0;">
@@ -183,6 +190,36 @@
         </section>
 
     </main>
+
+    <!-- Modale Mapping Assistiti Excel -->
+    <div id="assistitiMappingModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1050; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+        <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+            <h3 style="color: var(--blue-dark); margin-bottom: 15px;">Mappatura Colonne Rubrica Assistiti</h3>
+            <p style="font-size: 0.9rem; color: #555; margin-bottom: 15px;">Seleziona a quali colonne del tuo file di Excel corrispondono i seguenti campi. L'app userà questi dati per autocompilare Nome, Dispositivi, Apparecchiature e Indirizzi quando scriverai il Paziente!</p>
+            
+            <div class="form-group">
+                <label>Colonna: Nome Cognome Paziente/Ente *</label>
+                <select id="colPaziente" required></select>
+            </div>
+            <div class="form-group">
+                <label>Colonna: Apparecchiatura e Accessori</label>
+                <select id="colDispositivi"></select>
+            </div>
+            <div class="form-group">
+                <label>Colonna: Località</label>
+                <select id="colLocalita"></select>
+            </div>
+            <div class="form-group">
+                <label>Colonna: Indirizzo Struttura/Domicilio</label>
+                <select id="colIndirizzo"></select>
+            </div>
+            
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button type="button" id="btnCancelAssistitiMapping" class="btn btn-secondary" style="padding:10px 15px;">Annulla</button>
+                <button type="button" id="btnSaveAssistitiMapping" class="btn btn-primary" style="background:#10b981; padding:10px 15px; border:none; color:white;">Salva e Importa Rubrica</button>
+            </div>
+        </div>
+    </div>
     
     <!-- MODAL MODIFICA ATTIVITA PROGRAMMATA -->
     <div id="editProgrammatoModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
@@ -195,7 +232,7 @@
                 <input type="hidden" id="editProgFbId">
                 <div class="form-group">
                     <label>Paziente / Ente</label>
-                    <input type="text" id="editProgPaziente" required>
+                    <input type="text" id="editProgPaziente" list="assistitiDatalist" required>
                 </div>
                 <div class="form-group">
                     <label>Località</label>
@@ -236,7 +273,7 @@
         </div>
     </div>
 
-    <script type="module" src="programmati.js?v=27"></script>
-    <script type="module" src="global_notifications.js"></script>
+    <script type="module" src="programmati.js?v=40"></script>
+    <script type="module" src="global_notifications.js?v=40"></script>
 </body>
 </html>

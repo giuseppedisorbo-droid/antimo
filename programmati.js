@@ -512,3 +512,177 @@ document.addEventListener('DOMContentLoaded', () => {
 
     fetchProgrammati();
 });
+
+
+// === LOGICA IMPORT ASSISTITI XLSX/CSV ===
+document.addEventListener('DOMContentLoaded', () => {
+    const btnImpA = document.getElementById('btnImportAssistiti');
+    const uploA = document.getElementById('uploadAssistitiExcel');
+    const modA = document.getElementById('assistitiMappingModal');
+    const btnCA = document.getElementById('btnCancelAssistitiMapping');
+    const btnSA = document.getElementById('btnSaveAssistitiMapping');
+
+    const cPaz = document.getElementById('colPaziente');
+    const cDisp = document.getElementById('colDispositivi');
+    const cLoc = document.getElementById('colLocalita');
+    const cInd = document.getElementById('colIndirizzo');
+
+    let parsedExcelRows = []; // Temporaneo per tenere le righe prima del mapping
+
+    if (btnImpA && uploA) {
+        btnImpA.addEventListener('click', () => {
+            uploA.value = "";
+            uploA.click();
+        });
+
+        uploA.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const data = evt.target.result;
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                // Converte in array di array per avere le righe grezze e isolare l'header
+                const jsonSheet = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                if (jsonSheet.length === 0) {
+                    alert("Il file selezionato è vuoto.");
+                    return;
+                }
+
+                // Primo row = header
+                const headers = jsonSheet[0];
+                parsedExcelRows = XLSX.utils.sheet_to_json(worksheet); // Array of Objects keys based on header
+
+                if (!headers || headers.length === 0) {
+                    alert("Impossibile rilevare le colonne dal file.");
+                    return;
+                }
+
+                // Popola i vari select del modale
+                [cPaz, cDisp, cLoc, cInd].forEach(sel => {
+                    sel.innerHTML = '<option value="">-- Ignora / Lascia Vuoto --</option>';
+                    headers.forEach(h => {
+                        const opt = document.createElement('option');
+                        opt.value = h;
+                        opt.textContent = h;
+                        sel.appendChild(opt);
+                    });
+                });
+
+                // Tentiamo di pre-selezionare in base ai nomi più probabili
+                headers.forEach(h => {
+                    const hl = h.toLowerCase();
+                    if (hl.includes('paziente') || hl.includes('assistito') || hl.includes('nome')) cPaz.value = h;
+                    if (hl.includes('apparecchiatura') || hl.includes('dispositiv') || hl.includes('accessori') || hl.includes('strument')) cDisp.value = h;
+                    if (hl.includes('localit') || hl.includes('citt') || hl.includes('comune')) cLoc.value = h;
+                    if (hl.includes('indirizzo') || hl.includes('via')) cInd.value = h;
+                });
+
+                modA.classList.remove('hidden');
+            };
+            reader.onerror = function() {
+                alert("Errore nella lettura del file.");
+            };
+            reader.readAsBinaryString(file);
+        });
+
+        btnCA.addEventListener('click', () => {
+            modA.classList.add('hidden');
+            parsedExcelRows = [];
+        });
+
+        btnSA.addEventListener('click', async () => {
+            const valPaziente = cPaz.value;
+            const valDispositivi = cDisp.value;
+            const valLocalita = cLoc.value;
+            const valIndirizzo = cInd.value;
+
+            if (!valPaziente) {
+                alert("Devi obbligatoriamente indicare almeno la colonna per il Nome Paziente/Ente!");
+                cPaz.focus();
+                return;
+            }
+
+            const mappedData = [];
+            parsedExcelRows.forEach(row => {
+                const pName = row[valPaziente];
+                if (!pName || String(pName).trim() === '') return; // Skip vuoti
+
+                mappedData.push({
+                    paziente: String(pName).trim(),
+                    dispositivi: valDispositivi && row[valDispositivi] ? String(row[valDispositivi]).trim() : "",
+                    localita: valLocalita && row[valLocalita] ? String(row[valLocalita]).trim() : "",
+                    indirizzo: valIndirizzo && row[valIndirizzo] ? String(row[valIndirizzo]).trim() : ""
+                });
+            });
+
+            // Salvataggio Locale
+            localStorage.setItem('antimo_assistiti', JSON.stringify(mappedData));
+            
+            // Salvataggio Cloud
+            try {
+                const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                await setDoc(doc(window.db, "shared_data", "assistiti"), { list: mappedData });
+                console.log("Assistiti sincronizzati in Cloud!");
+            } catch(e) {
+                console.error("Errore salvataggio Cloud Assistiti", e);
+            }
+
+            // Forza update datalist sulla stessa pagina
+            if(typeof window.renderAssistitiDatalist === 'function') {
+                window.renderAssistitiDatalist();
+            }
+
+            modA.classList.add('hidden');
+            alert(`Importazione completata: ${mappedData.length} assistiti inseriti e memorizzati con successo!`);
+        });
+    }
+});
+
+// ==========================================
+// AUTO-COMPLETAMENTO ASSISTITI E DATALIST
+// ==========================================
+window.renderAssistitiDatalist = function() {
+    const dlist = document.getElementById('assistitiDatalist');
+    if(!dlist) return;
+    const assistiti = JSON.parse(localStorage.getItem('antimo_assistiti') || '[]');
+    dlist.innerHTML = '';
+    assistiti.forEach(a => {
+        let opt = document.createElement('option');
+        opt.value = a.paziente;
+        dlist.appendChild(opt);
+    });
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    window.renderAssistitiDatalist(); // Run at startup
+});
+
+// Event Delegation for Autofill
+document.addEventListener('input', (e) => {
+    if (e.target.tagName === 'INPUT' && e.target.getAttribute('list') === 'assistitiDatalist') {
+        const assistiti = JSON.parse(localStorage.getItem('antimo_assistiti') || '[]');
+        const val = e.target.value.trim();
+        const found = assistiti.find(a => a.paziente === val);
+        
+        if (found) {
+            let prefix = "";
+            if (e.target.id.startsWith("editProg")) prefix = "editProg";
+            else if (e.target.id.startsWith("edit")) prefix = "edit";
+            else prefix = "";
+
+            const disEl = document.getElementById(prefix ? prefix + "Dispositivi" : "dispositivi");
+            const locEl = document.getElementById(prefix ? prefix + "Localita" : "localita");
+            const indEl = document.getElementById(prefix ? prefix + "Indirizzo" : "indirizzo");
+
+            // Solo auto-fill se sono vuoti
+            if(disEl && found.dispositivi && !disEl.value) disEl.value = found.dispositivi;
+            if(locEl && found.localita && !locEl.value) locEl.value = found.localita;
+            if(indEl && found.indirizzo && !indEl.value) indEl.value = found.indirizzo;
+        }
+    }
+});
