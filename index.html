@@ -18,7 +18,6 @@
                 <button id="btnSettings" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: white;" title="Impostazioni">⚙️</button>
                 <button id="btnTogglePC" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; cursor: pointer; font-weight: bold; font-size: 0.8rem;">PC</button>
                 <a href="admin.html" id="btnOpenDashboard" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; cursor: pointer; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: flex; align-items: center;">💻 Dashboard</a>
-                <button id="btnOpenUsersList" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; cursor: pointer; font-weight: bold; font-size: 0.8rem;">👥 Dipendenti</button>
             </div>
             <div style="font-size: 0.75rem; color: rgba(255,255,255,0.9); margin-top: 8px; cursor: pointer; font-weight: 600;" id="appVersionStamp" onclick="nukeCache()">v24.9 - Chat Fix</div>
             <div id="loggedInUserDisplay" style="font-size: 0.8rem; color: #fcd34d; font-weight: bold; margin-top: 4px;"></div>
@@ -86,12 +85,13 @@
                         </select>
                         <input type="date" id="msgSearchDate" style="font-size: 0.85rem; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; max-width: 40px;">
                     </div>
-                    <div style="display: flex; gap: 5px; justify-content: flex-start; width: 100%; overflow-x: auto; padding-bottom: 5px;">
+                    <div style="display: flex; gap: 5px; justify-content: flex-start; width: 100%; overflow-x: auto; padding-bottom: 5px; align-items: center;">
                         <button id="btnMsgTabAll" class="btn btn-sm btn-primary btn-blue" style="padding: 4px 12px; margin: 0; font-size: 0.75rem; white-space: nowrap;">Tutti</button>
                         <button id="btnMsgTabUnread" class="btn btn-sm btn-secondary" style="padding: 4px 12px; margin: 0; font-size: 0.75rem; white-space: nowrap;">Non Letti</button>
                         <button id="btnMsgTabReceived" class="btn btn-sm btn-secondary" style="padding: 4px 12px; margin: 0; font-size: 0.75rem; white-space: nowrap;">Ricevuti</button>
                         <button id="btnMsgTabSent" class="btn btn-sm btn-secondary" style="padding: 4px 12px; margin: 0; font-size: 0.75rem; white-space: nowrap;">Inviati</button>
                         <button id="btnMsgTabDeleted" class="btn btn-sm btn-secondary" style="padding: 4px 12px; margin: 0; font-size: 0.75rem; white-space: nowrap;">Cestino</button>
+                        <button id="btnEmptyTrash" class="btn btn-sm btn-danger hidden" style="padding: 4px 12px; margin: 0; margin-left: auto; font-size: 0.75rem; white-space: nowrap; background-color: #ef4444; color: white; border: none; font-weight: bold; border-radius: 6px;">🔥 Svuota</button>
                     </div>
                 </div>
 
@@ -307,6 +307,9 @@
                 </div>
                 
                 <div style="margin-top: 20px;">
+                    <button class="btn btn-primary btn-blue" id="btnOpenUsersList" style="width: 100%; padding: 12px; margin-bottom: 10px; font-weight: bold;">
+                        <span class="btn-icon">👥</span> GESTIONE DIPENDENTI
+                    </button>
                     <button class="btn btn-primary btn-orange" id="btnManualSyncMobile" style="width: 100%; padding: 12px;">
                         <span class="btn-icon">🔄</span> SINCRONIZZA CON CLOUD
                     </button>
@@ -614,7 +617,7 @@
         </div>
 
     </main>
-    <script type="module" src="app.js?v=34"></script>
+    <script type="module" src="app.js?v=36"></script>
     <script type="module" src="global_notifications.js?v=30"></script>
     <script>
       // Gestione layout PC

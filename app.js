@@ -108,6 +108,7 @@ const btnMsgTabReceived = document.getElementById('btnMsgTabReceived');
 const btnMsgTabSent = document.getElementById('btnMsgTabSent');
 const btnMsgTabUnread = document.getElementById('btnMsgTabUnread');
 const btnMsgTabDeleted = document.getElementById('btnMsgTabDeleted');
+const btnEmptyTrash = document.getElementById('btnEmptyTrash');
 const msgSearchText = document.getElementById('msgSearchText');
 const msgSearchUser = document.getElementById('msgSearchUser');
 const msgSearchDate = document.getElementById('msgSearchDate');
@@ -403,6 +404,18 @@ if(btnMsgTabSent) btnMsgTabSent.addEventListener('click', (e) => { e.preventDefa
 if(btnMsgTabUnread) btnMsgTabUnread.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'unread'; updateMsgTabsUI(); renderMessagesUI(); });
 if(btnMsgTabDeleted) btnMsgTabDeleted.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'deleted'; updateMsgTabsUI(); renderMessagesUI(); });
 
+if(btnEmptyTrash) btnEmptyTrash.addEventListener('click', async (e) => {
+    e.preventDefault();
+    if(!confirm("Sei sicuro di voler SVUOTARE IL CESTINO? Tutti i messaggi eliminati verranno distrutti per sempre!")) return;
+    try {
+        const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        const toDelete = messagesDataCache.filter(item => item.data.eliminato === true);
+        for(let msg of toDelete) {
+            await deleteDoc(doc(db, "messaggi", msg.id));
+        }
+    } catch(err) { console.error("Errore svuota cestino", err); }
+});
+
 if(msgSearchText) msgSearchText.addEventListener('input', () => renderMessagesUI());
 if(msgSearchUser) msgSearchUser.addEventListener('change', () => renderMessagesUI());
 if(msgSearchDate) msgSearchDate.addEventListener('change', () => renderMessagesUI());
@@ -465,6 +478,53 @@ function renderMessagesUI() {
     const searchUser = (msgSearchUser && msgSearchUser.value) ? msgSearchUser.value : "";
     const searchDate = (msgSearchDate && msgSearchDate.value) ? msgSearchDate.value : "";
     
+    // Calculate counts for categories
+    let countAll = 0, countUnread = 0, countReceived = 0, countSent = 0, countDeleted = 0;
+    
+    messagesDataCache.forEach(item => {
+        const d = item.data;
+        let sN = d.sender || "Sconosciuto";
+        let rN = d.recipients || "Bacheca (Tutti)";
+        if (Array.isArray(rN)) rN = rN.join(', ');
+
+        // Apply shared filters (Search Text, Search User, Search Date)
+        if (searchUser && sN !== searchUser && !rN.includes(searchUser)) return;
+        if (searchText) {
+            const msgT = (d.text || "").toLowerCase();
+            const senderT = sN.toLowerCase();
+            if (!msgT.includes(searchText) && !senderT.includes(searchText)) return;
+        }
+        if (searchDate && d.timestamp) {
+            const dt = new Date(d.timestamp.toMillis());
+            const dtStr = dt.getFullYear() + "-" + String(dt.getMonth()+1).padStart(2,'0') + "-" + String(dt.getDate()).padStart(2,'0');
+            if (dtStr !== searchDate) return;
+        }
+
+        // Tally categories
+        if (d.eliminato === true) {
+            countDeleted++;
+        } else {
+            countAll++;
+            if (d.letto !== true) countUnread++;
+            if (rN === "Bacheca (Tutti)" || rN.includes(currentUser)) countReceived++;
+            if (sN === currentUser) countSent++;
+        }
+    });
+
+    if(btnMsgTabAll) btnMsgTabAll.innerHTML = `Tutti (${countAll})`;
+    if(btnMsgTabUnread) btnMsgTabUnread.innerHTML = `Non Letti (${countUnread})`;
+    if(btnMsgTabReceived) btnMsgTabReceived.innerHTML = `Ricevuti (${countReceived})`;
+    if(btnMsgTabSent) btnMsgTabSent.innerHTML = `Inviati (${countSent})`;
+    if(btnMsgTabDeleted) btnMsgTabDeleted.innerHTML = `Cestino (${countDeleted})`;
+
+    if(btnEmptyTrash) {
+        if (currentMsgTab === 'deleted' && countDeleted > 0) {
+            btnEmptyTrash.classList.remove('hidden');
+        } else {
+            btnEmptyTrash.classList.add('hidden');
+        }
+    }
+
     let filtered = messagesDataCache.filter(item => {
         const d = item.data;
         let sN = d.sender || "Sconosciuto";
