@@ -183,22 +183,41 @@ function updateHeaderFiltersUI() {
 }
 
 function toggleTarget(target) {
-    if (target === 'oggi') { isOggiVisible = !isOggiVisible; selectedCalendarDate = null; }
-    if (target === 'domani') { isDomaniVisible = !isDomaniVisible; selectedCalendarDate = null; }
-    if (target === 'planned') { isPlannedVisible = !isPlannedVisible; selectedCalendarDate = null; }
-    if (target === 'np') { isNpVisible = !isNpVisible; selectedCalendarDate = null; }
-    if (target === 'eseguiti') {
-        isEseguitiVisible = !isEseguitiVisible;
-        selectedCalendarDate = null;
-        if (isEseguitiVisible) {
-            activitiesListContainer.classList.remove('hidden');
-            if(btnViewActivities) btnViewActivities.innerHTML = `<span class="btn-icon">🙈</span> NASCONDI ATTIVITÀ`;
-            renderActivitiesList();
-        } else {
-            activitiesListContainer.classList.add('hidden');
-            if(btnViewActivities) btnViewActivities.innerHTML = `<span class="btn-icon">👁</span> VISUALIZZA ATTIVITÀ`;
-        }
+    const wasOn = (() => {
+        if(target === 'oggi') return isOggiVisible;
+        if(target === 'domani') return isDomaniVisible;
+        if(target === 'planned') return isPlannedVisible;
+        if(target === 'np') return isNpVisible;
+        if(target === 'eseguiti') return isEseguitiVisible;
+        return false;
+    })();
+
+    // Disattiva tutti
+    isOggiVisible = false;
+    isDomaniVisible = false;
+    isPlannedVisible = false;
+    isNpVisible = false;
+    isEseguitiVisible = false;
+    selectedCalendarDate = null;
+
+    // Se non era già attivo, allora attivalo (effetto toggle esclusivo)
+    if (!wasOn) {
+        if (target === 'oggi') isOggiVisible = true;
+        if (target === 'domani') isDomaniVisible = true;
+        if (target === 'planned') isPlannedVisible = true;
+        if (target === 'np') isNpVisible = true;
+        if (target === 'eseguiti') isEseguitiVisible = true;
     }
+
+    if (isEseguitiVisible) {
+        activitiesListContainer.classList.remove('hidden');
+        if(btnViewActivities) btnViewActivities.innerHTML = `<span class="btn-icon">🙈</span> NASCONDI ATTIVITÀ`;
+        renderActivitiesList();
+    } else {
+        activitiesListContainer.classList.add('hidden');
+        if(btnViewActivities) btnViewActivities.innerHTML = `<span class="btn-icon">👁</span> VISUALIZZA ATTIVITÀ`;
+    }
+
     updateHeaderFiltersUI();
     updateUI();
 }
