@@ -1178,20 +1178,32 @@ function renderNpInterventions() {
             const idx = e.target.getAttribute('data-index');
             const dataToLoad = plannedInterventions[idx];
             
-            // Popoliamo il form
-            iTipo.value = dataToLoad.tipo;
-            iPaziente.value = dataToLoad.paziente;
+            // Popoliamo il form e le checklist
+            iTipo.value = dataToLoad.tipo || "";
+            document.querySelectorAll('.cb-tipo-idx').forEach(cb => cb.checked = false);
+            if(dataToLoad.tipo) {
+                dataToLoad.tipo.split(',').forEach(t => {
+                    const cb = document.querySelector(`.cb-tipo-idx[value="${t.trim()}"]`);
+                    if(cb) cb.checked = true;
+                });
+            }
+
+            iPaziente.value = dataToLoad.paziente || "";
             if(iLocalita) iLocalita.value = dataToLoad.localita || dataToLoad.destinazione || "";
             if(iIndirizzo) iIndirizzo.value = dataToLoad.indirizzo || "";
             if(iTelefono) iTelefono.value = dataToLoad.telefono || "";
-            if(customDevices.includes(dataToLoad.dispositivi) || Array.from(iDispositiviSelect.options).some(o=>o.value===dataToLoad.dispositivi)) {
-                iDispositiviSelect.value = dataToLoad.dispositivi;
-                iNuovoDispositivo.classList.add('hidden');
-            } else {
-                iDispositiviSelect.value = "_AZI_NUOVO_";
-                iNuovoDispositivo.classList.remove('hidden');
-                iNuovoDispositivo.value = dataToLoad.dispositivi;
+            
+            iDispositiviSelect.value = dataToLoad.dispositivi || "";
+            document.querySelectorAll('.cb-disp-idx').forEach(cb => cb.checked = false);
+            if(dataToLoad.dispositivi) {
+                dataToLoad.dispositivi.split(',').forEach(d => {
+                    const dTrim = d.trim();
+                    const cb = document.querySelector('.cb-disp-idx[value="'+dTrim+'"]');
+                    if(cb) cb.checked = true;
+                });
             }
+            if(iNuovoDispositivo) iNuovoDispositivo.classList.add('hidden');
+            
             iNote.value = dataToLoad.note;
             pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
 
@@ -1612,14 +1624,46 @@ inputAllegatoProgrammazione.addEventListener('change', (e) => {
 
 iDispositiviSelect.addEventListener('change', (e) => {
     if(e.target.value === "_AZI_NUOVO_") {
-        iNuovoDispositivo.classList.remove('hidden');
-        iNuovoDispositivo.focus();
+        if(iNuovoDispositivo) iNuovoDispositivo.classList.remove('hidden');
+        if(iNuovoDispositivo) iNuovoDispositivo.focus();
     } else {
-        iNuovoDispositivo.classList.add('hidden');
+        if(iNuovoDispositivo) iNuovoDispositivo.classList.add('hidden');
     }
 });
 
+// Logic for Multi-Select Checklists
+function setupCustomChecklist(btnAddId, inputId, wrapperClass) {
+    const btnAdd = document.getElementById(btnAddId);
+    const input = document.getElementById(inputId);
+    if(btnAdd && input) {
+        btnAdd.addEventListener('click', () => {
+            const val = input.value.trim();
+            if(val) {
+                const label = document.createElement('label');
+                label.style.cssText = "display:flex; align-items:center; gap:8px; cursor:pointer;";
+                label.innerHTML = `<input type="checkbox" value="${val}" class="${wrapperClass}" checked> ${val}`;
+                input.parentElement.parentElement.insertBefore(label, input.parentElement);
+                input.value = '';
+            }
+        });
+        input.addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') { e.preventDefault(); btnAdd.click(); }
+        });
+    }
+}
+setupCustomChecklist('btnAddAltroTipoIdx', 'altroTipoIdx', 'cb-tipo-idx');
+setupCustomChecklist('btnAddAltroDispIdx', 'altroDispIdx', 'cb-disp-idx');
+
+function getChecklistValues(className) {
+    return Array.from(document.querySelectorAll('.' + className + ':checked')).map(cb => cb.value).join(', ');
+}
+
+
 btnPlanIntervention.addEventListener('click', async () => {
+    // Aggiorna hidden inputs dalle checklist prima di procedere
+    iTipo.value = getChecklistValues('cb-tipo-idx');
+    iDispositiviSelect.value = getChecklistValues('cb-disp-idx');
+
     let tipiSelezionati = iTipo.value.trim();
     if(!tipiSelezionati || !iPaziente.value || !iLocalita.value || !iIndirizzo.value) {
         return alert("Compila Tipo, Paziente, Località e Indirizzo per salvare l'intervento programmato!");
@@ -1735,6 +1779,10 @@ btnPlanIntervention.addEventListener('click', async () => {
 newInterventionForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
+    // Aggiorna hidden inputs dalle checklist prima di procedere
+    iTipo.value = getChecklistValues('cb-tipo-idx');
+    iDispositiviSelect.value = getChecklistValues('cb-disp-idx');
+
     // Validazione KM (Obbligatori se impostato su ON nelle Impostazioni)
     if (requireKm && !inputKmPercorsi.value) {
         return alert("Inserisci i Km percorsi prima di salvare l'attività (Obbligatorio dalle Impostazioni).");

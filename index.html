@@ -151,8 +151,21 @@
             </div>
             <form id="newInterventionForm">
                 <div class="form-group">
-                    <label for="tipoAttivita">Tipo Intervento (Partenza) *</label>
-                    <textarea id="tipoAttivita" rows="2" placeholder="Es. Sostituzione, Visita... (Separati da virgola o a capo)" required></textarea>
+                    <label>Tipo Intervento (Partenza) *</label>
+                    <div style="border: 1px solid #cbd5e1; border-radius: 12px; background: white; padding: 10px; max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Visita" class="cb-tipo-idx"> Visita</label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Sostituzione" class="cb-tipo-idx"> Sostituzione</label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Ritiro" class="cb-tipo-idx"> Ritiro</label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Consegna" class="cb-tipo-idx"> Consegna</label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Manutenzione" class="cb-tipo-idx"> Manutenzione</label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Installazione" class="cb-tipo-idx"> Installazione</label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Riparazione" class="cb-tipo-idx"> Riparazione</label>
+                        <div style="display: flex; gap: 5px; margin-top: 5px;">
+                            <input type="text" id="altroTipoIdx" placeholder="Altro..." style="padding: 4px; font-size: 0.85rem; flex: 1; border: 1px solid #ccc; border-radius: 4px;">
+                            <button type="button" id="btnAddAltroTipoIdx" class="btn btn-secondary btn-sm" style="width: auto; padding: 4px 8px;">+</button>
+                        </div>
+                    </div>
+                    <input type="hidden" id="tipoAttivita" required>
                 </div>
 
                 <div class="form-group">
@@ -185,8 +198,22 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="dispositiviSelect">Dispositivi</label>
-                    <textarea id="dispositiviSelect" rows="2" placeholder="Es. D3, Stativo... (Separati da virgola o a capo)"></textarea>
+                    <label>Dispositivi</label>
+                    <div style="border: 1px solid #cbd5e1; border-radius: 12px; background: white; padding: 10px; max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Concentratore" class="cb-disp-idx"> Concentratore</label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Ventilatore" class="cb-disp-idx"> Ventilatore</label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Aspiratore" class="cb-disp-idx"> Aspiratore</label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="D3" class="cb-disp-idx"> D3</label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Stativo" class="cb-disp-idx"> Stativo</label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Cpap" class="cb-disp-idx"> Cpap</label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="AutoCpap" class="cb-disp-idx"> AutoCpap</label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" value="Saturimetro" class="cb-disp-idx"> Saturimetro</label>
+                        <div style="display: flex; gap: 5px; margin-top: 5px;">
+                            <input type="text" id="altroDispIdx" placeholder="Altro dispositivo..." style="padding: 4px; font-size: 0.85rem; flex: 1; border: 1px solid #ccc; border-radius: 4px;">
+                            <button type="button" id="btnAddAltroDispIdx" class="btn btn-secondary btn-sm" style="width: auto; padding: 4px 8px;">+</button>
+                        </div>
+                    </div>
+                    <input type="hidden" id="dispositiviSelect">
                 </div>
 
                 <div class="form-group">

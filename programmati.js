@@ -208,9 +208,40 @@ function renderCalendar() {
     });
 }
 
+// Logic for Multi-Select Checklists
+function setupCustomChecklist(btnAddId, inputId, wrapperClass) {
+    const btnAdd = document.getElementById(btnAddId);
+    const input = document.getElementById(inputId);
+    if(btnAdd && input) {
+        btnAdd.addEventListener('click', () => {
+            const val = input.value.trim();
+            if(val) {
+                const label = document.createElement('label');
+                label.style.cssText = "display:flex; align-items:center; gap:8px; cursor:pointer;";
+                label.innerHTML = `<input type="checkbox" value="${val}" class="${wrapperClass}" checked> ${val}`;
+                input.parentElement.parentElement.insertBefore(label, input.parentElement);
+                input.value = '';
+            }
+        });
+        input.addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') { e.preventDefault(); btnAdd.click(); }
+        });
+    }
+}
+setupCustomChecklist('btnAddAltroTipoProg', 'altroTipoProg', 'cb-tipo-prog');
+setupCustomChecklist('btnAddAltroDispProg', 'altroDispProg', 'cb-disp-prog');
+
+function getChecklistValues(className) {
+    return Array.from(document.querySelectorAll('.' + className + ':checked')).map(cb => cb.value).join(', ');
+}
+
 // Submit Nuovo Programmazione
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    // Aggiorna hidden inputs
+    iTipoAttivita.value = getChecklistValues('cb-tipo-prog');
+    iDispositivi.value = getChecklistValues('cb-disp-prog');
 
     if(!iPaziente.value || !iLocalita.value || !iIndirizzo.value || !iData.value) {
         return alert("Compila tutti i campi obbligatori (Paziente, Località, Indirizzo e Data) per PROGRAMMARE! Altrimenti salva in attesa.");
@@ -268,6 +299,10 @@ btnToggleWaiting.addEventListener('click', () => {
 
 // Submit Nuovo "In Attesa"
 btnSaveWaiting.addEventListener('click', async () => {
+    // Aggiorna hidden inputs
+    iTipoAttivita.value = getChecklistValues('cb-tipo-prog');
+    iDispositivi.value = getChecklistValues('cb-disp-prog');
+
     if(!iPaziente.value || !iLocalita.value || !iIndirizzo.value) {
         return alert("Compila Paziente, Località e Indirizzo per salvare l'intervento in attesa!");
     }
