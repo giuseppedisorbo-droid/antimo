@@ -139,7 +139,7 @@ async function loadData() {
 
         // Ordina decrescente (più recenti prima)
         tuttiGliInterventi = rawData.sort((a, b) => b.startTime - a.startTime);
-        renderTable(tuttiGliInterventi);
+        applyFilters();
     } catch (e) {
         console.error("Errore download dati:", e);
         tableBody.innerHTML = `<tr><td colspan="8" style="color:red; text-align:center;">Errore di connessione a Firebase: ${e.message}</td></tr>`;

@@ -1225,7 +1225,8 @@ async function syncLocalDataToCloud() {
             
             // In ogni caso marchiamolo come sincronizzato
             inv.cloudSynced = true;
-            delete inv.fileData; // Puliamo dal pesante base64 se presente
+            // Svuotiamo il peso locale per non saturare i 5MB
+            delete inv.fileData; // Rimuovo enormi base64 se presenti (evitano QuotaExceededError su CloudUpload)
             dbUpdated = true;
             
         } catch (err) {
@@ -2280,6 +2281,10 @@ newInterventionForm.addEventListener('submit', async (e) => {
 
     completedInterventions.push(invToSave);
     
+    // Se stiamo per saturare il localStorage eliminiamo le foto Base64 appena dopo il salvataggio in Cloud
+    if (cloudSaveSuccess) {
+        completedInterventions.forEach(i => { delete i.fileData; });
+    }
     saveState(); 
     updateUI(); 
     updateInterventiCount();
