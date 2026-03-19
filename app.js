@@ -102,6 +102,14 @@ const msgIsNotification = document.getElementById('msgIsNotification');
 const btnTopNotification = document.getElementById('btnTopNotification');
 const topNotificationText = document.getElementById('topNotificationText');
 
+// Nodi Ricerca e Filtro Bacheca
+const btnMsgTabAll = document.getElementById('btnMsgTabAll');
+const btnMsgTabReceived = document.getElementById('btnMsgTabReceived');
+const btnMsgTabSent = document.getElementById('btnMsgTabSent');
+const msgSearchText = document.getElementById('msgSearchText');
+const msgSearchDate = document.getElementById('msgSearchDate');
+let currentMsgTab = 'all'; // 'all', 'received', 'sent'
+
 // Nuovi Toggles Logic
 let isPlannedVisible = false;
 let isNpVisible = false;
@@ -376,6 +384,21 @@ function extractDynamicBlocksData(containerId) {
 // --- FINE LOGICA BLOCCHI DINAMICI ---
 
 // LOGICA MESSAGGISTICA E NOTIFICHE
+let messagesDataCache = []; // Cache for filtering without refetching
+
+function updateMsgTabsUI() {
+    if(btnMsgTabAll) btnMsgTabAll.className = (currentMsgTab === 'all') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
+    if(btnMsgTabReceived) btnMsgTabReceived.className = (currentMsgTab === 'received') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
+    if(btnMsgTabSent) btnMsgTabSent.className = (currentMsgTab === 'sent') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
+}
+
+if(btnMsgTabAll) btnMsgTabAll.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'all'; updateMsgTabsUI(); renderMessagesUI(); });
+if(btnMsgTabReceived) btnMsgTabReceived.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'received'; updateMsgTabsUI(); renderMessagesUI(); });
+if(btnMsgTabSent) btnMsgTabSent.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'sent'; updateMsgTabsUI(); renderMessagesUI(); });
+
+if(msgSearchText) msgSearchText.addEventListener('input', () => renderMessagesUI());
+if(msgSearchDate) msgSearchDate.addEventListener('change', () => renderMessagesUI());
+
 async function loadMessages() {
     if (!isFirebaseConfigured) {
         if(messagesList) messagesList.innerHTML = '<div style="color:red; font-size:0.85rem; text-align:center;">Sincronizzazione Cloud non configurata per i messaggi.</div>';
@@ -386,148 +409,199 @@ async function loadMessages() {
         const q = query(collection(db, "messaggi"), orderBy("timestamp", "desc"));
         
         onSnapshot(q, (snapshot) => {
-            if(!messagesList) return;
-            messagesList.innerHTML = '';
-            let count = 0;
-            let activeNotes = [];
-            
+            messagesDataCache = [];
             snapshot.forEach((docSnap) => {
-                count++;
-                const data = docSnap.data();
-                if(data.isNotification) activeNotes.push(data.text);
-                
-                const div = document.createElement('div');
-                div.setAttribute('data-id', docSnap.id);
-                div.style.padding = "10px";
-                div.style.borderRadius = "8px";
-                div.style.backgroundColor = data.isNotification ? "#fffbeb" : (data.letto ? "#f8fafc" : "#f1f5f9");
-                div.style.borderLeft = data.isNotification ? "4px solid #f59e0b" : "4px solid #cbd5e1";
-                div.style.fontSize = "0.9rem";
-                div.style.display = "flex";
-                div.style.flexDirection = "column";
-                div.style.gap = "5px";
-                div.style.transition = "background-color 1s ease";
-                if(data.letto && !data.isNotification) div.style.opacity = "0.6";
-
-                let timeStr = "--/--/---- --:--";
-                if(data.timestamp) {
-                    const d = new Date(data.timestamp.toMillis());
-                    timeStr = `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-                }
-
-                let sN = data.sender || "Sconosciuto";
-                let rN = data.recipients || "Bacheca (Tutti)";
-
-                div.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <span style="font-size: 0.75rem; color: #666; font-weight: 600;">⏰ ${timeStr} </span>
-                        <div>
-                            ${data.presoInCarico ? '<span style="font-size:0.75rem; background:#3b82f6; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">👷 Preso in Carico</span>' : ''}
-                            ${data.isNotification ? '<span style="font-size:0.75rem; background:#f59e0b; color:white; padding:2px 6px; border-radius:12px; font-weight:bold;">📌 NOTIFICA</span>' : ''}
-                        </div>
-                    </div>
-                    <div style="margin-top:5px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; font-size: 0.8rem; color: var(--blue-dark);">
-                        <strong>Da:</strong> ${sN} &nbsp;|&nbsp; <strong>A:</strong> ${rN}
-                    </div>
-                    <div style="color: #333; line-height: 1.4; white-space: pre-wrap; margin-top:5px; ${data.letto ? 'text-decoration: line-through; color: #777;' : ''}">${data.text}</div>
-                `;
-                
-                const actionDiv = document.createElement('div');
-                actionDiv.style.display = "flex";
-                actionDiv.style.gap = "8px";
-                actionDiv.style.marginTop = "8px";
-                actionDiv.style.flexWrap = "wrap";
-
-                const toggleBtn = document.createElement('button');
-                toggleBtn.innerHTML = data.isNotification ? "🔕 Annulla Notifica" : "🔔 Setta Promemoria";
-                toggleBtn.style.cssText = "background: none; border: 1px solid #b8b8b8; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #555; background-color: rgba(255,255,255,0.5);";
-                toggleBtn.onclick = async () => {
-                    try {
-                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await updateDoc(doc(db, "messaggi", docSnap.id), { isNotification: !data.isNotification });
-                    } catch(err) { console.error("Errore toggle", err); }
-                };
-                actionDiv.appendChild(toggleBtn);
-
-                const toggleReadBtn = document.createElement('button');
-                toggleReadBtn.innerHTML = data.letto ? "📖 Da Leggere" : "✔️ Letto";
-                toggleReadBtn.style.cssText = "background: none; border: 1px solid #b8b8b8; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #555; background-color: rgba(255,255,255,0.5);";
-                toggleReadBtn.onclick = async () => {
-                    try {
-                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await updateDoc(doc(db, "messaggi", docSnap.id), { letto: !data.letto });
-                    } catch(err) { console.error("Errore letto", err); }
-                };
-                actionDiv.appendChild(toggleReadBtn);
-                
-                const toggleCaricoBtn = document.createElement('button');
-                toggleCaricoBtn.innerHTML = data.presoInCarico ? "❌ Annulla Incarico" : "👷 Prendi in Carico";
-                toggleCaricoBtn.style.cssText = "background: none; border: 1px solid #3b82f6; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #1d4ed8; background-color: rgba(59,130,246,0.1);";
-                toggleCaricoBtn.onclick = async () => {
-                    try {
-                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await updateDoc(doc(db, "messaggi", docSnap.id), { presoInCarico: !data.presoInCarico });
-                    } catch(err) { console.error("Errore carico", err); }
-                };
-                actionDiv.appendChild(toggleCaricoBtn);
-
-                const deleteBtn = document.createElement('button');
-                deleteBtn.innerHTML = "🗑️ Elimina";
-                deleteBtn.style.cssText = "background: none; border: 1px solid #ffcccc; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; cursor: pointer; color: #d32f2f; background-color: rgba(255,255,255,0.5);";
-                deleteBtn.onclick = async () => {
-                    if(!confirm("Eliminare definitivamente questo messaggio?")) return;
-                    try {
-                        const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await deleteDoc(doc(db, "messaggi", docSnap.id));
-                    } catch(err) { console.error("Errore elim msg", err); }
-                };
-                actionDiv.appendChild(deleteBtn);
-
-                div.appendChild(actionDiv);
-                
-                messagesList.appendChild(div);
+                messagesDataCache.push({ id: docSnap.id, data: docSnap.data() });
             });
-            
-            // Aggiorna Pulsante Globale Notifiche e Testo "Mostra/Nascondi"
-            if(activeNotes.length > 0 && btnTopNotification) {
-                btnTopNotification.classList.remove('hidden');
-                topNotificationText.textContent = `${activeNotes.length > 1 ? `(${activeNotes.length}) ` : ''}${activeNotes[0]}`;
-            } else if(btnTopNotification) {
-                btnTopNotification.classList.add('hidden');
-            }
-            
-            if(btnToggleMessages) {
-                const isHidden = messagesContainer.classList.contains('hidden');
-                let noteBadge = activeNotes.length > 0 ? ` <span style="background:var(--orange);color:white;padding:2px 6px;border-radius:12px;font-size:0.7rem;">${activeNotes.length}</span>` : '';
-                btnToggleMessages.innerHTML = (isHidden ? 'Mostra' : 'Nascondi') + noteBadge;
-            }
-
-            if(count === 0) {
-                messagesList.innerHTML = '<div style="text-align: center; font-size: 0.9rem; color: #666; padding: 10px;">Nessun messaggio in bacheca.</div>';
-            }
-            
-            // In caso di link WhatsApp con msgId
-            const urlParams = new URLSearchParams(window.location.search);
-            const msgId = urlParams.get('msgId');
-            if(msgId) {
-                const targetMsg = messagesList.querySelector(`div[data-id="${msgId}"]`);
-                if(targetMsg) {
-                    messagesContainer.classList.remove('hidden');
-                    if(btnToggleMessages) btnToggleMessages.textContent = 'Nascondi';
-                    setTimeout(() => {
-                        targetMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        const originalBg = targetMsg.style.backgroundColor;
-                        targetMsg.style.backgroundColor = '#dbeafe';
-                        setTimeout(() => { targetMsg.style.backgroundColor = originalBg; }, 3000);
-                    }, 500);
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                }
-            }
+            renderMessagesUI();
         }, (error) => {
             console.error("Errore snapshot messaggi", error);
             if(messagesList) messagesList.innerHTML = '<div style="color:red; font-size:0.85rem; text-align:center;">Errore caricamento messaggi.</div>';
         });
     } catch(e) { console.error(e); }
+}
+
+function renderMessagesUI() {
+    if(!messagesList) return;
+    messagesList.innerHTML = '';
+    let count = 0;
+    let activeNotes = [];
+
+    const currentUser = antimo_user_name || "Sconosciuto";
+    const searchText = (msgSearchText && msgSearchText.value) ? msgSearchText.value.toLowerCase() : "";
+    const searchDate = (msgSearchDate && msgSearchDate.value) ? msgSearchDate.value : "";
+    
+    let filtered = messagesDataCache.filter(item => {
+        const d = item.data;
+        let sN = d.sender || "Sconosciuto";
+        let rN = d.recipients || "Bacheca (Tutti)";
+
+        if (currentMsgTab === 'received') {
+            if (rN !== "Bacheca (Tutti)" && !rN.includes(currentUser)) return false;
+        } else if (currentMsgTab === 'sent') {
+            if (sN !== currentUser) return false;
+        }
+
+        if (searchText) {
+            const msgT = (d.text || "").toLowerCase();
+            const senderT = sN.toLowerCase();
+            if (!msgT.includes(searchText) && !senderT.includes(searchText)) return false;
+        }
+
+        if (searchDate && d.timestamp) {
+            const dt = new Date(d.timestamp.toMillis());
+            const dtStr = dt.getFullYear() + "-" + String(dt.getMonth()+1).padStart(2,'0') + "-" + String(dt.getDate()).padStart(2,'0');
+            if (dtStr !== searchDate) return false;
+        }
+
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        messagesList.innerHTML = '<div style="text-align: center; font-size: 0.9rem; color: #666; padding: 10px;">Nessun messaggio trovato per questa selezione.</div>';
+    } else {
+        filtered.forEach((item) => {
+            count++;
+            const data = item.data;
+            const docSnapId = item.id;
+            if(data.isNotification) activeNotes.push(data.text);
+            
+            const div = document.createElement('div');
+            div.setAttribute('data-id', docSnapId);
+            div.style.padding = "10px";
+            div.style.borderRadius = "8px";
+            div.style.backgroundColor = data.isNotification ? "#fffbeb" : (data.letto ? "#f8fafc" : "#f1f5f9");
+            div.style.borderLeft = data.isNotification ? "4px solid #f59e0b" : "4px solid #cbd5e1";
+            div.style.fontSize = "0.9rem";
+            div.style.display = "flex";
+            div.style.flexDirection = "column";
+            div.style.gap = "5px";
+            div.style.transition = "background-color 1s ease";
+            if(data.letto && !data.isNotification) div.style.opacity = "0.6";
+
+            let timeStr = "--/--/---- --:--";
+            if(data.timestamp) {
+                const d = new Date(data.timestamp.toMillis());
+                timeStr = `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+            }
+
+            let sN = data.sender || "Sconosciuto";
+            let rN = data.recipients || "Bacheca (Tutti)";
+
+            div.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <span style="font-size: 0.75rem; color: #666; font-weight: 600;">⏰ ${timeStr} </span>
+                    <div>
+                        ${data.presoInCarico ? '<span style="font-size:0.75rem; background:#3b82f6; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">👷 Preso in Carico</span>' : ''}
+                        ${data.isNotification ? '<span style="font-size:0.75rem; background:#f59e0b; color:white; padding:2px 6px; border-radius:12px; font-weight:bold;">📌 NOTIFICA</span>' : ''}
+                    </div>
+                </div>
+                <div style="margin-top:5px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; font-size: 0.8rem; color: var(--blue-dark);">
+                    <strong>Da:</strong> ${sN} &nbsp;|&nbsp; <strong>A:</strong> ${rN}
+                </div>
+                <div style="color: #333; line-height: 1.4; white-space: pre-wrap; margin-top:5px; ${data.letto ? 'text-decoration: line-through; color: #777;' : ''}">${data.text}</div>
+            `;
+            
+            const actionDiv = document.createElement('div');
+            actionDiv.style.display = "flex";
+            actionDiv.style.gap = "8px";
+            actionDiv.style.marginTop = "8px";
+            actionDiv.style.flexWrap = "wrap";
+
+            const toggleBtn = document.createElement('button');
+            toggleBtn.innerHTML = data.isNotification ? "🔕 Annulla Notifica" : "🔔 Setta Promemoria";
+            toggleBtn.style.cssText = "background: none; border: 1px solid #b8b8b8; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #555; background-color: rgba(255,255,255,0.5);";
+            toggleBtn.onclick = async () => {
+                try {
+                    const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                    await updateDoc(doc(db, "messaggi", docSnapId), { isNotification: !data.isNotification });
+                } catch(err) { console.error("Errore toggle", err); }
+            };
+            actionDiv.appendChild(toggleBtn);
+
+            // PULSANTE RISPONDI
+            const replyBtn = document.createElement('button');
+            replyBtn.innerHTML = "↩️ Rispondi";
+            replyBtn.style.cssText = "background: none; border: 1px solid #10b981; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #047857; background-color: rgba(16,185,129,0.1); font-weight: bold;";
+            replyBtn.onclick = () => {
+                if(msgText) {
+                    msgText.value = `@${sN} `;
+                    msgText.focus();
+                    msgText.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            };
+            actionDiv.appendChild(replyBtn);
+
+            const toggleReadBtn = document.createElement('button');
+            toggleReadBtn.innerHTML = data.letto ? "📖 Da Leggere" : "✔️ Letto";
+            toggleReadBtn.style.cssText = "background: none; border: 1px solid #b8b8b8; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #555; background-color: rgba(255,255,255,0.5);";
+            toggleReadBtn.onclick = async () => {
+                try {
+                    const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                    await updateDoc(doc(db, "messaggi", docSnapId), { letto: !data.letto });
+                } catch(err) { console.error("Errore letto", err); }
+            };
+            actionDiv.appendChild(toggleReadBtn);
+            
+            const toggleCaricoBtn = document.createElement('button');
+            toggleCaricoBtn.innerHTML = data.presoInCarico ? "❌ Annulla Incarico" : "👷 Prendi in Carico";
+            toggleCaricoBtn.style.cssText = "background: none; border: 1px solid #3b82f6; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #1d4ed8; background-color: rgba(59,130,246,0.1);";
+            toggleCaricoBtn.onclick = async () => {
+                try {
+                    const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                    await updateDoc(doc(db, "messaggi", docSnapId), { presoInCarico: !data.presoInCarico });
+                } catch(err) { console.error("Errore carico", err); }
+            };
+            actionDiv.appendChild(toggleCaricoBtn);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = "🗑️ Elimina";
+            deleteBtn.style.cssText = "background: none; border: 1px solid #ffcccc; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; cursor: pointer; color: #d32f2f; background-color: rgba(255,255,255,0.5);";
+            deleteBtn.onclick = async () => {
+                if(!confirm("Eliminare definitivamente questo messaggio?")) return;
+                try {
+                    const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                    await deleteDoc(doc(db, "messaggi", docSnapId));
+                } catch(err) { console.error("Errore elim msg", err); }
+            };
+            actionDiv.appendChild(deleteBtn);
+
+            div.appendChild(actionDiv);
+            messagesList.appendChild(div);
+        });
+    }
+    
+    // Aggiorna Pulsante Globale Notifiche e Testo "Mostra/Nascondi"
+    if(activeNotes.length > 0 && btnTopNotification) {
+        btnTopNotification.classList.remove('hidden');
+        if(topNotificationText) topNotificationText.textContent = `${activeNotes.length > 1 ? `(${activeNotes.length}) ` : ''}${activeNotes[0]}`;
+    } else if(btnTopNotification) {
+        btnTopNotification.classList.add('hidden');
+    }
+    
+    if(btnToggleMessages) {
+        const isHidden = messagesContainer.classList.contains('hidden');
+        let noteBadge = activeNotes.length > 0 ? ` <span style="background:var(--orange);color:white;padding:2px 6px;border-radius:12px;font-size:0.7rem;">${activeNotes.length}</span>` : '';
+        btnToggleMessages.innerHTML = (isHidden ? 'Mostra' : 'Nascondi') + noteBadge;
+    }
+    
+    // In caso di link WhatsApp con msgId
+    const urlParams = new URLSearchParams(window.location.search);
+    const msgId = urlParams.get('msgId');
+    if(msgId && currentMsgTab === 'all') {
+        const targetMsg = messagesList.querySelector(`div[data-id="${msgId}"]`);
+        if(targetMsg) {
+            messagesContainer.classList.remove('hidden');
+            if(btnToggleMessages) btnToggleMessages.textContent = 'Nascondi';
+            setTimeout(() => {
+                targetMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const originalBg = targetMsg.style.backgroundColor;
+                targetMsg.style.backgroundColor = '#dbeafe';
+                setTimeout(() => { targetMsg.style.backgroundColor = originalBg; }, 3000);
+            }, 500);
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }
 }
 
 let pendingMessageText = "";
