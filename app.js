@@ -106,9 +106,12 @@ const topNotificationText = document.getElementById('topNotificationText');
 const btnMsgTabAll = document.getElementById('btnMsgTabAll');
 const btnMsgTabReceived = document.getElementById('btnMsgTabReceived');
 const btnMsgTabSent = document.getElementById('btnMsgTabSent');
+const btnMsgTabUnread = document.getElementById('btnMsgTabUnread');
+const btnMsgTabDeleted = document.getElementById('btnMsgTabDeleted');
 const msgSearchText = document.getElementById('msgSearchText');
+const msgSearchUser = document.getElementById('msgSearchUser');
 const msgSearchDate = document.getElementById('msgSearchDate');
-let currentMsgTab = 'all'; // 'all', 'received', 'sent'
+let currentMsgTab = 'all'; // 'all', 'received', 'sent', 'unread', 'deleted'
 
 // Nuovi Toggles Logic
 let isPlannedVisible = false;
@@ -390,13 +393,18 @@ function updateMsgTabsUI() {
     if(btnMsgTabAll) btnMsgTabAll.className = (currentMsgTab === 'all') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
     if(btnMsgTabReceived) btnMsgTabReceived.className = (currentMsgTab === 'received') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
     if(btnMsgTabSent) btnMsgTabSent.className = (currentMsgTab === 'sent') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
+    if(btnMsgTabUnread) btnMsgTabUnread.className = (currentMsgTab === 'unread') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
+    if(btnMsgTabDeleted) btnMsgTabDeleted.className = (currentMsgTab === 'deleted') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
 }
 
 if(btnMsgTabAll) btnMsgTabAll.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'all'; updateMsgTabsUI(); renderMessagesUI(); });
 if(btnMsgTabReceived) btnMsgTabReceived.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'received'; updateMsgTabsUI(); renderMessagesUI(); });
 if(btnMsgTabSent) btnMsgTabSent.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'sent'; updateMsgTabsUI(); renderMessagesUI(); });
+if(btnMsgTabUnread) btnMsgTabUnread.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'unread'; updateMsgTabsUI(); renderMessagesUI(); });
+if(btnMsgTabDeleted) btnMsgTabDeleted.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'deleted'; updateMsgTabsUI(); renderMessagesUI(); });
 
 if(msgSearchText) msgSearchText.addEventListener('input', () => renderMessagesUI());
+if(msgSearchUser) msgSearchUser.addEventListener('change', () => renderMessagesUI());
 if(msgSearchDate) msgSearchDate.addEventListener('change', () => renderMessagesUI());
 
 async function loadMessages() {
@@ -410,9 +418,30 @@ async function loadMessages() {
         
         onSnapshot(q, (snapshot) => {
             messagesDataCache = [];
+            let uniqueUsers = new Set();
             snapshot.forEach((docSnap) => {
-                messagesDataCache.push({ id: docSnap.id, data: docSnap.data() });
+                const d = docSnap.data();
+                messagesDataCache.push({ id: docSnap.id, data: d });
+                if(d.sender && d.sender !== "Sconosciuto") uniqueUsers.add(d.sender);
+                if(d.recipients && d.recipients !== "Bacheca (Tutti)") {
+                    d.recipients.split(',').forEach(r => uniqueUsers.add(r.trim()));
+                }
             });
+
+            if(msgSearchUser) {
+                const currentVal = msgSearchUser.value;
+                msgSearchUser.innerHTML = '<option value="">Utente (Tutti)</option>';
+                Array.from(uniqueUsers).sort().forEach(u => {
+                    if(u) {
+                        let opt = document.createElement('option');
+                        opt.value = u;
+                        opt.textContent = u;
+                        msgSearchUser.appendChild(opt);
+                    }
+                });
+                msgSearchUser.value = currentVal;
+            }
+
             renderMessagesUI();
         }, (error) => {
             console.error("Errore snapshot messaggi", error);
@@ -429,6 +458,7 @@ function renderMessagesUI() {
 
     const currentUser = antimo_user_name || "Sconosciuto";
     const searchText = (msgSearchText && msgSearchText.value) ? msgSearchText.value.toLowerCase() : "";
+    const searchUser = (msgSearchUser && msgSearchUser.value) ? msgSearchUser.value : "";
     const searchDate = (msgSearchDate && msgSearchDate.value) ? msgSearchDate.value : "";
     
     let filtered = messagesDataCache.filter(item => {
@@ -436,10 +466,22 @@ function renderMessagesUI() {
         let sN = d.sender || "Sconosciuto";
         let rN = d.recipients || "Bacheca (Tutti)";
 
+        if (currentMsgTab === 'deleted') {
+            if (d.eliminato !== true) return false;
+        } else {
+            if (d.eliminato === true) return false;
+        }
+
         if (currentMsgTab === 'received') {
             if (rN !== "Bacheca (Tutti)" && !rN.includes(currentUser)) return false;
         } else if (currentMsgTab === 'sent') {
             if (sN !== currentUser) return false;
+        } else if (currentMsgTab === 'unread') {
+            if (d.letto === true) return false;
+        }
+
+        if (searchUser) {
+            if (sN !== searchUser && !rN.includes(searchUser)) return false;
         }
 
         if (searchText) {
@@ -464,20 +506,23 @@ function renderMessagesUI() {
             count++;
             const data = item.data;
             const docSnapId = item.id;
-            if(data.isNotification) activeNotes.push(data.text);
+            if(data.isNotification && !data.eliminato) activeNotes.push(data.text);
             
             const div = document.createElement('div');
             div.setAttribute('data-id', docSnapId);
             div.style.padding = "10px";
             div.style.borderRadius = "8px";
             div.style.backgroundColor = data.isNotification ? "#fffbeb" : (data.letto ? "#f8fafc" : "#f1f5f9");
+            if (data.eliminato) div.style.backgroundColor = "#fee2e2";
             div.style.borderLeft = data.isNotification ? "4px solid #f59e0b" : "4px solid #cbd5e1";
+            if (data.eliminato) div.style.borderLeft = "4px solid #ef4444";
             div.style.fontSize = "0.9rem";
             div.style.display = "flex";
             div.style.flexDirection = "column";
             div.style.gap = "5px";
             div.style.transition = "background-color 1s ease";
-            if(data.letto && !data.isNotification) div.style.opacity = "0.6";
+            if(data.letto && !data.isNotification && !data.eliminato) div.style.opacity = "0.6";
+            if(data.eliminato) div.style.opacity = "0.8";
 
             let timeStr = "--/--/---- --:--";
             if(data.timestamp) {
@@ -492,14 +537,15 @@ function renderMessagesUI() {
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <span style="font-size: 0.75rem; color: #666; font-weight: 600;">⏰ ${timeStr} </span>
                     <div>
-                        ${data.presoInCarico ? '<span style="font-size:0.75rem; background:#3b82f6; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">👷 Preso in Carico</span>' : ''}
-                        ${data.isNotification ? '<span style="font-size:0.75rem; background:#f59e0b; color:white; padding:2px 6px; border-radius:12px; font-weight:bold;">📌 NOTIFICA</span>' : ''}
+                        ${data.eliminato ? '<span style="font-size:0.75rem; background:#ef4444; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">🗑️ CESTINO</span>' : ''}
+                        ${data.presoInCarico && !data.eliminato ? '<span style="font-size:0.75rem; background:#3b82f6; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">👷 Preso in Carico</span>' : ''}
+                        ${data.isNotification && !data.eliminato ? '<span style="font-size:0.75rem; background:#f59e0b; color:white; padding:2px 6px; border-radius:12px; font-weight:bold;">📌 NOTIFICA</span>' : ''}
                     </div>
                 </div>
                 <div style="margin-top:5px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; font-size: 0.8rem; color: var(--blue-dark);">
                     <strong>Da:</strong> ${sN} &nbsp;|&nbsp; <strong>A:</strong> ${rN}
                 </div>
-                <div style="color: #333; line-height: 1.4; white-space: pre-wrap; margin-top:5px; ${data.letto ? 'text-decoration: line-through; color: #777;' : ''}">${data.text}</div>
+                <div style="color: #333; line-height: 1.4; white-space: pre-wrap; margin-top:5px; ${(data.letto || data.eliminato) ? 'text-decoration: line-through; color: #777;' : ''}">${data.text}</div>
             `;
             
             const actionDiv = document.createElement('div');
@@ -508,63 +554,86 @@ function renderMessagesUI() {
             actionDiv.style.marginTop = "8px";
             actionDiv.style.flexWrap = "wrap";
 
-            const toggleBtn = document.createElement('button');
-            toggleBtn.innerHTML = data.isNotification ? "🔕 Annulla Notifica" : "🔔 Setta Promemoria";
-            toggleBtn.style.cssText = "background: none; border: 1px solid #b8b8b8; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #555; background-color: rgba(255,255,255,0.5);";
-            toggleBtn.onclick = async () => {
-                try {
-                    const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                    await updateDoc(doc(db, "messaggi", docSnapId), { isNotification: !data.isNotification });
-                } catch(err) { console.error("Errore toggle", err); }
-            };
-            actionDiv.appendChild(toggleBtn);
+            if (data.eliminato) {
+                const restoreBtn = document.createElement('button');
+                restoreBtn.innerHTML = "♻️ Ripristina";
+                restoreBtn.style.cssText = "background: none; border: 1px solid #10b981; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #047857; background-color: rgba(16,185,129,0.1);";
+                restoreBtn.onclick = async () => {
+                    try {
+                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                        await updateDoc(doc(db, "messaggi", docSnapId), { eliminato: false });
+                    } catch(err) { console.error("Errore ripristino", err); }
+                };
+                actionDiv.appendChild(restoreBtn);
 
-            // PULSANTE RISPONDI
-            const replyBtn = document.createElement('button');
-            replyBtn.innerHTML = "↩️ Rispondi";
-            replyBtn.style.cssText = "background: none; border: 1px solid #10b981; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #047857; background-color: rgba(16,185,129,0.1); font-weight: bold;";
-            replyBtn.onclick = () => {
-                if(msgText) {
-                    msgText.value = `@${sN} `;
-                    msgText.focus();
-                    msgText.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-            };
-            actionDiv.appendChild(replyBtn);
+                const hardDeleteBtn = document.createElement('button');
+                hardDeleteBtn.innerHTML = "🔥 Elimina Definitivamente";
+                hardDeleteBtn.style.cssText = "background: none; border: 1px solid #dc2626; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #b91c1c; background-color: rgba(220,38,38,0.1); font-weight: bold;";
+                hardDeleteBtn.onclick = async () => {
+                    if(!confirm("Sei sicuro di voler distruggere per sempre questo messaggio? Non potrà essere recuperato!")) return;
+                    try {
+                        const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                        await deleteDoc(doc(db, "messaggi", docSnapId));
+                    } catch(err) { console.error("Errore hard delete", err); }
+                };
+                actionDiv.appendChild(hardDeleteBtn);
+            } else {
+                const toggleBtn = document.createElement('button');
+                toggleBtn.innerHTML = data.isNotification ? "🔕 Annulla Notifica" : "🔔 Setta Promemoria";
+                toggleBtn.style.cssText = "background: none; border: 1px solid #b8b8b8; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #555; background-color: rgba(255,255,255,0.5);";
+                toggleBtn.onclick = async () => {
+                    try {
+                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                        await updateDoc(doc(db, "messaggi", docSnapId), { isNotification: !data.isNotification });
+                    } catch(err) { console.error("Errore toggle", err); }
+                };
+                actionDiv.appendChild(toggleBtn);
 
-            const toggleReadBtn = document.createElement('button');
-            toggleReadBtn.innerHTML = data.letto ? "📖 Da Leggere" : "✔️ Letto";
-            toggleReadBtn.style.cssText = "background: none; border: 1px solid #b8b8b8; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #555; background-color: rgba(255,255,255,0.5);";
-            toggleReadBtn.onclick = async () => {
-                try {
-                    const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                    await updateDoc(doc(db, "messaggi", docSnapId), { letto: !data.letto });
-                } catch(err) { console.error("Errore letto", err); }
-            };
-            actionDiv.appendChild(toggleReadBtn);
-            
-            const toggleCaricoBtn = document.createElement('button');
-            toggleCaricoBtn.innerHTML = data.presoInCarico ? "❌ Annulla Incarico" : "👷 Prendi in Carico";
-            toggleCaricoBtn.style.cssText = "background: none; border: 1px solid #3b82f6; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #1d4ed8; background-color: rgba(59,130,246,0.1);";
-            toggleCaricoBtn.onclick = async () => {
-                try {
-                    const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                    await updateDoc(doc(db, "messaggi", docSnapId), { presoInCarico: !data.presoInCarico });
-                } catch(err) { console.error("Errore carico", err); }
-            };
-            actionDiv.appendChild(toggleCaricoBtn);
+                const replyBtn = document.createElement('button');
+                replyBtn.innerHTML = "↩️ Rispondi";
+                replyBtn.style.cssText = "background: none; border: 1px solid #10b981; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #047857; background-color: rgba(16,185,129,0.1); font-weight: bold;";
+                replyBtn.onclick = () => {
+                    if(msgText) {
+                        msgText.value = `@${sN} `;
+                        msgText.focus();
+                        msgText.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                };
+                actionDiv.appendChild(replyBtn);
 
-            const deleteBtn = document.createElement('button');
-            deleteBtn.innerHTML = "🗑️ Elimina";
-            deleteBtn.style.cssText = "background: none; border: 1px solid #ffcccc; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; cursor: pointer; color: #d32f2f; background-color: rgba(255,255,255,0.5);";
-            deleteBtn.onclick = async () => {
-                if(!confirm("Eliminare definitivamente questo messaggio?")) return;
-                try {
-                    const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                    await deleteDoc(doc(db, "messaggi", docSnapId));
-                } catch(err) { console.error("Errore elim msg", err); }
-            };
-            actionDiv.appendChild(deleteBtn);
+                const toggleReadBtn = document.createElement('button');
+                toggleReadBtn.innerHTML = data.letto ? "📖 Da Leggere" : "✔️ Letto";
+                toggleReadBtn.style.cssText = "background: none; border: 1px solid #b8b8b8; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #555; background-color: rgba(255,255,255,0.5);";
+                toggleReadBtn.onclick = async () => {
+                    try {
+                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                        await updateDoc(doc(db, "messaggi", docSnapId), { letto: !data.letto });
+                    } catch(err) { console.error("Errore letto", err); }
+                };
+                actionDiv.appendChild(toggleReadBtn);
+                
+                const toggleCaricoBtn = document.createElement('button');
+                toggleCaricoBtn.innerHTML = data.presoInCarico ? "❌ Annulla Incarico" : "👷 Prendi in Carico";
+                toggleCaricoBtn.style.cssText = "background: none; border: 1px solid #3b82f6; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #1d4ed8; background-color: rgba(59,130,246,0.1);";
+                toggleCaricoBtn.onclick = async () => {
+                    try {
+                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                        await updateDoc(doc(db, "messaggi", docSnapId), { presoInCarico: !data.presoInCarico });
+                    } catch(err) { console.error("Errore carico", err); }
+                };
+                actionDiv.appendChild(toggleCaricoBtn);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.innerHTML = "🗑️ Elimina";
+                deleteBtn.style.cssText = "background: none; border: 1px solid #ffcccc; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; cursor: pointer; color: #d32f2f; background-color: rgba(255,255,255,0.5);";
+                deleteBtn.onclick = async () => {
+                    try {
+                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                        await updateDoc(doc(db, "messaggi", docSnapId), { eliminato: true });
+                    } catch(err) { console.error("Errore soft delete", err); }
+                };
+                actionDiv.appendChild(deleteBtn);
+            }
 
             div.appendChild(actionDiv);
             messagesList.appendChild(div);

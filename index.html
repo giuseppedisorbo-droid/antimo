@@ -80,13 +80,18 @@
                 <!-- Filtri e Ricerca Bacheca -->
                 <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; align-items: center;">
                     <div style="display: flex; gap: 5px; flex: 1; min-width: 250px;">
-                        <input type="text" id="msgSearchText" placeholder="Cerca testo o mittente..." style="flex: 1; font-size: 0.85rem; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px;">
-                        <input type="date" id="msgSearchDate" style="font-size: 0.85rem; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px;">
+                        <input type="text" id="msgSearchText" placeholder="Cerca testo..." style="flex: 1; font-size: 0.85rem; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px;">
+                        <select id="msgSearchUser" style="flex: 1; font-size: 0.85rem; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px;">
+                            <option value="">Utente (Tutti)</option>
+                        </select>
+                        <input type="date" id="msgSearchDate" style="font-size: 0.85rem; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; max-width: 40px;">
                     </div>
-                    <div style="display: flex; gap: 5px; justify-content: flex-start; width: 100%;">
-                        <button id="btnMsgTabAll" class="btn btn-sm btn-primary btn-blue" style="padding: 4px 12px; margin: 0; font-size: 0.75rem;">Tutti</button>
-                        <button id="btnMsgTabReceived" class="btn btn-sm btn-secondary" style="padding: 4px 12px; margin: 0; font-size: 0.75rem;">Ricevuti</button>
-                        <button id="btnMsgTabSent" class="btn btn-sm btn-secondary" style="padding: 4px 12px; margin: 0; font-size: 0.75rem;">Inviati</button>
+                    <div style="display: flex; gap: 5px; justify-content: flex-start; width: 100%; overflow-x: auto; padding-bottom: 5px;">
+                        <button id="btnMsgTabAll" class="btn btn-sm btn-primary btn-blue" style="padding: 4px 12px; margin: 0; font-size: 0.75rem; white-space: nowrap;">Tutti</button>
+                        <button id="btnMsgTabUnread" class="btn btn-sm btn-secondary" style="padding: 4px 12px; margin: 0; font-size: 0.75rem; white-space: nowrap;">Non Letti</button>
+                        <button id="btnMsgTabReceived" class="btn btn-sm btn-secondary" style="padding: 4px 12px; margin: 0; font-size: 0.75rem; white-space: nowrap;">Ricevuti</button>
+                        <button id="btnMsgTabSent" class="btn btn-sm btn-secondary" style="padding: 4px 12px; margin: 0; font-size: 0.75rem; white-space: nowrap;">Inviati</button>
+                        <button id="btnMsgTabDeleted" class="btn btn-sm btn-secondary" style="padding: 4px 12px; margin: 0; font-size: 0.75rem; white-space: nowrap;">Cestino</button>
                     </div>
                 </div>
 
@@ -609,7 +614,7 @@
         </div>
 
     </main>
-    <script type="module" src="app.js?v=33"></script>
+    <script type="module" src="app.js?v=34"></script>
     <script type="module" src="global_notifications.js?v=30"></script>
     <script>
       // Gestione layout PC
