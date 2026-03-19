@@ -178,7 +178,7 @@ async function loadNonEseguiti() {
 
 function renderTable(dataArray) {
     if (dataArray.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center;">Nessun intervento trovato per i filtri selezionati.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center;">Nessun intervento trovato per i filtri selezionati.</td></tr>`;
         return;
     }
 
@@ -212,6 +212,7 @@ function renderTable(dataArray) {
         }
 
         tr.innerHTML = `
+            <td style="text-align: center;"><input type="checkbox" class="int-checkbox" value="${inv.fbId}" style="transform: scale(1.3); cursor: pointer;"></td>
             <td><strong>${dataStr}</strong></td>
             <td>${timeStr}</td>
             <td>${inv.paziente}</td>
@@ -248,7 +249,7 @@ function renderTable(dataArray) {
 
 function renderNonEseguitiTable(dataArray) {
     if (dataArray.length === 0) {
-        nonEseguitiTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 2rem; color: #666;">🎉 Nessun intervento pendente da controllare.</td></tr>`;
+        nonEseguitiTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: #666;">🎉 Nessun intervento pendente da controllare.</td></tr>`;
         return;
     }
 
@@ -260,6 +261,7 @@ function renderNonEseguitiTable(dataArray) {
         let dateStr = inv.dataPrevista ? inv.dataPrevista.split('-').reverse().join('/') : 'N/D';
 
         tr.innerHTML = `
+            <td style="text-align: center;"><input type="checkbox" class="prog-checkbox" value="${inv.fbId}" style="transform: scale(1.3); cursor: pointer;"></td>
             <td><strong>${dateStr}</strong></td>
             <td style="font-weight: 600;">${inv.paziente}</td>
             <td>${inv.localita || inv.destinazione || "N/D"}</td>
@@ -547,3 +549,116 @@ if (btnManualSync) {
 
 // Inizializza caricando i dati al boot
 loadData();
+
+// ==========================================
+// SELEZIONE MULTIPLA E CANCELLAZIONE DI MASSA
+// ==========================================
+const selectAllStorico = document.getElementById('selectAllStorico');
+const selectAllNonEseguiti = document.getElementById('selectAllNonEseguiti');
+const btnMassDeleteStorico = document.getElementById('btnMassDeleteStorico');
+const btnMassDeleteNonEseguiti = document.getElementById('btnMassDeleteNonEseguiti');
+const countStorico = document.getElementById('countStorico');
+const countNonEseguiti = document.getElementById('countNonEseguiti');
+
+// Funzione Helper per aggiornare i contatori e pulsanti
+function updateMassDeleteUI() {
+    const checkedStorico = document.querySelectorAll('.int-checkbox:checked');
+    const checkedNonEsg = document.querySelectorAll('.prog-checkbox:checked');
+    
+    if(checkedStorico.length > 0) {
+        btnMassDeleteStorico.classList.remove('hidden');
+        countStorico.innerText = checkedStorico.length;
+    } else {
+        btnMassDeleteStorico.classList.add('hidden');
+    }
+    
+    if(checkedNonEsg.length > 0) {
+        btnMassDeleteNonEseguiti.classList.remove('hidden');
+        countNonEseguiti.innerText = checkedNonEsg.length;
+    } else {
+        btnMassDeleteNonEseguiti.classList.add('hidden');
+    }
+}
+
+// Event Delegation per Checkbox individuali
+if(tableBody) {
+    tableBody.addEventListener('change', (e) => {
+        if(e.target.classList.contains('int-checkbox')) updateMassDeleteUI();
+    });
+}
+if(nonEseguitiTableBody) {
+    nonEseguitiTableBody.addEventListener('change', (e) => {
+        if(e.target.classList.contains('prog-checkbox')) updateMassDeleteUI();
+    });
+}
+
+// Master Checkboxes (Seleziona Tutti)
+if(selectAllStorico) {
+    selectAllStorico.addEventListener('change', (e) => {
+        const isChecked = e.target.checked;
+        document.querySelectorAll('.int-checkbox').forEach(cb => { cb.checked = isChecked; });
+        updateMassDeleteUI();
+    });
+}
+if(selectAllNonEseguiti) {
+    selectAllNonEseguiti.addEventListener('change', (e) => {
+        const isChecked = e.target.checked;
+        document.querySelectorAll('.prog-checkbox').forEach(cb => { cb.checked = isChecked; });
+        updateMassDeleteUI();
+    });
+}
+
+// Pulsanti Cancellazione Massiva
+if(btnMassDeleteStorico) {
+    btnMassDeleteStorico.addEventListener('click', async () => {
+        const checkedBoxes = Array.from(document.querySelectorAll('.int-checkbox:checked'));
+        if(checkedBoxes.length === 0) return;
+        
+        if(!confirm(`Sei assolutamente sicuro di voler eliminare DEFINITIVAMENTE ${checkedBoxes.length} interventi eseguiti? Questa azione è irreversibile.`)) return;
+        
+        btnMassDeleteStorico.disabled = true;
+        btnMassDeleteStorico.innerText = "Cancellazione in corso...";
+        
+        try {
+            for(let box of checkedBoxes) {
+                await deleteDoc(doc(db, "interventi", box.value));
+            }
+            alert(`Eliminazione di ${checkedBoxes.length} interventi completata.`);
+            if(selectAllStorico) selectAllStorico.checked = false;
+            btnMassDeleteStorico.classList.add('hidden');
+            await loadData();
+        } catch(e) {
+            alert("Errore durante l'eliminazione multipla: " + e.message);
+        } finally {
+            btnMassDeleteStorico.disabled = false;
+            btnMassDeleteStorico.innerHTML = `🗑️ Elimina Selezionati (<span id="countStorico">0</span>)`;
+        }
+    });
+}
+
+if(btnMassDeleteNonEseguiti) {
+    btnMassDeleteNonEseguiti.addEventListener('click', async () => {
+        const checkedBoxes = Array.from(document.querySelectorAll('.prog-checkbox:checked'));
+        if(checkedBoxes.length === 0) return;
+        
+        if(!confirm(`Sei sicuro di voler eliminare definitivamente ${checkedBoxes.length} interventi pendenti/non eseguiti?`)) return;
+        
+        btnMassDeleteNonEseguiti.disabled = true;
+        btnMassDeleteNonEseguiti.innerText = "Cancellazione in corso...";
+        
+        try {
+            for(let box of checkedBoxes) {
+                await deleteDoc(doc(db, "programmati", box.value));
+            }
+            alert(`Eliminazione di ${checkedBoxes.length} pianificazioni pendenti completata.`);
+            if(selectAllNonEseguiti) selectAllNonEseguiti.checked = false;
+            btnMassDeleteNonEseguiti.classList.add('hidden');
+            await loadNonEseguiti();
+        } catch(e) {
+            alert("Errore durante l'eliminazione multipla: " + e.message);
+        } finally {
+            btnMassDeleteNonEseguiti.disabled = false;
+            btnMassDeleteNonEseguiti.innerHTML = `🗑️ Elimina Selezionati (<span id="countNonEseguiti">0</span>)`;
+        }
+    });
+}

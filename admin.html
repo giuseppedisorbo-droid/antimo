@@ -171,12 +171,14 @@
         </div>
 
         <div class="table-container" style="margin-bottom: 2rem;">
-            <h2 style="padding: 1rem 1.5rem; margin: 0; background: #fffcf0; color: #b45309; border-bottom: 1px solid #fef08a;">
-                ⚠️ Interventi Non Eseguiti (Da Chiudere)
+            <h2 style="padding: 1rem 1.5rem; margin: 0; background: #fffcf0; color: #b45309; border-bottom: 1px solid #fef08a; display: flex; justify-content: space-between; align-items: center;">
+                <span>⚠️ Interventi Non Eseguiti (Da Chiudere)</span>
+                <button id="btnMassDeleteNonEseguiti" class="btn btn-danger btn-sm hidden" style="margin: 0; padding: 6px 12px; font-weight: bold; font-size: 0.8rem; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.4);">🗑️ Elimina Selezionati (<span id="countNonEseguiti">0</span>)</button>
             </h2>
             <table id="nonEseguitiTable">
                 <thead>
                     <tr>
+                        <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAllNonEseguiti" style="transform: scale(1.3); cursor: pointer;"></th>
                         <th>Data Prevista</th>
                         <th>Paziente</th>
                         <th>Località</th>
@@ -192,9 +194,11 @@
             </table>
         </div>
 
-        <div class="table-container">
             <h2 id="toggleStoricoHeader" style="padding: 1rem 1.5rem; margin: 0; background: #f8fafc; color: var(--blue-dark); border-bottom: 1px solid #eee; cursor: pointer; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                <span>✅ Storico Interventi (Eseguiti)</span>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <span>✅ Storico Interventi (Eseguiti)</span>
+                    <button id="btnMassDeleteStorico" class="btn btn-danger btn-sm hidden" style="margin: 0; padding: 6px 12px; font-weight: bold; font-size: 0.8rem; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.4);">🗑️ Elimina Selezionati (<span id="countStorico">0</span>)</button>
+                </div>
                 <div>
                     <button id="btnToggleFilters" class="btn btn-primary btn-sm" style="margin:0; font-size:0.85rem; padding: 5px 10px; background: #b45309; border: none; margin-right: 5px;">⚙️ Filtri</button>
                     <button id="storicoToggleIcon" class="btn btn-secondary btn-sm" style="margin:0; font-size:0.85rem; padding: 5px 10px;">Apri Storico ⬇️</button>
@@ -204,6 +208,7 @@
                 <table id="interventiTable">
                     <thead>
                         <tr>
+                            <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAllStorico" style="transform: scale(1.3); cursor: pointer;"></th>
                             <th>Data Esecuzione</th>
                             <th>Orario (Inizio - Fine)</th>
                             <th>Paziente</th>
@@ -272,7 +277,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-    <script type="module" src="admin.js?v=26"></script>
-    <script type="module" src="global_notifications.js"></script>
+    <script type="module" src="admin.js?v=42"></script>
+    <script type="module" src="global_notifications.js?v=42"></script>
 </body>
 </html>

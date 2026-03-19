@@ -626,7 +626,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Salvataggio Cloud
             try {
                 const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                await setDoc(doc(window.db, "shared_data", "assistiti"), { list: mappedData });
+                await setDoc(doc(db, "shared_data", "assistiti"), { list: mappedData });
                 console.log("Assistiti sincronizzati in Cloud!");
             } catch(e) {
                 console.error("Errore salvataggio Cloud Assistiti", e);

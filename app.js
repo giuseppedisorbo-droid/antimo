@@ -127,6 +127,10 @@ let isEseguitiVisible = false;
 let selectedCalendarDate = null;
 let allExpanded = false;
 
+// Tracker for 1-Step Form Programmed interventions
+let activeProgFbId = null;
+let activeProgItem = null;
+
 const globalToggleCardContainer = document.getElementById('globalToggleCardContainer');
 const btnToggleAllCollapse = document.getElementById('btnToggleAllCollapse');
 
@@ -2245,6 +2249,18 @@ newInterventionForm.addEventListener('submit', async (e) => {
             Object.keys(payloadToSave).forEach(k => payloadToSave[k] === undefined && delete payloadToSave[k]);
             await addDoc(collection(db, "interventi"), payloadToSave);
             
+            if (activeProgFbId) {
+                try {
+                    const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                    await updateDoc(doc(db, "programmati", activeProgFbId), { status: "completed" });
+                    console.log(`Programmato ${activeProgFbId} contrassegnato come completed`);
+                } catch(e) {
+                    console.error("Non sono riuscito ad aggiornare lo status in Firebase", e);
+                }
+                activeProgFbId = null;
+                activeProgItem = null;
+            }
+            
             cloudSaveSuccess = true;
         }
     } catch (error) {
@@ -2521,6 +2537,10 @@ function renderActivitiesList() {
             
             div.querySelector('button[data-action="avvia"]').addEventListener('click', () => {
                 const dataToLoad = plannedInterventions[origIndex];
+                
+                // Trapping the origin ID so we can formally close it in DB upon Save
+                activeProgFbId = dataToLoad.idFb || dataToLoad.id || null;
+                activeProgItem = dataToLoad;
             
             // Popoliamo il form coi blocchi dinamici
             const container = document.getElementById('dynamicInterventionsContainer');
