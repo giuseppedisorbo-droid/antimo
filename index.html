@@ -325,6 +325,9 @@
                     <button class="btn btn-primary btn-blue" id="btnOpenUsersList" style="width: 100%; padding: 12px; margin-bottom: 10px; font-weight: bold;">
                         <span class="btn-icon">👥</span> GESTIONE DIPENDENTI
                     </button>
+                    <button class="btn btn-primary btn-blue" id="btnOpenListsSetup" style="width: 100%; padding: 12px; margin-bottom: 10px; font-weight: bold; background: #6366f1; border-color: #4f46e5;">
+                        <span class="btn-icon">📋</span> GESTIONE VOCI (DISP/INT)
+                    </button>
                     <button class="btn btn-primary btn-orange" id="btnManualSyncMobile" style="width: 100%; padding: 12px;">
                         <span class="btn-icon">🔄</span> SINCRONIZZA CON CLOUD
                     </button>
@@ -334,6 +337,35 @@
                     <button class="btn btn-primary btn-orange" id="btnOpenDataBackup" style="width: 100%; padding: 12px; margin-top: 10px;">
                         <span class="btn-icon">🗄️</span> BACKUP DATI & RIPRISTINO
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL GESTIONE VOCI (DISP/INT) -->
+        <div id="listsSetupModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2200; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 600px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
+                    <span><span class="btn-icon">📋</span> Gestione Voci</span>
+                    <button id="btnCloseListsSetup" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                </h3>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button id="btnTabInterventi" class="btn btn-primary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal; background: var(--blue-primary);">Interventi</button>
+                    <button id="btnTabDispositivi" class="btn btn-secondary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal;">Dispositivi</button>
+                </div>
+
+                <div id="listsContentContainer" style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1;">
+                    <div style="display:flex; gap: 10px; margin-bottom: 15px;">
+                        <input type="text" id="newListItemDesc" placeholder="Es. Visita Fisiatrica..." style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                        <button id="btnAddListItem" class="btn btn-primary btn-orange" style="margin: 0; padding: 8px 15px;"><span class="btn-icon">➕</span> Aggiungi</button>
+                    </div>
+
+                    <div style="max-height: 300px; overflow-y: auto;">
+                        <table id="listsSetupTable" style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                            <!-- Le voci verranno popolate da JS -->
+                        </table>
+                    </div>
+                    <button id="btnSaveFirebaseLists" class="btn btn-primary" style="width: 100%; margin: 15px 0 0 0;"><span class="btn-icon">💾</span> SALVA MODIFICHE E CHIUDI</button>
                 </div>
             </div>
         </div>

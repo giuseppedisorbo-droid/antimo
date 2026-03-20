@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, query, where, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getStorage, ref, uploadString } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
@@ -23,6 +23,50 @@ let isAdminLogged = false;
 
 // DOM Auth
 const btnLoginAdmin = document.getElementById('btnLoginAdmin');
+
+// Liste Dinamiche Dropdown
+window.antimoDropdownLists = { interventi: [], dispositivi: [] };
+window.decodeCodeToLabel = function(codeRaw, type = 'interventi') {
+    if(!codeRaw) return "";
+    let codes = codeRaw.split(',').map(c => c.trim());
+    return codes.map(c => {
+        let listStr = type === 'interventi' ? 'interventi' : 'dispositivi';
+        let found = window.antimoDropdownLists[listStr].find(item => item.id === c);
+        return found ? found.desc : c;
+    }).join(', ');
+};
+
+async function loadDropdownLists() {
+    const defaultTypes = ['Visita', 'Sostituzione', 'Ritiro', 'Consegna', 'Manutenzione', 'Installazione', 'Riparazione'];
+    const defaultDevices = ['Concentratore', 'Ventilatore', 'Aspiratore', 'D3', 'Stativo', 'Cpap', 'AutoCpap', 'Saturimetro'];
+    
+    window.antimoDropdownLists = {
+        interventi: defaultTypes.map(t => ({ id: t, desc: t })),
+        dispositivi: defaultDevices.map(d => ({ id: d, desc: d }))
+    };
+
+    if(db) {
+        try {
+            const docRef = doc(db, "configurazioni", "liste_dropdown");
+            const docSnap = await getDoc(docRef);
+            if(docSnap.exists()) {
+                window.antimoDropdownLists = docSnap.data();
+                localStorage.setItem('antimo_dropdown_lists', JSON.stringify(window.antimoDropdownLists));
+            } else {
+                await setDoc(docRef, window.antimoDropdownLists);
+                localStorage.setItem('antimo_dropdown_lists', JSON.stringify(window.antimoDropdownLists));
+            }
+        } catch(e) {
+            console.error("Errore fetch liste dropdown admin, uso cache", e);
+            let cached = localStorage.getItem('antimo_dropdown_lists');
+            if(cached) window.antimoDropdownLists = JSON.parse(cached);
+        }
+    } else {
+        let cached = localStorage.getItem('antimo_dropdown_lists');
+        if(cached) window.antimoDropdownLists = JSON.parse(cached);
+    }
+}
+loadDropdownLists();
 
 // BACKUP AUTOMATICO SILENZIOSO
 async function automaticFirebaseBackup() {
@@ -218,8 +262,8 @@ function renderTable(dataArray) {
             <td>${inv.paziente}</td>
             <td>${inv.localita || inv.destinazione || "N/D"}</td>
             <td>${inv.indirizzo || ""} <br><small style="color:gray;">${inv.telefono || ""}</small></td>
-            <td><span class="badge badge-success">${inv.tipo}</span><br><small style="color:gray;">${inv.note || ''}</small></td>
-            <td>${inv.dispositivi}<br><small style="color:gray;">${inv.matricola ? 'SN: ' + inv.matricola : ''}</small></td>
+            <td><span class="badge badge-success">${window.decodeCodeToLabel(inv.tipo, 'interventi')}</span><br><small style="color:gray;">${inv.note || ''}</small></td>
+            <td>${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi')}<br><small style="color:gray;">${inv.matricola ? 'SN: ' + inv.matricola : ''}</small></td>
             <td>${inv.kmPercorsi ? inv.kmPercorsi + ' km' : '-'}</td>
             <td>${fileHtml} ${adminActions}</td>
         `;
@@ -266,7 +310,7 @@ function renderNonEseguitiTable(dataArray) {
             <td style="font-weight: 600;">${inv.paziente}</td>
             <td>${inv.localita || inv.destinazione || "N/D"}</td>
             <td>${inv.indirizzo || ""} <br><small style="color:gray;">${inv.telefono || ""}</small></td>
-            <td><span class="badge badge-warning">${inv.tipo}</span><br><small style="color:gray;">${inv.dispositivi} ${inv.matricola ? `(SN: ${inv.matricola})` : ''}</small></td>
+            <td><span class="badge badge-warning">${window.decodeCodeToLabel(inv.tipo, 'interventi')}</span><br><small style="color:gray;">${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi')} ${inv.matricola ? `(SN: ${inv.matricola})` : ''}</small></td>
             <td style="color:#b45309; font-weight:600; font-style: italic;">"${inv.motivazione || 'Nessuna'}"</td>
             <td>
                 <button class="btn btn-primary btn-sm btn-chiudi" data-fbid="${inv.fbId}" style="background-color: var(--blue-dark); color: white; width: 100%; margin-bottom: 5px;">Archivia (Chiudi)</button>
@@ -367,7 +411,7 @@ function esporterCSV() {
         let rs = [
             `"${formatDateDMY(new Date(inv.startTime))}"`, `"${formatTime(inv.startTime)}"`, `"${formatTime(inv.endTime)}"`,
             `"${inv.paziente.replace(/"/g, '""')}"`, `"${loc.replace(/"/g, '""')}"`, `"${ind.replace(/"/g, '""')}"`, `"${inv.telefono || ""}"`,
-            `"${inv.tipo}"`, `"${inv.dispositivi.replace(/"/g, '""')}"`, `"${inv.matricola ? inv.matricola.replace(/"/g, '""') : ''}"`, `"${inv.kmPercorsi}"`,
+            `"${window.decodeCodeToLabel(inv.tipo, 'interventi')}"`, `"${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi').replace(/"/g, '""')}"`, `"${inv.matricola ? inv.matricola.replace(/"/g, '""') : ''}"`, `"${inv.kmPercorsi}"`,
             `"${inv.note ? inv.note.replace(/"/g, '""') : ''}"`, `"${inv.fileUrl || ''}"`
         ];
         csvContent += rs.join(";") + "\n";

@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, serverTimestamp, enableIndexedDbPersistence, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, updateDoc, serverTimestamp, enableIndexedDbPersistence, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
 // ====== CONFIGURAZIONE FIREBASE ======
@@ -42,6 +42,53 @@ if (isFirebaseConfigured) {
     }
 }
 // =====================================
+
+// Liste Dinamiche Dropdown
+window.antimoDropdownLists = { interventi: [], dispositivi: [] };
+window.decodeCodeToLabel = function(codeRaw, type = 'interventi') {
+    if(!codeRaw) return "";
+    let codes = codeRaw.split(',').map(c => c.trim());
+    return codes.map(c => {
+        let listStr = type === 'interventi' ? 'interventi' : 'dispositivi';
+        let found = window.antimoDropdownLists[listStr].find(item => item.id === c);
+        return found ? found.desc : c;
+    }).join(', ');
+};
+
+async function loadDropdownLists() {
+    const defaultTypes = ['Visita', 'Sostituzione', 'Ritiro', 'Consegna', 'Manutenzione', 'Installazione', 'Riparazione'];
+    const defaultDevices = ['Concentratore', 'Ventilatore', 'Aspiratore', 'D3', 'Stativo', 'Cpap', 'AutoCpap', 'Saturimetro'];
+    
+    // Default se Firebase non è configurato o offline primissimo avvio
+    // Per retrocompatibilità al 100%, l'ID delle voci default combacia col loro nome testo originario.
+    window.antimoDropdownLists = {
+        interventi: defaultTypes.map(t => ({ id: t, desc: t })),
+        dispositivi: defaultDevices.map(d => ({ id: d, desc: d }))
+    };
+
+    if(isFirebaseConfigured) {
+        try {
+            const docRef = doc(db, "configurazioni", "liste_dropdown");
+            const docSnap = await getDoc(docRef);
+            if(docSnap.exists()) {
+                window.antimoDropdownLists = docSnap.data();
+                localStorage.setItem('antimo_dropdown_lists', JSON.stringify(window.antimoDropdownLists));
+            } else {
+                await setDoc(docRef, window.antimoDropdownLists);
+                localStorage.setItem('antimo_dropdown_lists', JSON.stringify(window.antimoDropdownLists));
+            }
+        } catch(e) {
+            console.error("Errore fetch liste dropdown, uso cache", e);
+            let cached = localStorage.getItem('antimo_dropdown_lists');
+            if(cached) window.antimoDropdownLists = JSON.parse(cached);
+        }
+    } else {
+        let cached = localStorage.getItem('antimo_dropdown_lists');
+        if(cached) window.antimoDropdownLists = JSON.parse(cached);
+    }
+}
+// Chiamiamo il caricamento
+loadDropdownLists();
 
 // Stato App
 let completedInterventions = JSON.parse(localStorage.getItem('antimo_interventions')) || [];
@@ -2520,7 +2567,7 @@ function renderActivitiesList() {
                     <div style="flex:1;">
                         <div style="font-size:0.80rem; color:red; margin-bottom:4px;"><strong>⏳ PROGRAMMATO${showOra}</strong></div>
                         <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${inv.paziente} ${fileBadget}</div>
-                        <div style="font-size:0.85rem; color:#555;">📍 ${inv.localita || inv.destinazione} | 🔧 ${inv.tipo}</div>
+                        <div style="font-size:0.85rem; color:#555;">📍 ${inv.localita || inv.destinazione} | 🔧 ${window.decodeCodeToLabel(inv.tipo, 'interventi')}</div>
                     </div>
                     <div style="display: flex; gap: 8px; align-items: center; padding-left: 10px;">
                         <button class="btn btn-primary btn-orange btn-sm" style="padding:6px 10px; font-size:0.8rem; line-height:1; min-width:auto;" data-action="avvia" data-index="${origIndex}">▶ AVVIA</button>
@@ -2531,7 +2578,7 @@ function renderActivitiesList() {
                 <div class="card-expanded-view hidden">
                     <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${inv.indirizzo || ''}</div>
                     <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${inv.telefono || '-'}</div>
-                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${inv.dispositivi || 'Nessuno'}</div>
+                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi') || 'Nessuno'}</div>
                     <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Matricola:</strong> ${inv.matricola || 'N/D'}</div>
                     <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${inv.note || 'Nessuna'}</div>
                     ${attachHtml}
@@ -2612,7 +2659,7 @@ function renderActivitiesList() {
                     <div style="flex:1;">
                         <div style="font-size:0.80rem; color:#22c55e; margin-bottom:4px;"><strong>✅ Dalle ${padZ(d.getHours())}:${padZ(d.getMinutes())} alle ${padZ(e.getHours())}:${padZ(e.getMinutes())}</strong></div>
                         <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${inv.paziente} ${fileBadget}</div>
-                        <div style="font-size:0.85rem; color:#555;">📍 ${inv.localita || inv.destinazione} | 🔧 ${inv.tipo}</div>
+                        <div style="font-size:0.85rem; color:#555;">📍 ${inv.localita || inv.destinazione} | 🔧 ${window.decodeCodeToLabel(inv.tipo, 'interventi')}</div>
                         ${inv.operatore && inv.operatore !== myName ? `<div style="font-size:0.80rem; color:#8b5cf6; margin-top:2px;">👨‍🔧 Eseguito da: <strong>${inv.operatore}</strong></div>` : ''}
                     </div>
                     <div style="display: flex; gap: 8px; align-items: center; padding-left: 10px;">
@@ -2623,7 +2670,7 @@ function renderActivitiesList() {
                 <div class="card-expanded-view hidden">
                     <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${inv.indirizzo || ''}</div>
                     <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${inv.telefono || '-'}</div>
-                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${inv.dispositivi || 'Nessuno'}</div>
+                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi') || 'Nessuno'}</div>
                     <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Matricola:</strong> ${inv.matricola || 'N/D'}</div>
                     <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${inv.note || 'Nessuna'}</div>
                     <div style="font-size:0.85rem; color:#15803d; margin-top:5px;"><strong>Km A/R:</strong> ${inv.kmPercorsi || '0'}</div>
@@ -3037,3 +3084,143 @@ document.addEventListener('input', (e) => {
         }
     }
 });
+
+// ==========================================
+// GESTIONE VOCI (DISP/INT)
+// ==========================================
+const btnOpenListsSetup = document.getElementById('btnOpenListsSetup');
+const listsSetupModal = document.getElementById('listsSetupModal');
+const btnCloseListsSetup = document.getElementById('btnCloseListsSetup');
+const btnTabInterventi = document.getElementById('btnTabInterventi');
+const btnTabDispositivi = document.getElementById('btnTabDispositivi');
+const listsSetupTable = document.getElementById('listsSetupTable');
+const newListItemDesc = document.getElementById('newListItemDesc');
+const btnAddListItem = document.getElementById('btnAddListItem');
+const btnSaveFirebaseLists = document.getElementById('btnSaveFirebaseLists');
+
+let currentListTab = 'interventi'; // 'interventi' o 'dispositivi'
+
+if(btnOpenListsSetup) {
+    btnOpenListsSetup.addEventListener('click', () => {
+        listsSetupModal.classList.remove('hidden');
+        renderListsSetupTable();
+    });
+}
+
+if(btnCloseListsSetup) {
+    btnCloseListsSetup.addEventListener('click', () => {
+        listsSetupModal.classList.add('hidden');
+    });
+}
+
+if(btnTabInterventi) {
+    btnTabInterventi.addEventListener('click', () => {
+        currentListTab = 'interventi';
+        btnTabInterventi.className = 'btn btn-primary';
+        btnTabInterventi.style.background = 'var(--blue-primary)';
+        btnTabDispositivi.className = 'btn btn-secondary';
+        btnTabDispositivi.style.background = '';
+        renderListsSetupTable();
+    });
+}
+
+if(btnTabDispositivi) {
+    btnTabDispositivi.addEventListener('click', () => {
+        currentListTab = 'dispositivi';
+        btnTabDispositivi.className = 'btn btn-primary';
+        btnTabDispositivi.style.background = 'var(--blue-primary)';
+        btnTabInterventi.className = 'btn btn-secondary';
+        btnTabInterventi.style.background = '';
+        renderListsSetupTable();
+    });
+}
+
+function renderListsSetupTable() {
+    if(!listsSetupTable) return;
+    listsSetupTable.innerHTML = '';
+    const list = window.antimoDropdownLists[currentListTab] || [];
+    
+    if(list.length === 0) {
+        listsSetupTable.innerHTML = '<tr><td style="text-align:center; padding: 20px; color: #666;">Nessuna voce presente.</td></tr>';
+        return;
+    }
+
+    list.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid #eee';
+        
+        tr.innerHTML = `
+            <td style="padding: 10px; width: 30%; color: #888; font-size: 0.8rem; vertical-align: middle;">
+                ID: ${item.id}
+            </td>
+            <td style="padding: 10px; width: 40%; vertical-align: middle;">
+                <input type="text" id="desc_${item.id}" value="${item.desc.replace(/"/g, '&quot;')}" style="width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
+            </td>
+            <td style="padding: 10px; width: 30%; text-align: right; vertical-align: middle;">
+                <button class="btn btn-primary btn-sm" onclick="salvaVoceEdit('${item.id}')" style="padding: 6px 10px; margin: 0 5px 0 0; font-size: 0.8rem;">Modifica</button>
+                <button class="btn btn-danger btn-sm" onclick="eliminaVoce('${item.id}')" style="padding: 6px 10px; margin: 0; font-size: 0.8rem;">X</button>
+            </td>
+        `;
+        listsSetupTable.appendChild(tr);
+    });
+}
+
+window.salvaVoceEdit = function(id) {
+    const input = document.getElementById('desc_' + id);
+    if(!input) return;
+    const newDesc = input.value.trim();
+    if(!newDesc) {
+        alert("La descrizione non può essere vuota.");
+        return;
+    }
+    const list = window.antimoDropdownLists[currentListTab];
+    const item = list.find(x => x.id === id);
+    if(item) {
+        item.desc = newDesc;
+        renderListsSetupTable();
+    }
+};
+
+window.eliminaVoce = function(id) {
+    if(!confirm("Sei sicuro di voler eliminare questa voce? I vecchi record mostreranno il codice invece del nome se la elimini.")) return;
+    let list = window.antimoDropdownLists[currentListTab];
+    window.antimoDropdownLists[currentListTab] = list.filter(x => x.id !== id);
+    renderListsSetupTable();
+};
+
+if(btnAddListItem) {
+    btnAddListItem.addEventListener('click', () => {
+        const desc = newListItemDesc.value.trim();
+        if(!desc) return alert("Inserisci una descrizione valida.");
+        
+        const prefix = currentListTab === 'interventi' ? 'INT_' : 'DEV_';
+        const newId = prefix + Date.now().toString();
+        
+        window.antimoDropdownLists[currentListTab].push({ id: newId, desc: desc });
+        newListItemDesc.value = '';
+        renderListsSetupTable();
+    });
+}
+
+if(btnSaveFirebaseLists) {
+    btnSaveFirebaseLists.addEventListener('click', async () => {
+        try {
+            btnSaveFirebaseLists.disabled = true;
+            btnSaveFirebaseLists.innerHTML = "Salvataggio...";
+            
+            const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            const docRef = doc(db, "configurazioni", "liste_dropdown");
+            await setDoc(docRef, window.antimoDropdownLists);
+            
+            localStorage.setItem('antimo_dropdown_lists', JSON.stringify(window.antimoDropdownLists));
+            alert("Liste aggiornate con successo su Cloud!");
+            listsSetupModal.classList.add('hidden');
+        } catch(e) {
+            console.error("Errore salvataggio liste", e);
+            alert("Errore durante il salvataggio.");
+        } finally {
+            btnSaveFirebaseLists.disabled = false;
+            btnSaveFirebaseLists.innerHTML = '<span class="btn-icon">💾</span> SALVA MODIFICHE E CHIUDI';
+        }
+    });
+}

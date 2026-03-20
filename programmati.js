@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, where, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, where, deleteDoc, doc, updateDoc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // ====== CONFIGURAZIONE FIREBASE ======
 const firebaseConfig = {
@@ -25,6 +25,50 @@ try {
 let plannedInterventions = [];
 let waitingInterventions = [];
 let calendar;
+
+// Liste Dinamiche Dropdown
+window.antimoDropdownLists = { interventi: [], dispositivi: [] };
+window.decodeCodeToLabel = function(codeRaw, type = 'interventi') {
+    if(!codeRaw) return "";
+    let codes = codeRaw.split(',').map(c => c.trim());
+    return codes.map(c => {
+        let listStr = type === 'interventi' ? 'interventi' : 'dispositivi';
+        let found = window.antimoDropdownLists[listStr].find(item => item.id === c);
+        return found ? found.desc : c;
+    }).join(', ');
+};
+
+async function loadDropdownLists() {
+    const defaultTypes = ['Visita', 'Sostituzione', 'Ritiro', 'Consegna', 'Manutenzione', 'Installazione', 'Riparazione'];
+    const defaultDevices = ['Concentratore', 'Ventilatore', 'Aspiratore', 'D3', 'Stativo', 'Cpap', 'AutoCpap', 'Saturimetro'];
+    
+    window.antimoDropdownLists = {
+        interventi: defaultTypes.map(t => ({ id: t, desc: t })),
+        dispositivi: defaultDevices.map(d => ({ id: d, desc: d }))
+    };
+
+    if(db) {
+        try {
+            const docRef = doc(db, "configurazioni", "liste_dropdown");
+            const docSnap = await getDoc(docRef);
+            if(docSnap.exists()) {
+                window.antimoDropdownLists = docSnap.data();
+                localStorage.setItem('antimo_dropdown_lists', JSON.stringify(window.antimoDropdownLists));
+            } else {
+                await setDoc(docRef, window.antimoDropdownLists);
+                localStorage.setItem('antimo_dropdown_lists', JSON.stringify(window.antimoDropdownLists));
+            }
+        } catch(e) {
+            console.error("Errore fetch liste dropdown in programmati, uso cache", e);
+            let cached = localStorage.getItem('antimo_dropdown_lists');
+            if(cached) window.antimoDropdownLists = JSON.parse(cached);
+        }
+    } else {
+        let cached = localStorage.getItem('antimo_dropdown_lists');
+        if(cached) window.antimoDropdownLists = JSON.parse(cached);
+    }
+}
+loadDropdownLists();
 
 // DOM
 const form = document.querySelector('form');
@@ -139,8 +183,8 @@ function renderTable() {
             <td style="font-weight: bold;">${p.paziente}</td>
             <td>${p.localita || p.destinazione || 'N/D'}</td>
             <td>${p.indirizzo || ''} <br><small style="color:gray;">${p.telefono || ''}</small></td>
-            <td><span class="status-badge" style="background-color: #f1f5f9; color: var(--text-main); font-size: 0.8rem; padding: 4px 8px;">${p.tipo || 'Non spec.'}</span></td>
-            <td style="font-size: 0.85rem; color: #555;">${notes}</td>
+            <td><span class="status-badge" style="background-color: #f1f5f9; color: var(--text-main); font-size: 0.8rem; padding: 4px 8px;">${window.decodeCodeToLabel(p.tipo, 'interventi') || 'Non spec.'}</span></td>
+            <td style="font-size: 0.85rem; color: #555;">${window.decodeCodeToLabel(p.dispositivi, 'dispositivi')} <br /> ${p.note || ''}</td>
             <td>
                 <button class="btn btn-primary btn-sm" onclick="editProgrammato('${p.idFb}')" style="padding: 4px 8px; font-size: 0.8rem; text-transform: none; margin-bottom: 4px; width:100%; border-radius: 6px;">Modifica</button>
                 <button class="btn btn-danger btn-sm" onclick="deleteProgrammato('${p.idFb}')" style="padding: 4px 8px; font-size: 0.8rem; text-transform: none; width:100%; border-radius: 6px;">Elimina</button>
@@ -210,11 +254,8 @@ function renderCalendar() {
 
 // --- LOGICA BLOCCHI DINAMICI ---
 function createInterventionBlockHTML() {
-    const types = ['Visita', 'Sostituzione', 'Ritiro', 'Consegna', 'Manutenzione', 'Installazione', 'Riparazione'];
-    const devices = ['Concentratore', 'Ventilatore', 'Aspiratore', 'D3', 'Stativo', 'Cpap', 'AutoCpap', 'Saturimetro'];
-    
-    let typeOptions = types.map(t => `<option value="${t}">${t}</option>`).join('');
-    let devOptions = devices.map(d => `<option value="${d}">${d}</option>`).join('');
+    let typeOptions = window.antimoDropdownLists.interventi.map(t => `<option value="${t.id}">${t.desc}</option>`).join('');
+    let devOptions = window.antimoDropdownLists.dispositivi.map(d => `<option value="${d.id}">${d.desc}</option>`).join('');
     
     return `
         <div class="dynamic-intervention-block" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 15px; background: #f8fafc; position: relative;">
@@ -271,7 +312,7 @@ function initDynamicBlocks(containerId, addBtnId) {
             if(data.disp && !dispMatched) {
                 const opt = document.createElement('option');
                 opt.value = data.disp;
-                opt.textContent = data.disp;
+                opt.textContent = window.decodeCodeToLabel(data.disp, 'dispositivi') || data.disp;
                 dispSelect.insertBefore(opt, dispSelect.querySelector('option[value="Altro"]'));
             }
             dispSelect.value = data.disp || "";
