@@ -231,7 +231,6 @@ function updateHeaderFiltersUI() {
     const list = [
         { btn: btnMostraOggi, active: isOggiVisible },
         { btn: btnMostraDomani, active: isDomaniVisible },
-        { btn: btnMostraProgrammati, active: isPlannedVisible && !selectedCalendarDate },
         { btn: btnMostraP, active: isPlannedVisible && !selectedCalendarDate },
         { btn: btnMostraNP, active: isNpVisible },
         { btn: btnMostraEseguiti, active: isEseguitiVisible },
@@ -294,7 +293,6 @@ function toggleTarget(target) {
 
 if(btnMostraOggi) btnMostraOggi.addEventListener('click', () => toggleTarget('oggi'));
 if(btnMostraDomani) btnMostraDomani.addEventListener('click', () => toggleTarget('domani'));
-if(btnMostraProgrammati) btnMostraProgrammati.addEventListener('click', () => toggleTarget('planned'));
 if(btnMostraP) btnMostraP.addEventListener('click', () => toggleTarget('planned'));
 if(btnMostraNP) btnMostraNP.addEventListener('click', () => toggleTarget('np'));
 if(btnMostraEseguiti) btnMostraEseguiti.addEventListener('click', () => toggleTarget('eseguiti'));
@@ -565,7 +563,7 @@ function renderMessagesUI() {
         } else {
             countAll++;
             if (d.letto !== true) countUnread++;
-            if (rN === "Bacheca (Tutti)" || rN.includes(currentUser)) countReceived++;
+            if ((rN === "Bacheca (Tutti)" || rN.includes(currentUser)) && !d.presoInCarico) countReceived++;
             if (sN === currentUser) countSent++;
         }
     });
@@ -598,6 +596,7 @@ function renderMessagesUI() {
 
         if (currentMsgTab === 'received') {
             if (rN !== "Bacheca (Tutti)" && !rN.includes(currentUser)) return false;
+            if (d.presoInCarico === true) return false;
         } else if (currentMsgTab === 'sent') {
             if (sN !== currentUser) return false;
         } else if (currentMsgTab === 'unread') {
@@ -660,13 +659,22 @@ function renderMessagesUI() {
 
             let sN = data.sender || "Sconosciuto";
             let rN = data.recipients || "Bacheca (Tutti)";
+            
+            let attHtml = '';
+            if(data.fileUrls && data.fileUrls.length > 0) {
+                attHtml = '<div style="margin-top: 10px; display: flex; gap: 5px; flex-wrap: wrap;">';
+                data.fileUrls.forEach(f => {
+                    attHtml += `<a href="${f.url}" target="_blank" style="display:inline-flex; align-items:center; gap:5px; padding:4px 8px; background:rgba(59,130,246,0.1); color:var(--blue-primary); border-radius:4px; text-decoration:none; font-size:0.8rem; border:1px solid #bfdbfe;">📎 ${f.name || 'Allegato'}</a>`;
+                });
+                attHtml += '</div>';
+            }
 
             div.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <span style="font-size: 0.75rem; color: #666; font-weight: 600;">⏰ ${timeStr} </span>
                     <div>
                         ${data.eliminato ? '<span style="font-size:0.75rem; background:#ef4444; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">🗑️ CESTINO</span>' : ''}
-                        ${data.presoInCarico && !data.eliminato ? '<span style="font-size:0.75rem; background:#3b82f6; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">👷 Preso in Carico</span>' : ''}
+                        ${data.presoInCarico && !data.eliminato ? `<span style="font-size:0.75rem; background:#3b82f6; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">👷 Preso in Carico da ${data.presoInCaricoDa || 'Te'}</span>` : ''}
                         ${data.isNotification && !data.eliminato ? '<span style="font-size:0.75rem; background:#f59e0b; color:white; padding:2px 6px; border-radius:12px; font-weight:bold;">📌 NOTIFICA</span>' : ''}
                     </div>
                 </div>
@@ -674,6 +682,7 @@ function renderMessagesUI() {
                     <strong>Da:</strong> ${sN} &nbsp;|&nbsp; <strong>A:</strong> ${rN}
                 </div>
                 <div style="color: #333; line-height: 1.4; white-space: pre-wrap; margin-top:5px; ${(data.letto || data.eliminato) ? 'text-decoration: line-through; color: #777;' : ''}">${data.text}</div>
+                ${attHtml}
             `;
             
             const actionDiv = document.createElement('div');
@@ -740,13 +749,18 @@ function renderMessagesUI() {
                 };
                 actionDiv.appendChild(toggleReadBtn);
                 
+                const myUserName = localStorage.getItem('antimo_user_name') || 'Sconosciuto';
                 const toggleCaricoBtn = document.createElement('button');
-                toggleCaricoBtn.innerHTML = data.presoInCarico ? "❌ Annulla Incarico" : "👷 Prendi in Carico";
+                toggleCaricoBtn.innerHTML = data.presoInCarico ? `❌ Annulla Incarico (${data.presoInCaricoDa || 'Te'})` : "👷 Prendi in Carico";
                 toggleCaricoBtn.style.cssText = "background: none; border: 1px solid #3b82f6; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #1d4ed8; background-color: rgba(59,130,246,0.1);";
                 toggleCaricoBtn.onclick = async () => {
                     try {
                         const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await updateDoc(doc(db, "messaggi", docSnapId), { presoInCarico: !data.presoInCarico });
+                        if (data.presoInCarico) {
+                            await updateDoc(doc(db, "messaggi", docSnapId), { presoInCarico: false, presoInCaricoDa: null });
+                        } else {
+                            await updateDoc(doc(db, "messaggi", docSnapId), { presoInCarico: true, presoInCaricoDa: myUserName });
+                        }
                     } catch(err) { console.error("Errore carico", err); }
                 };
                 actionDiv.appendChild(toggleCaricoBtn);
@@ -778,8 +792,8 @@ function renderMessagesUI() {
     
     if(btnToggleMessages) {
         const isHidden = messagesContainer.classList.contains('hidden');
-        let noteBadge = activeNotes.length > 0 ? ` <span style="background:var(--orange);color:white;padding:2px 6px;border-radius:12px;font-size:0.7rem;">${activeNotes.length}</span>` : '';
-        btnToggleMessages.innerHTML = (isHidden ? 'Mostra' : 'Nascondi') + noteBadge;
+        let noteBadge = activeNotes.length > 0 ? ` <span style="background:#ef4444;color:white;padding:3px 8px;border-radius:12px;font-size:1rem;font-weight:bold;margin-left:5px;box-shadow:0 2px 4px rgba(239,68,68,0.3);">${activeNotes.length}</span>` : '';
+        btnToggleMessages.innerHTML = (isHidden ? 'MOSTRA' : 'NASCONDI') + noteBadge;
     }
     
     // In caso di link WhatsApp con msgId
@@ -803,6 +817,42 @@ function renderMessagesUI() {
 
 let pendingMessageText = "";
 let pendingMessageIsNotification = false;
+let pendingMessageFiles = [];
+
+const msgAttachmentsInput = document.getElementById('msgAttachments');
+const msgPreviewContainer = document.getElementById('msgPreviewContainer');
+
+if (msgAttachmentsInput) {
+    msgAttachmentsInput.addEventListener('change', (e) => {
+        const files = e.target.files;
+        pendingMessageFiles = [];
+        msgPreviewContainer.innerHTML = '';
+        if (files.length > 0) {
+            msgPreviewContainer.classList.remove('hidden');
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const dataUrl = ev.target.result;
+                    pendingMessageFiles.push({ name: file.name, type: file.type, data: dataUrl });
+                    
+                    const div = document.createElement('div');
+                    div.style.cssText = 'position: relative; width: 60px; height: 60px; border: 1px solid #ccc; border-radius: 4px; overflow: hidden;';
+                    if (file.type.startsWith('image/')) {
+                        div.innerHTML = `<img src="${dataUrl}" style="width:100%; height:100%; object-fit:cover;">`;
+                    } else if (file.type.startsWith('video/')) {
+                        div.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#eee; font-size:1.5rem;">🎥</div>`;
+                    } else {
+                        div.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#eee; font-size:1.5rem;">📄</div>`;
+                    }
+                    msgPreviewContainer.appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            });
+        } else {
+            msgPreviewContainer.classList.add('hidden');
+        }
+    });
+}
 
 const waSelectModal = document.getElementById('waSelectModal');
 const waContactsList = document.getElementById('waContactsList');
@@ -819,13 +869,29 @@ async function processMessageSave(text, isNotif, recipients = "Bacheca (Tutti)")
     try {
         const senderName = localStorage.getItem('antimo_user_name') || "Sconosciuto";
         const { collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        const docRef = await addDoc(collection(db, "messaggi"), {
+        const { ref: storageRefCall, uploadString, getDownloadURL } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js");
+        
+        let fileUrls = [];
+        if (pendingMessageFiles && pendingMessageFiles.length > 0 && typeof storage !== 'undefined') {
+            const upPromises = pendingMessageFiles.map(async (att, idx) => {
+                const fName = `messaggi_attachments/msg_${Date.now()}_${idx}_${att.name.replace(/[^a-zA-Z0-9.\-]/g, "_")}`;
+                const storageRef = storageRefCall(storage, fName);
+                await uploadString(storageRef, att.data, 'data_url');
+                const url = await getDownloadURL(storageRef);
+                return { url: url, name: att.name, type: att.type };
+            });
+            fileUrls = await Promise.all(upPromises);
+        }
+
+        const docD = {
             text: text,
             isNotification: isNotif,
             sender: senderName,
             recipients: recipients,
-            timestamp: serverTimestamp()
-        });
+            timestamp: serverTimestamp(),
+            fileUrls: fileUrls
+        };
+        const docRef = await addDoc(collection(db, "messaggi"), docD);
         return docRef.id;
     } catch(err) {
         console.error("Errore invio msg", err);
@@ -888,8 +954,11 @@ if(btnWaSkip) {
     btnWaSkip.addEventListener('click', async () => {
         btnWaSkip.disabled = true; btnWaSkip.innerHTML = '...';
         await processMessageSave(pendingMessageText, pendingMessageIsNotification, "Bacheca (Tutti)");
-        document.getElementById('msgText').value = '';
         if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = true;
+        
+        if (msgAttachmentsInput) msgAttachmentsInput.value = '';
+        if (msgPreviewContainer) { msgPreviewContainer.innerHTML = ''; msgPreviewContainer.classList.add('hidden'); }
+        pendingMessageFiles = [];
         
         waSelectModal.classList.add('hidden');
         btnWaSkip.disabled = false; btnWaSkip.innerHTML = 'Solo Bacheca';
@@ -906,8 +975,11 @@ if(btnWaSend) {
         
         btnWaSend.disabled = true; btnWaSend.innerHTML = '...';
         const msgId = await processMessageSave(pendingMessageText, pendingMessageIsNotification, recNames);
-        document.getElementById('msgText').value = '';
         if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = true;
+        
+        if (msgAttachmentsInput) msgAttachmentsInput.value = '';
+        if (msgPreviewContainer) { msgPreviewContainer.innerHTML = ''; msgPreviewContainer.classList.add('hidden'); }
+        pendingMessageFiles = [];
         
         waSelectModal.classList.add('hidden');
         btnWaSend.disabled = false; btnWaSend.innerHTML = 'Procedi su WA';
@@ -929,7 +1001,7 @@ if(btnWaSend) {
                 else cleanNum = cleanNum.replace('+', '');
                 
                 let appLink = window.location.origin + window.location.pathname + '?msgId=' + msgId;
-                let textWithLink = pendingMessageText + "\n\nApri nell'App: " + appLink;
+                let textWithLink = "📩 Nuova comunicazione in Bacheca.\n\n👉 Apri nell'App per leggere e visualizzare eventuali allegati: " + appLink;
                 
                 btn.href = `https://wa.me/${cleanNum}?text=${encodeURIComponent(textWithLink)}`;
                 btn.innerHTML = `<span style="font-size:1.2rem;">💬</span> WhatsApp per ${cNome}`;
