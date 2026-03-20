@@ -564,7 +564,7 @@ function renderMessagesUI() {
             countAll++;
             if (d.letto !== true) countUnread++;
             if ((rN === "Bacheca (Tutti)" || rN.includes(currentUser)) && !d.presoInCarico) countReceived++;
-            if (sN === currentUser) countSent++;
+            if (sN === currentUser && !d.presoInCarico) countSent++;
         }
     });
 
@@ -599,6 +599,7 @@ function renderMessagesUI() {
             if (d.presoInCarico === true) return false;
         } else if (currentMsgTab === 'sent') {
             if (sN !== currentUser) return false;
+            if (d.presoInCarico === true) return false;
         } else if (currentMsgTab === 'unread') {
             if (d.letto === true) return false;
         }
