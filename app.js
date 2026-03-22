@@ -1369,8 +1369,20 @@ async function syncLocalDataToCloud() {
         throw new Error("Impossibile leggere dal Cloud per verificare i doppioni. Controlla i permessi o la connessione.");
     }
     
-    // 2. Filtriamo solo quelli locali che MANGANo dal cloud
-    let daSincronizzare = tuttiIFilePath.filter(inv => !cloudIds.includes(inv.id));
+    // Filtriamo gli interventi che in locale risultano "sincronizzati" ma che sul server non ci sono più:
+    // Significa che sono stati eliminati definitivamente dalla dashboard admin.
+    let daRimuovere = tuttiIFilePath.filter(inv => inv.cloudSynced && !cloudIds.includes(inv.id));
+    if (daRimuovere.length > 0) {
+        console.log(`Rilevati ${daRimuovere.length} interventi eliminati dal server admin. Pulisco cache locale.`);
+        completedInterventions = completedInterventions.filter(inv => cloudIds.includes(inv.id) || !inv.cloudSynced);
+        saveState();
+        if(typeof updateUI === 'function') updateUI();
+        if(typeof updateInterventiCount === 'function') updateInterventiCount();
+        tuttiIFilePath = completedInterventions;
+    }
+
+    // 2. Filtriamo solo quelli locali offline NUOVI che MANGANo dal cloud e che NON sono mai stati sul cloud
+    let daSincronizzare = tuttiIFilePath.filter(inv => !inv.cloudSynced && !cloudIds.includes(inv.id));
     
     // DEBUG MANUALE POTENTE PER L'UTENTE
     if (typeof window !== 'undefined' && window._antimo_forcing_sync) {

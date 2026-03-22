@@ -161,6 +161,13 @@ const quickFilters = document.querySelectorAll('.filter-quick');
 const btnToggleFilters = document.getElementById('btnToggleFilters');
 const filtersWrapper = document.getElementById('filtersWrapper');
 const btnFilterMonth = document.getElementById('btnFilterMonth');
+const quickSearchStorico = document.getElementById('quickSearchStorico');
+
+if (quickSearchStorico) {
+    quickSearchStorico.addEventListener('input', () => {
+        applyFilters();
+    });
+}
 
 let tuttiGliInterventi = [];
 
@@ -352,13 +359,16 @@ function renderNonEseguitiTable(dataArray) {
 function applyFilters() {
     let filtrati = [...tuttiGliInterventi];
 
-    // Filtro Ricerca Testo
+    // Filtro Ricerca Testo (combinato)
     const searchVal = filterSearch.value.toLowerCase().trim();
-    if (searchVal) {
+    const quickSearchVal = quickSearchStorico ? quickSearchStorico.value.toLowerCase().trim() : "";
+    const combinedSearch = searchVal || quickSearchVal;
+
+    if (combinedSearch) {
         filtrati = filtrati.filter(i =>
-            i.paziente.toLowerCase().includes(searchVal) ||
-            (i.destinazione || "").toLowerCase().includes(searchVal) ||
-            (i.localita || "").toLowerCase().includes(searchVal)
+            i.paziente.toLowerCase().includes(combinedSearch) ||
+            (i.destinazione || "").toLowerCase().includes(combinedSearch) ||
+            (i.localita || "").toLowerCase().includes(combinedSearch)
         );
     }
 
