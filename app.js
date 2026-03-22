@@ -447,12 +447,15 @@ function extractDynamicBlocksData(containerId) {
 // LOGICA MESSAGGISTICA E NOTIFICHE
 let messagesDataCache = []; // Cache for filtering without refetching
 
+const btnMsgTabResolved = document.getElementById('btnMsgTabResolved');
+
 function updateMsgTabsUI() {
     if(btnMsgTabAll) btnMsgTabAll.className = (currentMsgTab === 'all') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
     if(btnMsgTabReceived) btnMsgTabReceived.className = (currentMsgTab === 'received') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
     if(btnMsgTabSent) btnMsgTabSent.className = (currentMsgTab === 'sent') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
     if(btnMsgTabUnread) btnMsgTabUnread.className = (currentMsgTab === 'unread') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
     if(btnMsgTabDeleted) btnMsgTabDeleted.className = (currentMsgTab === 'deleted') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
+    if(btnMsgTabResolved) btnMsgTabResolved.className = (currentMsgTab === 'resolved') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
 }
 
 if(btnMsgTabAll) btnMsgTabAll.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'all'; updateMsgTabsUI(); renderMessagesUI(); });
@@ -460,6 +463,7 @@ if(btnMsgTabReceived) btnMsgTabReceived.addEventListener('click', (e) => { e.pre
 if(btnMsgTabSent) btnMsgTabSent.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'sent'; updateMsgTabsUI(); renderMessagesUI(); });
 if(btnMsgTabUnread) btnMsgTabUnread.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'unread'; updateMsgTabsUI(); renderMessagesUI(); });
 if(btnMsgTabDeleted) btnMsgTabDeleted.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'deleted'; updateMsgTabsUI(); renderMessagesUI(); });
+if(btnMsgTabResolved) btnMsgTabResolved.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'resolved'; updateMsgTabsUI(); renderMessagesUI(); });
 
 if(btnEmptyTrash) btnEmptyTrash.addEventListener('click', async (e) => {
     e.preventDefault();
@@ -536,7 +540,7 @@ function renderMessagesUI() {
     const searchDate = (msgSearchDate && msgSearchDate.value) ? msgSearchDate.value : "";
     
     // Calculate counts for categories
-    let countAll = 0, countUnread = 0, countReceived = 0, countSent = 0, countDeleted = 0;
+    let countAll = 0, countUnread = 0, countReceived = 0, countSent = 0, countDeleted = 0, countResolved = 0;
     
     messagesDataCache.forEach(item => {
         const d = item.data;
@@ -560,6 +564,8 @@ function renderMessagesUI() {
         // Tally categories
         if (d.eliminato === true) {
             countDeleted++;
+        } else if (d.isResolved === true) {
+            countResolved++;
         } else {
             countAll++;
             if (d.letto !== true) countUnread++;
@@ -573,6 +579,7 @@ function renderMessagesUI() {
     if(btnMsgTabReceived) btnMsgTabReceived.innerHTML = `Ricevuti (${countReceived})`;
     if(btnMsgTabSent) btnMsgTabSent.innerHTML = `Inviati (${countSent})`;
     if(btnMsgTabDeleted) btnMsgTabDeleted.innerHTML = `Cestino (${countDeleted})`;
+    if(btnMsgTabResolved) btnMsgTabResolved.innerHTML = `Risolti (${countResolved})`;
 
     if(btnEmptyTrash) {
         if (currentMsgTab === 'deleted' && countDeleted > 0) {
@@ -590,8 +597,10 @@ function renderMessagesUI() {
 
         if (currentMsgTab === 'deleted') {
             if (d.eliminato !== true) return false;
+        } else if (currentMsgTab === 'resolved') {
+            if (d.isResolved !== true || d.eliminato === true) return false;
         } else {
-            if (d.eliminato === true) return false;
+            if (d.eliminato === true || d.isResolved === true) return false;
         }
 
         if (currentMsgTab === 'received') {
@@ -675,8 +684,9 @@ function renderMessagesUI() {
                     <span style="font-size: 0.75rem; color: #666; font-weight: 600;">⏰ ${timeStr} </span>
                     <div>
                         ${data.eliminato ? '<span style="font-size:0.75rem; background:#ef4444; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">🗑️ CESTINO</span>' : ''}
-                        ${data.presoInCarico && !data.eliminato ? `<span style="font-size:0.75rem; background:#3b82f6; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">👷 Preso in Carico da ${data.presoInCaricoDa || 'Te'}</span>` : ''}
-                        ${data.isNotification && !data.eliminato ? '<span style="font-size:0.75rem; background:#f59e0b; color:white; padding:2px 6px; border-radius:12px; font-weight:bold;">📌 NOTIFICA</span>' : ''}
+                        ${data.isResolved && !data.eliminato ? '<span style="font-size:0.75rem; background:#10b981; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">✅ RISOLTO</span>' : ''}
+                        ${data.presoInCarico && !data.eliminato && !data.isResolved ? `<span style="font-size:0.75rem; background:#3b82f6; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">👷 Preso in Carico da ${data.presoInCaricoDa || 'Te'}</span>` : ''}
+                        ${data.isNotification && !data.eliminato && !data.isResolved ? '<span style="font-size:0.75rem; background:#f59e0b; color:white; padding:2px 6px; border-radius:12px; font-weight:bold;">📌 NOTIFICA</span>' : ''}
                     </div>
                 </div>
                 <div style="margin-top:5px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; font-size: 0.8rem; color: var(--blue-dark);">
@@ -703,6 +713,29 @@ function renderMessagesUI() {
                     } catch(err) { console.error("Errore ripristino", err); }
                 };
                 actionDiv.appendChild(restoreBtn);
+
+                const hardDeleteBtn = document.createElement('button');
+                hardDeleteBtn.innerHTML = "🔥 Elimina Definitivamente";
+                hardDeleteBtn.style.cssText = "background: none; border: 1px solid #dc2626; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #b91c1c; background-color: rgba(220,38,38,0.1); font-weight: bold;";
+                hardDeleteBtn.onclick = async () => {
+                    if(!confirm("Sei sicuro di voler distruggere per sempre questo messaggio? Non potrà essere recuperato!")) return;
+                    try {
+                        const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                        await deleteDoc(doc(db, "messaggi", docSnapId));
+                    } catch(err) { console.error("Errore hard delete", err); }
+                };
+                actionDiv.appendChild(hardDeleteBtn);
+            } else if (data.isResolved) {
+                const riprendiBtn = document.createElement('button');
+                riprendiBtn.innerHTML = "♻️ Riprendi in Carico";
+                riprendiBtn.style.cssText = "background: none; border: 1px solid #f59e0b; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #b45309; background-color: rgba(245,158,11,0.1);";
+                riprendiBtn.onclick = async () => {
+                    try {
+                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                        await updateDoc(doc(db, "messaggi", docSnapId), { isResolved: false });
+                    } catch(err) { console.error("Errore riprendi risolto", err); }
+                };
+                actionDiv.appendChild(riprendiBtn);
 
                 const hardDeleteBtn = document.createElement('button');
                 hardDeleteBtn.innerHTML = "🔥 Elimina Definitivamente";
@@ -790,6 +823,19 @@ function renderMessagesUI() {
                     } catch(err) { console.error("Errore carico", err); }
                 };
                 actionDiv.appendChild(toggleCaricoBtn);
+
+                if (data.presoInCarico && data.presoInCaricoDa === myUserName) {
+                    const resolveBtn = document.createElement('button');
+                    resolveBtn.innerHTML = "✅ Segna come Risolto";
+                    resolveBtn.style.cssText = "background: none; border: 1px solid #10b981; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #047857; background-color: rgba(16,185,129,0.1); font-weight: bold;";
+                    resolveBtn.onclick = async () => {
+                        try {
+                            const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                            await updateDoc(doc(db, "messaggi", docSnapId), { isResolved: true, isNotification: false, letto: true });
+                        } catch(err) { console.error("Errore risolvi", err); }
+                    };
+                    actionDiv.appendChild(resolveBtn);
+                }
 
                 const deleteBtn = document.createElement('button');
                 deleteBtn.innerHTML = "🗑️ Elimina";
