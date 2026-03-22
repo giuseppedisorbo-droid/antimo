@@ -731,13 +731,38 @@ function renderMessagesUI() {
                 replyBtn.innerHTML = "↩️ Rispondi";
                 replyBtn.style.cssText = "background: none; border: 1px solid #10b981; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #047857; background-color: rgba(16,185,129,0.1); font-weight: bold;";
                 replyBtn.onclick = () => {
+                    window.pendingReplyRecipients = [sN];
                     if(msgText) {
-                        msgText.value = `@${sN} `;
+                        msgText.placeholder = `Rispondi a ${sN}...`;
                         msgText.focus();
                         msgText.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
                 };
                 actionDiv.appendChild(replyBtn);
+
+                const replyAllBtn = document.createElement('button');
+                replyAllBtn.innerHTML = "↩️👥 Rispondi a tutti";
+                replyAllBtn.style.cssText = "background: none; border: 1px solid #059669; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #065f46; background-color: rgba(5,150,105,0.1); font-weight: bold;";
+                replyAllBtn.onclick = () => {
+                    let allRecs = [sN];
+                    if (data.recipients && data.recipients !== "Bacheca (Tutti)") {
+                        if (typeof data.recipients === 'string') {
+                            data.recipients.split(',').forEach(r => allRecs.push(r.trim()));
+                        } else if (Array.isArray(data.recipients)) {
+                            data.recipients.forEach(r => allRecs.push(r));
+                        }
+                    }
+                    const currentUser = localStorage.getItem('antimo_user_name') || "Sconosciuto";
+                    allRecs = [...new Set(allRecs)].filter(r => r !== currentUser);
+                    window.pendingReplyRecipients = allRecs;
+                    
+                    if (msgText) {
+                        msgText.placeholder = `Rispondi a tutti (${allRecs.join(', ')})...`;
+                        msgText.focus();
+                        msgText.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                };
+                actionDiv.appendChild(replyAllBtn);
 
                 const toggleReadBtn = document.createElement('button');
                 toggleReadBtn.innerHTML = data.letto ? "📖 Da Leggere" : "✔️ Letto";
@@ -860,6 +885,20 @@ const waContactsList = document.getElementById('waContactsList');
 const waSelectAll = document.getElementById('waSelectAll');
 const btnWaSkip = document.getElementById('btnWaSkip');
 const btnWaSend = document.getElementById('btnWaSend');
+const btnCloseWaSelect = document.getElementById('btnCloseWaSelect');
+
+if(btnCloseWaSelect) {
+    btnCloseWaSelect.addEventListener('click', () => {
+        waSelectModal.classList.add('hidden');
+        window.pendingReplyRecipients = null;
+        if (msgAttachmentsInput) msgAttachmentsInput.value = '';
+        if (msgPreviewContainer) { msgPreviewContainer.innerHTML = ''; msgPreviewContainer.classList.add('hidden'); }
+        pendingMessageFiles = [];
+        if(document.getElementById('msgText')) {
+            document.getElementById('msgText').placeholder = "Scrivi un nuovo messaggio o comunicazione...";
+        }
+    });
+}
 
 const waQueueModal = document.getElementById('waQueueModal');
 const waQueueList = document.getElementById('waQueueList');
@@ -930,9 +969,10 @@ if(newMessageForm) {
                 dipendenti.forEach((c, i) => {
                     const cbValue = c.telefono1 || c.telefono || "";
                     const cbName = `${c.nome} ${c.cognome || ''}`.trim();
+                    const isChecked = window.pendingReplyRecipients && window.pendingReplyRecipients.includes(cbName) ? 'checked' : '';
                     const div = document.createElement('label');
                     div.style.cssText = "display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: #f9f9f9; border-radius: 6px; border: 1px solid #eee;";
-                    div.innerHTML = `<input type="checkbox" class="wa-contact-cb" value="${i}" data-name="${cbName}" data-phone="${cbValue}" style="transform: scale(1.2);"> <span style="font-weight:bold; color:var(--blue-dark);">${cbName}</span> <span style="color:#666; font-size:0.85rem;">(${cbValue || 'Nessun num'})</span>`;
+                    div.innerHTML = `<input type="checkbox" class="wa-contact-cb" value="${i}" data-name="${cbName}" data-phone="${cbValue}" style="transform: scale(1.2);" ${isChecked}> <span style="font-weight:bold; color:var(--blue-dark);">${cbName}</span> <span style="color:#666; font-size:0.85rem;">(${cbValue || 'Nessun num'})</span>`;
                     waContactsList.appendChild(div);
                 });
             } else {
@@ -953,13 +993,22 @@ if(waSelectAll) {
 
 if(btnWaSkip) {
     btnWaSkip.addEventListener('click', async () => {
+        const checkedBoxes = Array.from(document.querySelectorAll('.wa-contact-cb:checked'));
+        let recNames = checkedBoxes.map(cb => cb.getAttribute('data-name')).join(', ');
+        if(!recNames) recNames = "Bacheca (Tutti)";
+
         btnWaSkip.disabled = true; btnWaSkip.innerHTML = '...';
-        await processMessageSave(pendingMessageText, pendingMessageIsNotification, "Bacheca (Tutti)");
+        await processMessageSave(pendingMessageText, pendingMessageIsNotification, recNames);
         if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = true;
         
         if (msgAttachmentsInput) msgAttachmentsInput.value = '';
         if (msgPreviewContainer) { msgPreviewContainer.innerHTML = ''; msgPreviewContainer.classList.add('hidden'); }
         pendingMessageFiles = [];
+        window.pendingReplyRecipients = null;
+        if(document.getElementById('msgText')) {
+            document.getElementById('msgText').value = '';
+            document.getElementById('msgText').placeholder = "Scrivi un nuovo messaggio o comunicazione...";
+        }
         
         waSelectModal.classList.add('hidden');
         btnWaSkip.disabled = false; btnWaSkip.innerHTML = 'Solo Bacheca';
@@ -981,6 +1030,11 @@ if(btnWaSend) {
         if (msgAttachmentsInput) msgAttachmentsInput.value = '';
         if (msgPreviewContainer) { msgPreviewContainer.innerHTML = ''; msgPreviewContainer.classList.add('hidden'); }
         pendingMessageFiles = [];
+        window.pendingReplyRecipients = null;
+        if(document.getElementById('msgText')) {
+            document.getElementById('msgText').value = '';
+            document.getElementById('msgText').placeholder = "Scrivi un nuovo messaggio o comunicazione...";
+        }
         
         waSelectModal.classList.add('hidden');
         btnWaSend.disabled = false; btnWaSend.innerHTML = 'Procedi su WA';
