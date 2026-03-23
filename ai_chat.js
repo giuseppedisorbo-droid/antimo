@@ -87,10 +87,11 @@ function appendMessage(role, text) {
     const border = isUser ? 'none' : '1px solid #e2e8f0';
     const shadow = isUser ? '0 2px 4px rgba(99, 102, 241, 0.3)' : '0 1px 2px rgba(0,0,0,0.05)';
 
-    // Parse simple markdown
-    let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                            .replace(/`(.*?)`/g, '<code style="background: rgba(0,0,0,0.1); padding: 2px 4px; border-radius: 4px;">$1</code>');
+    // Parse simple markdown robustly
+    let formattedText = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    formattedText = formattedText.replace(/\*\*([\s\S]*?)\*\*/g, '<strong>$1</strong>')
+                                 .replace(/\*([\s\S]*?)\*/g, '<em>$1</em>')
+                                 .replace(/`([^`]*?)`/g, '<code style="background: rgba(0,0,0,0.1); padding: 2px 4px; border-radius: 4px;">$1</code>');
 
     const msgHtml = `
         <div style="display: flex; gap: 10px; align-items: flex-start; justify-content: ${isUser ? 'flex-end' : 'flex-start'};">
@@ -153,8 +154,7 @@ async function callGemini(promptText) {
     reqBodyContents.push(promptObj);
 
     const dataPayload = {
-        contents: reqBodyContents,
-        generationConfig: { temperature: 0.2, maxOutputTokens: 800 }
+        contents: reqBodyContents
     };
 
     const startTime = Date.now();
