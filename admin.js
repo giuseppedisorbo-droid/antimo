@@ -19,6 +19,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
+provider.setCustomParameters({ prompt: 'select_account' });
 let isAdminLogged = false;
 
 // DOM Auth
@@ -127,7 +128,7 @@ onAuthStateChanged(auth, (user) => {
         if (btnOpenAiSettings) btnOpenAiSettings.classList.add('hidden');
 
         if (user) {
-            alert("Accesso negato. Solo l'amministratore può modificare lo storico.");
+            alert(`Accesso negato per: ${user.email}. Solo l'Amministratore (giuseppedisorbo@gmail.com) può accedere a questa pagina. Fai di nuovo Login e scegli l'account Google corretto.`);
             signOut(auth);
         }
     }
