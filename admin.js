@@ -262,6 +262,13 @@ if (quickSearchStorico) {
 }
 
 let tuttiGliInterventi = [];
+let tuttiGliInterventiProgrammati = [];
+
+// Variabili globali per istanze dei Grafici (per distruggerli prima di ridisegnarli)
+let chartInstStato = null;
+let chartInstTecnici = null;
+let chartInstTrend = null;
+let chartInstD3 = null;
 
 // Helper
 function padZ(num) { return num.toString().padStart(2, '0'); }
@@ -323,6 +330,7 @@ async function loadNonEseguiti() {
             }
         });
 
+        tuttiGliInterventiProgrammati = data;
         renderNonEseguitiTable(data);
     } catch (e) {
         console.error("Errore fetch non eseguiti:", e);
@@ -496,14 +504,166 @@ function applyFilters() {
         // start of that day
         const ds = new Date(filterDateStart.value).setHours(0, 0, 0, 0);
         filtrati = filtrati.filter(i => i.startTime >= ds);
+        filtratiProgrammati = filtratiProgrammati.filter(i => {
+            const dt = i.dataPrevista ? new Date(i.dataPrevista).setHours(0,0,0,0) : 0;
+            return dt >= ds;
+        });
     }
     if (filterDateEnd.value) {
         // end of that day
         const de = new Date(filterDateEnd.value).setHours(23, 59, 59, 999);
         filtrati = filtrati.filter(i => i.startTime <= de);
+        filtratiProgrammati = filtratiProgrammati.filter(i => {
+            const dt = i.dataPrevista ? new Date(i.dataPrevista).setHours(23,59,59,999) : 0;
+            return dt <= de;
+        });
     }
 
     renderTable(filtrati);
+    renderNonEseguitiTable(filtratiProgrammati);
+    
+    // Se la sezione statistiche è aperta, renderizziamo i grafici
+    if (adminStatsSection && !adminStatsSection.classList.contains('hidden')) {
+        renderAdminCharts(filtrati, filtratiProgrammati);
+    }
+}
+
+// -------------------------------------------------------------
+// MOTORE RENDERING GRAFICI (CHART.JS)
+// -------------------------------------------------------------
+function renderAdminCharts(eseguiti, programmati) {
+    if (typeof Chart === 'undefined') return;
+
+    // Distrugge le vecchie istanze per evitare sovrapposizioni
+    if (chartInstStato) chartInstStato.destroy();
+    if (chartInstTecnici) chartInstTecnici.destroy();
+    if (chartInstTrend) chartInstTrend.destroy();
+    if (chartInstD3) chartInstD3.destroy();
+
+    // COLORI
+    const colors = {
+        blue: '#3b82f6', green: '#10b981', orange: '#f59e0b', red: '#ef4444',
+        purple: '#8b5cf6', teal: '#14b8a6', pink: '#ec4899'
+    };
+    const palette = Object.values(colors);
+
+    // 1. STATO INTERVENTI (Pie)
+    const ctxStato = document.getElementById('chartStatoInterventi');
+    if (ctxStato) {
+        chartInstStato = new Chart(ctxStato, {
+            type: 'doughnut',
+            data: {
+                labels: ['Completati', 'Da Chiudere (Non Eseguiti)'],
+                datasets: [{
+                    data: [eseguiti.length, programmati.length],
+                    backgroundColor: [colors.green, colors.orange],
+                    borderWidth: 0
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    // 2. INTERVENTI PER TECNICO (Bar)
+    const ctxTecnici = document.getElementById('chartInterventiTecnici');
+    if (ctxTecnici) {
+        const counts = {};
+        eseguiti.forEach(inv => {
+            const t = inv.tecnico || 'Sconosciuto';
+            counts[t] = (counts[t] || 0) + 1;
+        });
+        const labels = Object.keys(counts).sort((a,b) => counts[b] - counts[a]);
+        const data = labels.map(l => counts[l]);
+
+        chartInstTecnici = new Chart(ctxTecnici, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Interventi Eseguiti',
+                    data: data,
+                    backgroundColor: colors.blue,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+            }
+        });
+    }
+
+    // 3. TREND TEMPORALE ESEGUITI (Line)
+    const ctxTrend = document.getElementById('chartTrendTemporale');
+    if (ctxTrend) {
+        const trendMap = {};
+        eseguiti.forEach(inv => {
+            const d = new Date(inv.startTime);
+            const dateStr = formatDateDMY(d); // raggruppa giornalmente
+            trendMap[dateStr] = (trendMap[dateStr] || 0) + 1;
+        });
+        // Ordina cronologicamente le date
+        const sortedDates = Object.keys(trendMap).sort((a,b) => {
+            const [da, ma, ya] = a.split('/');
+            const [db, mb, yb] = b.split('/');
+            return new Date(ya, ma-1, da) - new Date(yb, mb-1, db);
+        });
+        const data = sortedDates.map(l => trendMap[l]);
+
+        chartInstTrend = new Chart(ctxTrend, {
+            type: 'line',
+            data: {
+                labels: sortedDates,
+                datasets: [{
+                    label: 'Interventi Eseguiti',
+                    data: data,
+                    borderColor: colors.purple,
+                    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    // 4. MEDIA VALUTAZIONE D3 PER OPERATORE (Bar)
+    const ctxD3 = document.getElementById('chartValutazioniD3');
+    if (ctxD3) {
+        const d3Map = {}; // { 'Mario': { sum: 10, count: 2 } }
+        eseguiti.forEach(inv => {
+            if (inv.operatoreValutazione && inv.esito) {
+                const punteggio = parseFloat(inv.esito.replace(',','.').replace(/[^\d.-]/g, ''));
+                if (!isNaN(punteggio)) {
+                    if (!d3Map[inv.operatoreValutazione]) d3Map[inv.operatoreValutazione] = { sum: 0, count: 0 };
+                    d3Map[inv.operatoreValutazione].sum += punteggio;
+                    d3Map[inv.operatoreValutazione].count += 1;
+                }
+            }
+        });
+        
+        const labels = Object.keys(d3Map);
+        const data = labels.map(l => (d3Map[l].sum / d3Map[l].count).toFixed(2));
+
+        chartInstD3 = new Chart(ctxD3, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Punteggio Medio',
+                    data: data,
+                    backgroundColor: colors.teal,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+    }
 }
 
 // Export
