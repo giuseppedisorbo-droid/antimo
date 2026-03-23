@@ -111,7 +111,9 @@ onAuthStateChanged(auth, (user) => {
             btnLoginAdmin.style.backgroundColor = "var(--red)";
             btnLoginAdmin.style.color = "white";
         }
-        
+        const btnOpenAiSettings = document.getElementById('btnOpenAiSettings');
+        if (btnOpenAiSettings) btnOpenAiSettings.classList.remove('hidden');
+
         // Lancia il backup automatico in background
         automaticFirebaseBackup();
     } else {
@@ -121,6 +123,9 @@ onAuthStateChanged(auth, (user) => {
             btnLoginAdmin.style.backgroundColor = "var(--blue-dark)";
             btnLoginAdmin.style.color = "white";
         }
+        const btnOpenAiSettings = document.getElementById('btnOpenAiSettings');
+        if (btnOpenAiSettings) btnOpenAiSettings.classList.add('hidden');
+
         if (user) {
             alert("Accesso negato. Solo l'amministratore può modificare lo storico.");
             signOut(auth);
@@ -141,6 +146,92 @@ if (btnLoginAdmin) {
     });
 
 }
+
+// ====== AI ADMIN LOGIC ======
+const btnOpenAiSettings = document.getElementById('btnOpenAiSettings');
+const aiAdminModal = document.getElementById('aiAdminModal');
+const btnCloseAiAdmin = document.getElementById('btnCloseAiAdmin');
+const adminAiKeyInput = document.getElementById('adminAiKeyInput');
+const btnSaveAiKey = document.getElementById('btnSaveAiKey');
+const btnTestAiKey = document.getElementById('btnTestAiKey');
+const btnRefreshAiLogs = document.getElementById('btnRefreshAiLogs');
+const aiLogsTableBody = document.getElementById('aiLogsTableBody');
+const aiLogsSummary = document.getElementById('aiLogsSummary');
+
+if(btnOpenAiSettings) {
+    btnOpenAiSettings.addEventListener('click', async () => {
+        aiAdminModal.classList.remove('hidden');
+        
+        // Carica la chiave API da Firestore e disabilita modale se non trovata al volo (dovrebbe esistere)
+        try {
+            const snap = await getDoc(doc(db, "configurazioni", "ai_settings"));
+            if (snap.exists() && snap.data().gemini_api_key) {
+                adminAiKeyInput.value = snap.data().gemini_api_key;
+            } else {
+                adminAiKeyInput.value = "";
+            }
+        } catch (err) { console.error("Errore fetch chiave AI", err); }
+
+        loadAiLogs();
+    });
+}
+if(btnCloseAiAdmin) btnCloseAiAdmin.addEventListener('click', () => aiAdminModal.classList.add('hidden'));
+
+if(btnSaveAiKey) {
+    btnSaveAiKey.addEventListener('click', async () => {
+        if (!adminAiKeyInput.value.trim()) { alert("Inserire una chiave valida."); return; }
+        try {
+            await setDoc(doc(db, "configurazioni", "ai_settings"), {
+                gemini_api_key: adminAiKeyInput.value.trim(),
+                updatedAt: new Date().toISOString()
+            });
+            alert("Chiave API Google Gemini salvata su Firestore e ora disponibile per tutti i tecnici!");
+        } catch (error) { alert("Errore di salvataggio: " + error.message); }
+    });
+}
+
+async function loadAiLogs() {
+    aiLogsTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px;">Caricamento in corso...</td></tr>`;
+    try {
+        const snap = await getDocs(collection(db, "ai_logs"));
+        let logs = [];
+        let totalCost = 0;
+        snap.forEach(d => { 
+            let data = d.data();
+            logs.push(data); 
+            if(data.cost) totalCost += Number(data.cost);
+        });
+        
+        // Ordina dal più recente
+        logs.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
+        aiLogsSummary.innerText = `Costo Totale Stimato: $${totalCost.toFixed(5)}`;
+        aiLogsTableBody.innerHTML = '';
+
+        if(logs.length === 0) {
+            aiLogsTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px;">Nessun log AI presente.</td></tr>`;
+            return;
+        }
+
+        logs.forEach(lg => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${new Date(lg.timestamp).toLocaleString()}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold; color: var(--blue-dark);">${lg.user || "Sconosciuto"}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${(lg.prompt || '').replace(/"/g, '&quot;')}">${lg.prompt || '-'}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${lg.tokens || '0'}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${(lg.durationMs ? (lg.durationMs / 1000).toFixed(2) : '0')}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #b45309;">$${lg.cost ? Number(lg.cost).toFixed(5) : '0.00000'}</td>
+            `;
+            aiLogsTableBody.appendChild(tr);
+        });
+    } catch(err) {
+        console.error("Errore ricaricamento log", err);
+        aiLogsTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: red;">Errore caricamento logs</td></tr>`;
+    }
+}
+if(btnRefreshAiLogs) btnRefreshAiLogs.addEventListener('click', loadAiLogs);
+// ==========================
 
 // DOM Elements
 const tableBody = document.getElementById('tableBody');
@@ -181,6 +272,17 @@ function formatTime(ms) {
 }
 
 async function loadData() {
+    try {
+        // Fetch Operatori Sanitari
+        window.operatoriSanitari = [];
+        const qOps = query(collection(db, "anagrafiche"), where("qualifica", "==", "Operatore sanitario"));
+        const opsSnap = await getDocs(qOps);
+        opsSnap.forEach(d => {
+            const data = d.data();
+            window.operatoriSanitari.push({id: d.id, nome: (data.nome + " " + (data.cognome||"")).trim()});
+        });
+    } catch(e) { console.error("Errore fetch operatori", e); }
+
     try {
         const querySnapshot = await getDocs(collection(db, "interventi"));
         const rawData = [];
@@ -262,6 +364,14 @@ function renderTable(dataArray) {
             `;
         }
 
+        const badgeVal = (inv.operatoreValutazione || inv.esito || inv.statoValutazione) 
+            ? `<div style="margin-top: 4px; display:inline-block; padding: 2px 6px; background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; border-radius: 4px; font-size: 0.75rem;">
+                <strong>Valutazione:</strong> 
+                ${inv.operatoreValutazione ? `Op: ${inv.operatoreValutazione}` : ''} 
+                ${inv.esito ? `| Esito: ${inv.esito}` : ''}
+                ${inv.statoValutazione ? `| Stato: ${inv.statoValutazione}` : ''}
+               </div>` : '';
+
         tr.innerHTML = `
             <td style="text-align: center;"><input type="checkbox" class="int-checkbox" value="${inv.fbId}" style="transform: scale(1.3); cursor: pointer;"></td>
             <td><strong>${dataStr}</strong></td>
@@ -270,7 +380,7 @@ function renderTable(dataArray) {
             <td>${inv.localita || inv.destinazione || "N/D"}</td>
             <td>${inv.indirizzo || ""} <br><small style="color:gray;">${inv.telefono || ""}</small></td>
             <td><span class="badge badge-success">${window.decodeCodeToLabel(inv.tipo, 'interventi')}</span><br><small style="color:gray;">${inv.note || ''}</small></td>
-            <td>${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi')}<br><small style="color:gray;">${inv.matricola ? 'SN: ' + inv.matricola : ''}</small></td>
+            <td>${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi')}<br><small style="color:gray;">${inv.matricola ? 'SN: ' + inv.matricola : ''}</small><br>${badgeVal}</td>
             <td>${inv.kmPercorsi ? inv.kmPercorsi + ' km' : '-'}</td>
             <td>${fileHtml} ${adminActions}</td>
         `;
@@ -311,13 +421,21 @@ function renderNonEseguitiTable(dataArray) {
 
         let dateStr = inv.dataPrevista ? inv.dataPrevista.split('-').reverse().join('/') : 'N/D';
 
+        const badgeVal = (inv.operatoreValutazione || inv.esito || inv.statoValutazione) 
+            ? `<div style="margin-top: 4px; display:inline-block; padding: 2px 6px; background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; border-radius: 4px; font-size: 0.75rem;">
+                <strong>Valutazione:</strong> 
+                ${inv.operatoreValutazione ? `Op: ${inv.operatoreValutazione}` : ''} 
+                ${inv.esito ? `| Esito: ${inv.esito}` : ''}
+                ${inv.statoValutazione ? `| Stato: ${inv.statoValutazione}` : ''}
+               </div>` : '';
+
         tr.innerHTML = `
             <td style="text-align: center;"><input type="checkbox" class="prog-checkbox" value="${inv.fbId}" style="transform: scale(1.3); cursor: pointer;"></td>
             <td><strong>${dateStr}</strong></td>
             <td style="font-weight: 600;">${inv.paziente}</td>
             <td>${inv.localita || inv.destinazione || "N/D"}</td>
             <td>${inv.indirizzo || ""} <br><small style="color:gray;">${inv.telefono || ""}</small></td>
-            <td><span class="badge badge-warning">${window.decodeCodeToLabel(inv.tipo, 'interventi')}</span><br><small style="color:gray;">${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi')} ${inv.matricola ? `(SN: ${inv.matricola})` : ''}</small></td>
+            <td><span class="badge badge-warning">${window.decodeCodeToLabel(inv.tipo, 'interventi')}</span><br><small style="color:gray;">${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi')} ${inv.matricola ? `(SN: ${inv.matricola})` : ''}</small><br>${badgeVal}</td>
             <td style="color:#b45309; font-weight:600; font-style: italic;">"${inv.motivazione || 'Nessuna'}"</td>
             <td>
                 <button class="btn btn-primary btn-sm btn-chiudi" data-fbid="${inv.fbId}" style="background-color: var(--blue-dark); color: white; width: 100%; margin-bottom: 5px;">Archivia (Chiudi)</button>
@@ -451,6 +569,14 @@ function openEditModal(inv, isProgrammato) {
     document.getElementById('editDispositivi').value = inv.dispositivi || "";
     document.getElementById('editKm').value = inv.kmPercorsi || "0";
     document.getElementById('editNote').value = inv.note || "";
+    
+    let opSel = document.getElementById('editOperatoreValutazione');
+    if(opSel) {
+        opSel.innerHTML = '<option value="">Nessuno</option>' + (window.operatoriSanitari || []).map(o => `<option value="${o.nome}">${o.nome}</option>`).join('');
+        opSel.value = inv.operatoreValutazione || "";
+    }
+    document.getElementById('editEsito').value = inv.esito || "";
+    document.getElementById('editStatoValutazione').value = inv.statoValutazione || "";
 
     if (isProgrammato) document.getElementById('containerKm').style.display = 'none';
     else document.getElementById('containerKm').style.display = 'block';
@@ -476,6 +602,9 @@ if (btnSaveEdit) btnSaveEdit.addEventListener('click', async () => {
             tipo: document.getElementById('editTipo').value,
             dispositivi: document.getElementById('editDispositivi').value,
             kmPercorsi: document.getElementById('editKm').value,
+            operatoreValutazione: document.getElementById('editOperatoreValutazione').value,
+            esito: document.getElementById('editEsito').value,
+            statoValutazione: document.getElementById('editStatoValutazione').value,
             note: document.getElementById('editNote').value
         });
         editInterventionModal.classList.add('hidden');
