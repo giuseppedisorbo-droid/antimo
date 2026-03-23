@@ -88,7 +88,10 @@ async function loadDropdownLists() {
     }
 }
 // Chiamiamo il caricamento
-loadDropdownLists();
+loadDropdownLists().then(() => {
+    initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
+    initDynamicBlocks('dynamicProgInterventionsContainer', 'btnAddProgInterventionBlock');
+});
 
 // Stato App
 let completedInterventions = JSON.parse(localStorage.getItem('antimo_interventions')) || [];
@@ -415,12 +418,6 @@ function initDynamicBlocks(containerId, addBtnId) {
     
     return { addBlock, container }; // Export hook se necessario altrove
 }
-
-// Inizializza i due form principali
-setTimeout(() => {
-    initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
-    initDynamicBlocks('dynamicProgInterventionsContainer', 'btnAddProgInterventionBlock');
-}, 100);
 
 // Helper per leggere i dati al submit
 function extractDynamicBlocksData(containerId) {
@@ -3448,6 +3445,8 @@ if(btnSaveFirebaseLists) {
             localStorage.setItem('antimo_dropdown_lists', JSON.stringify(window.antimoDropdownLists));
             alert("Liste aggiornate con successo su Cloud!");
             listsSetupModal.classList.add('hidden');
+            initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
+            initDynamicBlocks('dynamicProgInterventionsContainer', 'btnAddProgInterventionBlock');
         } catch(e) {
             console.error("Errore salvataggio liste", e);
             alert("Errore durante il salvataggio.");
