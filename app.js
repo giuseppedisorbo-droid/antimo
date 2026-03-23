@@ -334,11 +334,11 @@ if(btnCloseInterventionSection) {
 
 // --- LOGICA BLOCCHI DINAMICI ---
 function createInterventionBlockHTML() {
-    const types = ['Visita', 'Sostituzione', 'Ritiro', 'Consegna', 'Manutenzione', 'Installazione', 'Riparazione'];
-    const devices = ['Concentratore', 'Ventilatore', 'Aspiratore', 'D3', 'Stativo', 'Cpap', 'AutoCpap', 'Saturimetro'];
+    const types = window.antimoDropdownLists && window.antimoDropdownLists.interventi ? window.antimoDropdownLists.interventi : [];
+    const devices = window.antimoDropdownLists && window.antimoDropdownLists.dispositivi ? window.antimoDropdownLists.dispositivi : [];
     
-    let typeOptions = types.map(t => `<option value="${t}">${t}</option>`).join('');
-    let devOptions = devices.map(d => `<option value="${d}">${d}</option>`).join('');
+    let typeOptions = types.map(t => `<option value="${t.id}">${t.desc}</option>`).join('');
+    let devOptions = devices.map(d => `<option value="${d.id}">${d.desc}</option>`).join('');
     
     return `
         <div class="dynamic-intervention-block" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 15px; background: #f8fafc; position: relative;">
@@ -922,6 +922,54 @@ if (msgAttachmentsInput) {
             });
         } else {
             msgPreviewContainer.classList.add('hidden');
+        }
+    });
+}
+
+const btnWhatsappNuovoIntervento = document.getElementById('btnWhatsappNuovoIntervento');
+if (btnWhatsappNuovoIntervento) {
+    btnWhatsappNuovoIntervento.addEventListener('click', () => {
+        let paz = document.getElementById('paziente') ? document.getElementById('paziente').value : "";
+        let loc = document.getElementById('localita') ? document.getElementById('localita').value : "";
+        let ind = document.getElementById('indirizzo') ? document.getElementById('indirizzo').value : "";
+        
+        let extraInfo = "";
+        if (paz || loc || ind) {
+            extraInfo = `\nPaziente: ${paz}\nLuogo: ${loc} - ${ind}`;
+        }
+        
+        pendingMessageText = "NUOVO INTERVENTO" + extraInfo;
+        pendingMessageIsNotification = false;
+        if(waSelectModal) waSelectModal.classList.remove('hidden');
+    });
+}
+
+if (msgText) {
+    msgText.addEventListener('paste', (e) => {
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.kind === 'file' && item.type.startsWith('image/')) {
+                const file = item.getAsFile();
+                if (!file) continue;
+                
+                const fileName = `PastedImage_${Date.now()}.png`;
+
+                if (msgPreviewContainer) msgPreviewContainer.classList.remove('hidden');
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const dataUrl = ev.target.result;
+                    pendingMessageFiles.push({ name: fileName, type: file.type, data: dataUrl });
+
+                    if (msgPreviewContainer) {
+                        const div = document.createElement('div');
+                        div.style.cssText = 'position: relative; width: 60px; height: 60px; border: 1px solid #ccc; border-radius: 4px; overflow: hidden; margin-top: 5px;';
+                        div.innerHTML = `<img src="${dataUrl}" style="width:100%; height:100%; object-fit:cover;">`;
+                        msgPreviewContainer.appendChild(div);
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
         }
     });
 }
