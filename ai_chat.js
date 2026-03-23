@@ -147,13 +147,27 @@ async function callGemini(promptText) {
 
     const startTime = Date.now();
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`, {
+        const fetchOptions = {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(dataPayload)
-        });
+        };
+
+        let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, fetchOptions);
+        let data = await response.json();
+
+        if (data.error && data.error.message && data.error.message.includes("is not found")) {
+            console.warn("gemini-1.5-flash not found. Fallback to gemini-1.5-pro...");
+            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiApiKey}`, fetchOptions);
+            data = await response.json();
+            
+            if (data.error && data.error.message && data.error.message.includes("is not found")) {
+                console.warn("gemini-1.5-pro not found. Fallback to gemini-pro...");
+                response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`, fetchOptions);
+                data = await response.json();
+            }
+        }
         
-        const data = await response.json();
         const duration = Date.now() - startTime;
         
         if (data.error) throw new Error(data.error.message);
