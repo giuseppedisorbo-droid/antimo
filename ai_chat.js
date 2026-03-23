@@ -45,7 +45,12 @@ MOLTO IMPORTANTE: Formatta SEMPRE la tua risposta in modo **altamente strutturat
 - Usa gli **elenchi numerati** (1., 2., 3.) per spiegare le procedure passo-passo.
 - Usa il **grassetto** per indicare il nome esatto dei pulsanti, dei menu o dei campi da cliccare/compilare (es. clicca su **Nuovo Intervento**).
 - Evita lunghi muri di testo. Vai dritto al punto con elenchi puntati.
-- Non inventare funzionalità che non esistono nella lista precedente.`;
+- Non inventare funzionalità che non esistono nella lista precedente.
+- GESTIONE NUOVE FUNZIONALITÀ (PRODUCT MANAGER): Se l'utente chiede una funzione che attualmente non esiste in Antimo, comportati da Product Manager. Informalo che la funzione non è presente e offriti di preparare un documento di "Richiesta Sviluppo" per Giuseppe (lo sviluppatore). Fai da 1 a 5 domande mirate all'utente per capire i requisiti di business, l'aspetto visivo e la logica desiderata.
+- CREAZIONE DEL PROMPT DI SVILUPPO: Quando l'utente ha risposto alle tue domande e hai un'idea chiara della feature, scrivi un Prompt ingegneristico destinato all'Assistente AI Sviluppatore ("Google Antigravity"). Devi scrivere il prompt ESATTAMENTE in mezzo a questi due tag speciali: 
+[AUTO_PROMPT]
+(Scrivi qui il prompt per lo sviluppatore spiegando chiaramente i requisiti)
+[/AUTO_PROMPT]`;
 
 // 1. Fetch Key All'Avvio Modal
 async function initAiAssistant() {
@@ -196,9 +201,33 @@ async function callGemini(promptText) {
         
         if (data.error) throw new Error(data.error.message);
 
-        const reply = data.candidates[0].content.parts[0].text;
+        let reply = data.candidates[0].content.parts[0].text;
         chatHistory.push(promptObj);
         chatHistory.push({ role: "model", parts: [{ text: reply }] });
+
+        // Intercettazione AUTO_PROMPT
+        const autoPromptMatch = reply.match(/\[AUTO_PROMPT\]([\s\S]*?)\[\/AUTO_PROMPT\]/);
+        if (autoPromptMatch) {
+            const extractedPrompt = autoPromptMatch[1].trim();
+            // Rimuove la parte tecnica dalla risposta mostrata all'utente
+            reply = reply.replace(/\[AUTO_PROMPT\][\s\S]*?\[\/AUTO_PROMPT\]/, "\n\n✅ **Richiesta Sviluppata con Successo!** Ho generato il progetto tecnico e l'ho appena postato sulla Bacheca Notifiche di Giuseppe.");
+            
+            // Invia silenziosamente in Bacheca Firestore
+            try {
+                const userName = localStorage.getItem('antimo_filter_tecnico') || "Anonimo";
+                await addDoc(collection(db, "messaggi"), {
+                    text: `🤖 **[AI FEATURE REQUEST da ${userName}]**\n\nAttenzione Giuseppe, l'utente ha richiesto di sviluppare con Antigravity la seguente implementazione:\n\n${extractedPrompt}`,
+                    user: "Antimo Assistant",
+                    timestamp: serverTimestamp(),
+                    isNotification: true,
+                    letto: false,
+                    eliminato: false,
+                    presoInCarico: false
+                });
+            } catch(e) {
+                console.error("Errore salvataggio ticket AI:", e);
+            }
+        }
 
         appendMessage('assistant', reply);
 
