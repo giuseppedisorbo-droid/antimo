@@ -19,7 +19,7 @@
                 <button id="btnTogglePC" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; cursor: pointer; font-weight: bold; font-size: 0.8rem;">PC</button>
                 <a href="admin.html" id="btnOpenDashboard" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; cursor: pointer; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: flex; align-items: center;">💻 Dashboard</a>
             </div>
-            <div style="font-size: 0.75rem; color: rgba(255,255,255,0.9); margin-top: 8px; cursor: pointer; font-weight: 600;" id="appVersionStamp" onclick="nukeCache()">v26.0 - Mass Delete & AutoSync v54</div>
+            <div style="font-size: 0.75rem; color: rgba(255,255,255,0.9); margin-top: 8px; cursor: pointer; font-weight: 600;" id="appVersionStamp" onclick="nukeCache()">v26.0 - Mass Delete & AutoSync v55</div>
             <div id="loggedInUserDisplay" style="font-size: 0.8rem; color: #fcd34d; font-weight: bold; margin-top: 4px;"></div>
             <button id="btnTopNotification" class="hidden" style="margin-top: 5px; background: #e11d48; color: white; border-radius: 6px; padding: 4px 8px; border: 1px solid rgba(255,255,255,0.5); cursor: pointer; font-weight: 600; font-size: 0.75rem; display: flex; align-items: center; max-width: 250px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
                 🔔 <span id="topNotificationText" style="margin-left: 5px; overflow:hidden; text-overflow:ellipsis; white-space: nowrap;"></span>
@@ -684,15 +684,26 @@
         <div id="aiChatModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; display: flex; align-items: flex-start; justify-content: center; overflow-y: hidden;">
             <div style="background: #f8fafc; border-radius: 12px; width: 95%; max-width: 600px; height: 90vh; margin: 20px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.3); display: flex; flex-direction: column; overflow: hidden;">
                 <!-- Header Chat -->
-                <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; color: white;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <div style="font-size: 1.5rem;">🤖</div>
-                        <div>
-                            <h3 style="margin: 0; font-size: 1.1rem; color: white;">Antimo Assistant</h3>
-                            <p style="margin: 0; font-size: 0.75rem; color: #e0e7ff;">Powered by Google Gemini</p>
+                <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 12px 20px; display: flex; flex-direction: column; gap: 8px; color: white;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="font-size: 1.5rem;">🤖</div>
+                            <div>
+                                <h3 style="margin: 0; font-size: 1.1rem; color: white;">Antimo Assistant</h3>
+                                <p style="margin: 0; font-size: 0.75rem; color: #e0e7ff;">Powered by Google Gemini</p>
+                            </div>
                         </div>
+                        <button id="btnCloseAiChat" style="background: none; border: none; color: white; font-size: 1.8rem; cursor: pointer; line-height: 1;">&times;</button>
                     </div>
-                    <button id="btnCloseAiChat" style="background: none; border: none; color: white; font-size: 1.8rem; cursor: pointer; line-height: 1;">&times;</button>
+                    <!-- Stile Risposta -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: #e0e7ff;">
+                        <span>Densità Risposta:</span>
+                        <select id="aiResponseStyle" style="padding: 2px 4px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.4); background: rgba(0,0,0,0.1); color: white; cursor: pointer; font-size: 0.8rem; outline: none;">
+                            <option value="standard" style="color: black;" selected>Normale</option>
+                            <option value="breve" style="color: black;">Breve (Riassuntiva)</option>
+                            <option value="lunga" style="color: black;">Dettagliata (Analitica)</option>
+                        </select>
+                    </div>
                 </div>
                 
                 <!-- Area Messaggi -->
@@ -716,9 +727,9 @@
         </div>
 
     </main>
-    <script type="module" src="app.js?v=54"></script>
-    <script type="module" src="ai_chat.js?v=8"></script>
-    <script type="module" src="global_notifications.js?v=54"></script>
+    <script type="module" src="app.js?v=55"></script>
+    <script type="module" src="ai_chat.js?v=9"></script>
+    <script type="module" src="global_notifications.js?v=55"></script>
     <script>
       // Gestione layout PC
       document.addEventListener('DOMContentLoaded', () => {

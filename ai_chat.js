@@ -88,14 +88,14 @@ function appendMessage(role, text) {
     const shadow = isUser ? '0 2px 4px rgba(99, 102, 241, 0.3)' : '0 1px 2px rgba(0,0,0,0.05)';
 
     // Parse simple markdown
-    const formattedText = text.replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>')
-                              .replace(/\\n/g, '<br/>')
-                              .replace(/`(.*?)`/g, '<code style="background: rgba(0,0,0,0.1); padding: 2px 4px; border-radius: 4px;">$1</code>');
+    let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                            .replace(/`(.*?)`/g, '<code style="background: rgba(0,0,0,0.1); padding: 2px 4px; border-radius: 4px;">$1</code>');
 
     const msgHtml = `
         <div style="display: flex; gap: 10px; align-items: flex-start; justify-content: ${isUser ? 'flex-end' : 'flex-start'};">
             ${isUser ? '' : '<div style="font-size: 1.5rem; margin-top: -5px;">🤖</div>'}
-            <div style="background: ${bg}; color: ${color}; border: ${border}; padding: 12px 15px; border-radius: ${borderRadius}; max-width: 85%; font-size: 0.9rem; line-height: 1.4; box-shadow: ${shadow};">
+            <div style="background: ${bg}; color: ${color}; border: ${border}; padding: 12px 15px; border-radius: ${borderRadius}; max-width: 85%; font-size: 0.9rem; line-height: 1.4; box-shadow: ${shadow}; white-space: pre-wrap;">
                 ${formattedText}
             </div>
         </div>
@@ -125,15 +125,22 @@ function showLoader() {
 // 4. Gemini Call
 async function callGemini(promptText) {
     if (!geminiApiKey) {
-        appendMessage('assistant', "L'Amministratore non ha ancora configurato la Chiave API di Gemini. Accedi al pannello Admin -> Impostazioni AI per salvarla.");
+        appendMessage('assistant', "L'Amministratore non ha ancora configurato la Chiave API di Gemini. Accedi al pannello Admin -> Configurazione AI per salvarla.");
         return;
     }
 
-    appendMessage('user', promptText);
-    showLoader();
+    const aiResponseStyleElement = document.getElementById('aiResponseStyle');
+    let dynamicPrompt = promptText;
+    if (aiResponseStyleElement) {
+        if (aiResponseStyleElement.value === 'breve') {
+            dynamicPrompt += "\n\n(Istruzione Speciale dell'Utente: COMPORTATI COME UN RIASSUNTO. Dai una risposta ESTREMAMENTE BREVE, SINTETICA ED ESSENZIALE, MASSIMO 2 FRASI.)";
+        } else if (aiResponseStyleElement.value === 'lunga') {
+            dynamicPrompt += "\n\n(Istruzione Speciale dell'Utente: COMPORTATI COME UN'ANALISI COMPLETA. Dai una risposta ESTREMAMENTE DETTAGLIATA, ANALITICA ED ESAUSTIVA in ogni minimo aspetto.)";
+        }
+    }
 
     // Prepare message structure matching Gemini v1beta
-    const promptObj = { role: "user", parts: [{ text: promptText }] };
+    const promptObj = { role: "user", parts: [{ text: dynamicPrompt }] };
     let reqBodyContents = [];
 
     // Always inject System Context first manually as a user prompt (since Flash sometimes balks at systemInstruction depending on version)
