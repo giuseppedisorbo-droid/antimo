@@ -40,7 +40,12 @@ CARATTERISTICHE DELL'APP:
 7. Funzionamento Offline: L'app salva tutto su 'localStorage' e prova la sincronizzazione se c'è internet.
 8. Versioni: L'app legge la sua versione corrente e mostra vecchi changelog per comodità dal riepilogo versioni.
 
-Rispondi sempre in INGLESE o ITALIANO in base a come ti scrive l'utente (preferibilmente in ITALIANO), sii molto conciso, cortese e tecnico. Se fa domande generiche sull'app, spiega cosa può fare. Se chiede come fare qualcosa (es. "Come valuto il D3?"), spiegagli di cliccare su Nuovo Intervento e compilare i campi "Esito" e la tendina "Operatore Sanitario". Formatta la risposta con Markdown.`;
+Rispondi sempre in ITALIANO (a meno che non ti scrivano diversamente), sii conciso, cortese e tecnico.
+MOLTO IMPORTANTE: Formatta SEMPRE la tua risposta in modo **altamente strutturato**, seguendo queste regole:
+- Usa gli **elenchi numerati** (1., 2., 3.) per spiegare le procedure passo-passo.
+- Usa il **grassetto** per indicare il nome esatto dei pulsanti, dei menu o dei campi da cliccare/compilare (es. clicca su **Nuovo Intervento**).
+- Evita lunghi muri di testo. Vai dritto al punto con elenchi puntati.
+- Non inventare funzionalità che non esistono nella lista precedente.`;
 
 // 1. Fetch Key All'Avvio Modal
 async function initAiAssistant() {
