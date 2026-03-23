@@ -941,35 +941,59 @@ if (btnWhatsappNuovoIntervento) {
     });
 }
 
-if (msgText) {
-    msgText.addEventListener('paste', (e) => {
-        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-        for (let i = 0; i < items.length; i++) {
-            const item = items[i];
-            if (item.kind === 'file' && item.type.startsWith('image/')) {
-                const file = item.getAsFile();
-                if (!file) continue;
-                
-                const fileName = `PastedImage_${Date.now()}.png`;
+// GLOBAL PASTE LISTENER PRO (Bacheca & Allegati Intervento)
+document.addEventListener('paste', (e) => {
+    const target = e.target;
+    // Identifichiamo dove l'utente sta incollando
+    const isBacheca = target.id === 'msgText';
+    // Qualunque casella di testo durante l'inserimento/modifica intervento vale per gli allegati
+    const isInterventionNote = target.closest('#interventionSection') && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT');
 
-                if (msgPreviewContainer) msgPreviewContainer.classList.remove('hidden');
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    const dataUrl = ev.target.result;
+    if (!isBacheca && !isInterventionNote) return;
+
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+            const file = item.getAsFile();
+            if (!file) continue;
+
+            const fileName = `PastedImage_${Date.now()}.png`;
+            const reader = new FileReader();
+
+            reader.onload = (ev) => {
+                const dataUrl = ev.target.result;
+
+                if (isBacheca) {
+                    if (msgPreviewContainer) msgPreviewContainer.classList.remove('hidden');
                     pendingMessageFiles.push({ name: fileName, type: file.type, data: dataUrl });
 
                     if (msgPreviewContainer) {
                         const div = document.createElement('div');
-                        div.style.cssText = 'position: relative; width: 60px; height: 60px; border: 1px solid #ccc; border-radius: 4px; overflow: hidden; margin-top: 5px;';
+                        div.style.cssText = 'position: relative; width: 60px; height: 60px; border: 1px solid #ccc; border-radius: 4px; overflow: hidden; margin-top: 5px; margin-right: 5px; display: inline-block;';
                         div.innerHTML = `<img src="${dataUrl}" style="width:100%; height:100%; object-fit:cover;">`;
                         msgPreviewContainer.appendChild(div);
                     }
-                };
-                reader.readAsDataURL(file);
-            }
+                } else if (isInterventionNote) {
+                    // Lo inseriamo negli allegati dell'Intervento (Eseguito / Programmato)
+                    const filePreviewCont = document.getElementById('filePreviewContainer');
+                    if (filePreviewCont) filePreviewCont.classList.remove('hidden');
+                    
+                    currentAttachments.push({
+                        data: dataUrl,
+                        type: file.type,
+                        name: fileName
+                    });
+                    
+                    if (typeof renderAttachmentsPreview === 'function') {
+                        renderAttachmentsPreview();
+                    }
+                }
+            };
+            reader.readAsDataURL(file);
         }
-    });
-}
+    }
+});
 
 const waSelectModal = document.getElementById('waSelectModal');
 const waContactsList = document.getElementById('waContactsList');
@@ -1652,12 +1676,7 @@ async function updateInterventiCount() {
 }
 
 if(filterTecnicoOggi) {
-    const defaultName = localStorage.getItem('antimo_user_name') || "";
-    if (defaultName.toLowerCase().includes("giuseppe")) {
-        filterTecnicoOggi.value = "TUTTI";
-    }
-
-    // Aggiungiamo i nomi di tutti i dipendenti al dropdown
+    // 1. Aggiungiamo i nomi di tutti i dipendenti al dropdown
     if (window.anagrafiche && window.anagrafiche.length > 0) {
         const dipendenti = window.anagrafiche.filter(d => d.qualifica === "Dipendente").map(d => d.ragioneSociale).sort();
         dipendenti.forEach(nome => {
@@ -1669,7 +1688,20 @@ if(filterTecnicoOggi) {
         });
     }
 
-    filterTecnicoOggi.addEventListener('change', () => {
+    // 2. Imposta il valore
+    const savedFilter = localStorage.getItem('antimo_filterTecnicoOggi');
+    if (savedFilter) {
+        filterTecnicoOggi.value = savedFilter;
+    } else {
+        const defaultName = localStorage.getItem('antimo_user_name') || "";
+        if (defaultName.toLowerCase().includes("giuseppe")) {
+            filterTecnicoOggi.value = "TUTTI";
+        }
+    }
+
+    // 3. Listener
+    filterTecnicoOggi.addEventListener('change', (e) => {
+        localStorage.setItem('antimo_filterTecnicoOggi', e.target.value);
         updateInterventiCount();
         if(!activitiesListContainer.classList.contains('hidden')) {
             renderActivitiesList();
