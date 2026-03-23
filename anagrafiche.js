@@ -26,6 +26,7 @@ const searchAnagrafiche = document.getElementById('searchAnagrafiche');
 const iNome = document.getElementById('nome');
 const iCognome = document.getElementById('cognome');
 const iCodiceFiscale = document.getElementById('codiceFiscale');
+const iQualifica = document.getElementById('qualifica');
 const iLocalita = document.getElementById('localita');
 const iProvincia = document.getElementById('provincia');
 const iIndirizzo = document.getElementById('indirizzo');
@@ -143,11 +144,13 @@ function renderTable(dataToRender) {
         }
 
         const nomeCognome = `${a.nome || ''} ${a.cognome || ''}`.trim();
+        const qual = a.qualifica ? `<span style="background:var(--blue-light); color:var(--blue-dark); padding:2px 6px; border-radius:4px; font-size:0.75rem; font-weight:bold;">${a.qualifica}</span>` : '-';
         const locInd = `${a.localita || ''} ${a.provincia ? `(${a.provincia})` : ''} <br><small>${a.indirizzo || ''}</small>`;
         const rec = `${a.telefono1 || ''} <br><small>${a.telefono2 || ''}</small>`;
 
         tr.innerHTML = `
             <td><strong>${nomeCognome}</strong></td>
+            <td>${qual}</td>
             <td>${locInd}</td>
             <td>${rec}</td>
             <td><span style="text-transform:uppercase;">${a.codiceFiscale || '-'}</span></td>
@@ -223,6 +226,7 @@ anagraficheForm.addEventListener('submit', async (e) => {
             timestamp: serverTimestamp(),
             nome: iNome.value.trim(),
             cognome: iCognome.value.trim(),
+            qualifica: iQualifica.value,
             codiceFiscale: iCodiceFiscale.value.trim().toUpperCase(),
             localita: iLocalita.value.trim(),
             provincia: iProvincia.value.trim().toUpperCase(),

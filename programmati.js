@@ -60,6 +60,17 @@ async function loadDropdownLists() {
                 await setDoc(docRef, window.antimoDropdownLists);
                 localStorage.setItem('antimo_dropdown_lists', JSON.stringify(window.antimoDropdownLists));
             }
+            
+            // Fetch Operatori Sanitari
+            window.operatoriSanitari = [];
+            const { getDocs, query, collection, where } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            const qOps = query(collection(db, "anagrafiche"), where("qualifica", "==", "Operatore sanitario"));
+            const opsSnap = await getDocs(qOps);
+            opsSnap.forEach(d => {
+                const data = d.data();
+                window.operatoriSanitari.push({id: d.id, nome: (data.nome + " " + (data.cognome||"")).trim()});
+            });
+            
         } catch(e) {
             console.error("Errore fetch liste dropdown in programmati, uso cache", e);
             let cached = localStorage.getItem('antimo_dropdown_lists');
@@ -182,12 +193,20 @@ function renderTable() {
         const dateStr = p.dataPrevista ? p.dataPrevista.split('-').reverse().join('/') : 'N/D';
         const notes = p.dispositivi || p.note || '';
 
+        const badgeVal = (p.operatoreValutazione || p.esito || p.statoValutazione) 
+            ? `<div style="margin-top: 4px; display:inline-block; padding: 2px 6px; background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; border-radius: 4px; font-size: 0.75rem;">
+                <strong>Valutazione:</strong> 
+                ${p.operatoreValutazione ? `Op: ${p.operatoreValutazione}` : ''} 
+                ${p.esito ? `| Esito: ${p.esito}` : ''}
+                ${p.statoValutazione ? `| Stato: ${p.statoValutazione}` : ''}
+               </div>` : '';
+
         tr.innerHTML = `
             <td style="font-weight: 600; color: var(--blue-primary);">${dateStr}</td>
             <td style="font-weight: bold;">${p.paziente}</td>
             <td>${p.localita || p.destinazione || 'N/D'}</td>
             <td>${p.indirizzo || ''} <br><small style="color:gray;">${p.telefono || ''}</small></td>
-            <td><span class="status-badge" style="background-color: #f1f5f9; color: var(--text-main); font-size: 0.8rem; padding: 4px 8px;">${window.decodeCodeToLabel(p.tipo, 'interventi') || 'Non spec.'}</span></td>
+            <td><span class="status-badge" style="background-color: #f1f5f9; color: var(--text-main); font-size: 0.8rem; padding: 4px 8px;">${window.decodeCodeToLabel(p.tipo, 'interventi') || 'Non spec.'}</span><br>${badgeVal}</td>
             <td style="font-size: 0.85rem; color: #555;">${window.decodeCodeToLabel(p.dispositivi, 'dispositivi')} <br /> ${p.note || ''}</td>
             <td>
                 <button class="btn btn-primary btn-sm" onclick="editProgrammato('${p.idFb}')" style="padding: 4px 8px; font-size: 0.8rem; text-transform: none; margin-bottom: 4px; width:100%; border-radius: 6px;">Modifica</button>
@@ -260,6 +279,8 @@ function renderCalendar() {
 function createInterventionBlockHTML() {
     let typeOptions = window.antimoDropdownLists.interventi.map(t => `<option value="${t.id}">${t.desc}</option>`).join('');
     let devOptions = window.antimoDropdownLists.dispositivi.map(d => `<option value="${d.id}">${d.desc}</option>`).join('');
+    let operatori = window.operatoriSanitari || [];
+    let opOptions = operatori.map(o => `<option value="${o.nome}">${o.nome}</option>`).join('');
     
     return `
         <div class="dynamic-intervention-block" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 15px; background: #f8fafc; position: relative;">
@@ -282,9 +303,30 @@ function createInterventionBlockHTML() {
                     </select>
                 </div>
             </div>
-            <div class="form-group" style="margin-bottom: 0;">
+            <div class="form-group" style="margin-bottom: 10px;">
                 <label style="font-size: 0.8rem; color: #475569;">Matricola / Note Extra</label>
                 <input type="text" class="block-mat" placeholder="Es. SN123456" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: white;">
+            </div>
+            <div style="border-top: 1px dashed #cbd5e1; padding-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 0;">
+                    <label style="font-size: 0.75rem; color: #0284c7; font-weight: bold;">Operatore Sanitario (Opzionale)</label>
+                    <select class="block-operatore" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #bae6fd; font-size: 0.85rem; background: #f0f9ff;">
+                        <option value="">Nessuno</option>
+                        ${opOptions}
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1; min-width: 80px; margin-bottom: 0;">
+                    <label style="font-size: 0.75rem; color: #0284c7; font-weight: bold;">Esito / Punteggio</label>
+                    <input type="text" class="block-esito" placeholder="Es. Positivo, 95..." style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #bae6fd; font-size: 0.85rem; background: #f0f9ff;">
+                </div>
+                <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 0;">
+                    <label style="font-size: 0.75rem; color: #0284c7; font-weight: bold;">Stato Valutazione</label>
+                    <select class="block-stato-valutazione" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #bae6fd; font-size: 0.85rem; background: #f0f9ff;">
+                        <option value="">Nessuno</option>
+                        <option value="Svolta - A buon fine">✅ Svolta - A buon fine</option>
+                        <option value="Svolta - Da ripetere">🔄 Svolta - Da ripetere</option>
+                    </select>
+                </div>
             </div>
         </div>
     `;
@@ -334,21 +376,27 @@ function initDynamicBlocks(containerId, addBtnId) {
 
 function extractDynamicBlocksData(containerId) {
     const container = document.getElementById(containerId);
-    if(!container) return { array: [], tipoStr: "", dispStr: "", matStr: "" };
+    if(!container) return { array: [], tipoStr: "", dispStr: "", matStr: "", operatoreValutazioneStr: "", esitoStr: "", statoValutazioneStr: "" };
     
     let blocks = [];
     container.querySelectorAll('.dynamic-intervention-block').forEach(b => {
         let t = b.querySelector('.block-tipo').value.trim();
         let d = b.querySelector('.block-disp').value.trim();
         let m = b.querySelector('.block-mat').value.trim();
-        if(t || d || m) blocks.push({ tipo: t, disp: d, mat: m });
+        let op = b.querySelector('.block-operatore') ? b.querySelector('.block-operatore').value.trim() : "";
+        let es = b.querySelector('.block-esito') ? b.querySelector('.block-esito').value.trim() : "";
+        let st = b.querySelector('.block-stato-valutazione') ? b.querySelector('.block-stato-valutazione').value.trim() : "";
+        if(t || d || m || op || es || st) blocks.push({ tipo: t, disp: d, mat: m, operatoreValutazione: op, esito: es, statoValutazione: st });
     });
     
     return {
         array: blocks,
         tipoStr: blocks.map(b => b.tipo).filter(x=>x).join(', '),
         dispStr: blocks.map(b => b.disp).filter(x=>x).join(', '),
-        matStr: blocks.map(b => b.mat).filter(x=>x).join(', ')
+        matStr: blocks.map(b => b.mat).filter(x=>x).join('; '),
+        operatoreValutazioneStr: blocks.map(b => b.operatoreValutazione).filter(x=>x).join(', '),
+        esitoStr: blocks.map(b => b.esito).filter(x=>x).join('; '),
+        statoValutazioneStr: blocks.map(b => b.statoValutazione).filter(x=>x).join(', ')
     };
 }
 // --- FINE LOGICA BLOCCHI DINAMICI ---
@@ -378,6 +426,9 @@ form.addEventListener('submit', async (e) => {
         telefono: iTelefono ? iTelefono.value : "",
         dispositivi: blocksData.dispStr,
         matricola: blocksData.matStr,
+        operatoreValutazione: blocksData.operatoreValutazioneStr,
+        esito: blocksData.esitoStr,
+        statoValutazione: blocksData.statoValutazioneStr,
         interventiList: blocksData.array,
         dataPrevista: iData.value,
         oraPrevista: document.getElementById('oraProgrammata') ? document.getElementById('oraProgrammata').value : "",
@@ -431,16 +482,17 @@ btnSaveWaiting.addEventListener('click', async () => {
     const plannedId = "plan_" + Date.now().toString();
     const waitingEvent = {
         id: plannedId,
-        tipo: blocksData.tipoStr || "",
+        tipo: blocksData.tipoStr,
         paziente: iPaziente.value,
         localita: iLocalita.value,
         indirizzo: iIndirizzo.value,
         telefono: iTelefono ? iTelefono.value : "",
-        dispositivi: blocksData.dispStr || "",
-        matricola: blocksData.matStr || "",
+        dispositivi: blocksData.dispStr,
+        matricola: blocksData.matStr,
+        operatoreValutazione: blocksData.operatoreValutazioneStr,
+        esito: blocksData.esitoStr,
+        statoValutazione: blocksData.statoValutazioneStr,
         interventiList: blocksData.array,
-        dataPrevista: "",
-        oraPrevista: "",
         status: 'in_attesa',
         timestamp: new Date().getTime()
     };
@@ -506,6 +558,14 @@ window.editProgrammato = function(idFb) {
     document.getElementById('editProgData').value = p.dataPrevista || "";
     document.getElementById('editProgOra').value = p.oraPrevista || "";
     
+    let opSel = document.getElementById('editProgOperatoreValutazione');
+    if(opSel) {
+        opSel.innerHTML = '<option value="">Nessuno</option>' + (window.operatoriSanitari || []).map(o => `<option value="${o.nome}">${o.nome}</option>`).join('');
+        opSel.value = p.operatoreValutazione || "";
+    }
+    document.getElementById('editProgEsito').value = p.esito || "";
+    document.getElementById('editProgStatoValutazione').value = p.statoValutazione || "";
+    
     document.getElementById('editProgrammatoModal').classList.remove('hidden');
 };
 
@@ -532,6 +592,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 tipo: document.getElementById('editProgTipo').value,
                 dispositivi: document.getElementById('editProgDispositivi').value,
                 matricola: document.getElementById('editProgMatricola').value,
+                operatoreValutazione: document.getElementById('editProgOperatoreValutazione').value,
+                esito: document.getElementById('editProgEsito').value,
+                statoValutazione: document.getElementById('editProgStatoValutazione').value,
                 dataPrevista: newD,
                 oraPrevista: document.getElementById('editProgOra').value,
                 status: newD ? 'planned' : 'in_attesa' // revaluta status in base a se c'è data o no
