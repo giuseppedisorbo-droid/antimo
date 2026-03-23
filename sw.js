@@ -1,16 +1,16 @@
-const CACHE_NAME = 'antimo-attivita-v46';
+const CACHE_NAME = 'antimo-attivita-v47';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './style.css',
-  './app.js?v=46',
-  './global_notifications.js?v=46',
+  './app.js?v=47',
+  './global_notifications.js?v=47',
   './programmati.html',
-  './programmati.js?v=46',
+  './programmati.js?v=47',
   './admin.html',
-  './admin.js?v=46',
+  './admin.js?v=47',
   './anagrafiche.html',
-  './anagrafiche.js?v=46',
+  './anagrafiche.js?v=47',
   './manifest.json'
 ];
 
@@ -48,10 +48,12 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Ignora le richieste a Firebase
+  // Ignora le richieste a Firebase e Autenticazione
   if (event.request.url.includes('firestore.googleapis.com') || 
       event.request.url.includes('firebasestorage.googleapis.com') ||
-      event.request.url.includes('identitytoolkit.googleapis.com')) {
+      event.request.url.includes('identitytoolkit.googleapis.com') ||
+      event.request.url.includes('firebaseapp.com') ||
+      event.request.url.includes('googleapis.com')) {
     return;
   }
 

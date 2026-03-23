@@ -1,4 +1,4 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // ====== CONFIGURAZIONE FIREBASE ======
@@ -12,7 +12,7 @@ const firebaseConfig = {
     measurementId: "G-WTWNH23PLS"
 };
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 
 // DOM Elements
@@ -147,7 +147,7 @@ async function callGemini(promptText) {
 
     const startTime = Date.now();
     try {
-        const response = await fetch(\`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=\${geminiApiKey}\`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(dataPayload)
@@ -220,11 +220,11 @@ if (aiChatInput) {
 
 // Add CSS pulse logic
 const style = document.createElement('style');
-style.innerHTML = \`
+style.innerHTML = `
 .dot-pulse { display: inline-flex; align-items: center; gap: 3px; }
 .dot-pulse i { width: 5px; height: 5px; background: #64748b; border-radius: 50%; display: inline-block; animation: dotPulse 1.4s infinite ease-in-out both; }
 .dot-pulse i:nth-child(1) { animation-delay: -0.32s; }
 .dot-pulse i:nth-child(2) { animation-delay: -0.16s; }
 @keyframes dotPulse { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
-\`;
+`;
 document.head.appendChild(style);
