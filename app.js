@@ -82,6 +82,18 @@ async function loadDropdownLists() {
             let cached = localStorage.getItem('antimo_dropdown_lists');
             if(cached) window.antimoDropdownLists = JSON.parse(cached);
         }
+        
+        // Fetch Operatori Sanitari
+        window.operatoriSanitari = [];
+        try {
+            const qOps = query(collection(db, "anagrafiche"), where("qualifica", "==", "Operatore sanitario"));
+            const opsSnap = await getDocs(qOps);
+            opsSnap.forEach(d => {
+                const data = d.data();
+                window.operatoriSanitari.push({id: d.id, nome: (data.nome + " " + (data.cognome||"")).trim()});
+            });
+        } catch(e) { console.error("Errore fetch operatori sanitari", e); }
+        
     } else {
         let cached = localStorage.getItem('antimo_dropdown_lists');
         if(cached) window.antimoDropdownLists = JSON.parse(cached);
@@ -339,9 +351,11 @@ if(btnCloseInterventionSection) {
 function createInterventionBlockHTML() {
     const types = window.antimoDropdownLists && window.antimoDropdownLists.interventi ? window.antimoDropdownLists.interventi : [];
     const devices = window.antimoDropdownLists && window.antimoDropdownLists.dispositivi ? window.antimoDropdownLists.dispositivi : [];
+    const operatori = window.operatoriSanitari || [];
     
     let typeOptions = types.map(t => `<option value="${t.id}">${t.desc}</option>`).join('');
     let devOptions = devices.map(d => `<option value="${d.id}">${d.desc}</option>`).join('');
+    let opOptions = operatori.map(o => `<option value="${o.nome}">${o.nome}</option>`).join('');
     
     return `
         <div class="dynamic-intervention-block" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 15px; background: #f8fafc; position: relative;">
@@ -364,9 +378,31 @@ function createInterventionBlockHTML() {
                     </select>
                 </div>
             </div>
-            <div class="form-group" style="margin-bottom: 0;">
+            <div class="form-group" style="margin-bottom: 10px;">
                 <label style="font-size: 0.8rem; color: #475569;">Matricola / Note Extra</label>
                 <input type="text" class="block-mat" placeholder="Es. SN123456" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: white;">
+            </div>
+            
+            <div style="border-top: 1px dashed #cbd5e1; padding-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 0;">
+                    <label style="font-size: 0.75rem; color: #0284c7; font-weight: bold;">Operatore Sanitario (Opzionale)</label>
+                    <select class="block-operatore" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #bae6fd; font-size: 0.85rem; background: #f0f9ff;">
+                        <option value="">Nessuno</option>
+                        ${opOptions}
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1; min-width: 80px; margin-bottom: 0;">
+                    <label style="font-size: 0.75rem; color: #0284c7; font-weight: bold;">Esito / Punteggio</label>
+                    <input type="text" class="block-esito" placeholder="Es. Positivo, 95..." style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #bae6fd; font-size: 0.85rem; background: #f0f9ff;">
+                </div>
+                <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 0;">
+                    <label style="font-size: 0.75rem; color: #0284c7; font-weight: bold;">Stato Valutazione</label>
+                    <select class="block-stato-valutazione" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #bae6fd; font-size: 0.85rem; background: #f0f9ff;">
+                        <option value="">Nessuno</option>
+                        <option value="Svolta - A buon fine">✅ Svolta - A buon fine</option>
+                        <option value="Svolta - Da ripetere">🔄 Svolta - Da ripetere</option>
+                    </select>
+                </div>
             </div>
         </div>
     `;
@@ -422,21 +458,27 @@ function initDynamicBlocks(containerId, addBtnId) {
 // Helper per leggere i dati al submit
 function extractDynamicBlocksData(containerId) {
     const container = document.getElementById(containerId);
-    if(!container) return { array: [], tipoStr: "", dispStr: "", matStr: "" };
+    if(!container) return { array: [], tipoStr: "", dispStr: "", matStr: "", operatoreValutazioneStr: "", esitoStr: "", statoValutazioneStr: "" };
     
     let blocks = [];
     container.querySelectorAll('.dynamic-intervention-block').forEach(b => {
         let t = b.querySelector('.block-tipo').value.trim();
         let d = b.querySelector('.block-disp').value.trim();
         let m = b.querySelector('.block-mat').value.trim();
-        if(t || d || m) blocks.push({ tipo: t, disp: d, mat: m });
+        let op = b.querySelector('.block-operatore') ? b.querySelector('.block-operatore').value.trim() : "";
+        let es = b.querySelector('.block-esito') ? b.querySelector('.block-esito').value.trim() : "";
+        let st = b.querySelector('.block-stato-valutazione') ? b.querySelector('.block-stato-valutazione').value.trim() : "";
+        if(t || d || m || op || es || st) blocks.push({ tipo: t, disp: d, mat: m, operatoreValutazione: op, esito: es, statoValutazione: st });
     });
     
     return {
         array: blocks,
         tipoStr: blocks.map(b => b.tipo).filter(x=>x).join(', '),
         dispStr: blocks.map(b => b.disp).filter(x=>x).join(', '),
-        matStr: blocks.map(b => b.mat).filter(x=>x).join(', ')
+        matStr: blocks.map(b => b.mat).filter(x=>x).join('; '),
+        operatoreValutazioneStr: blocks.map(b => b.operatoreValutazione).filter(x=>x).join(', '),
+        esitoStr: blocks.map(b => b.esito).filter(x=>x).join('; '),
+        statoValutazioneStr: blocks.map(b => b.statoValutazione).filter(x=>x).join(', ')
     };
 }
 // --- FINE LOGICA BLOCCHI DINAMICI ---
@@ -2012,6 +2054,25 @@ if(btnOpenBackup) {
     btnOpenBackup.addEventListener('click', () => {
         settingsModal.classList.add('hidden'); // Chiude impostazioni
         
+        // Version Update Dinamico
+        const currentVersionEl = document.getElementById('appVersionStamp');
+        let currentVersion = "v24.3"; 
+        if(currentVersionEl) {
+            let fullText = currentVersionEl.innerText || currentVersionEl.textContent;
+            currentVersion = fullText.split(' - ')[0].trim();
+        }
+        
+        const backupManualeVersionTxt = document.getElementById('backupManualeVersionTxt');
+        if(backupManualeVersionTxt) backupManualeVersionTxt.innerText = currentVersion + " (Custom)";
+        
+        const backupOggiVersionTxt = document.getElementById('backupOggiVersionTxt');
+        if(backupOggiVersionTxt) backupOggiVersionTxt.innerText = currentVersion + " (Attuale)";
+        
+        document.querySelectorAll('.btn-desc-version[data-version="v24.3"]').forEach(b => b.setAttribute('data-version', currentVersion));
+        document.querySelectorAll('.btn-reinstall-version[data-version="v24.3"]').forEach(b => b.setAttribute('data-version', currentVersion));
+        document.querySelectorAll('.btn-desc-version[data-version="v24.3-manual"]').forEach(b => b.setAttribute('data-version', currentVersion + "-manual"));
+        document.querySelectorAll('.btn-reinstall-version[data-version="v24.3-manual"]').forEach(b => b.setAttribute('data-version', currentVersion + "-manual"));
+
         // Calcola le date da mostrare
         const today = new Date();
         
@@ -2052,8 +2113,19 @@ document.querySelectorAll('.btn-desc-version').forEach(btn => {
         const version = e.target.getAttribute('data-version');
         let contentHtml = "";
         
-        // Genera il changelog hardcoded
-        if(version === "v24.3") {
+        const currentVersionEl = document.getElementById('appVersionStamp');
+        const currentVersion = currentVersionEl ? (currentVersionEl.innerText || currentVersionEl.textContent).split(' - ')[0].trim() : "v24.3";
+        const isCurrent = (version === currentVersion || version === currentVersion + "-manual");
+
+        // Genera il changelog
+        if(isCurrent && version !== "v24.3" && version !== "v24.3-manual") {
+            contentHtml = `
+                <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px;">🌟 Ultima Versione</h4>
+                <div style="padding: 10px; background: #e0f2fe; color: #0284c7; border-left: 4px solid #0ea5e9; border-radius: 4px; font-size: 0.9rem;">
+                    <strong>${version}</strong>: Aggiornamento automatico con ottimizzazioni alle logiche di sistema ed interfaccia utente.
+                </div>
+            `;
+        } else if(version === "v24.3" || version === "v24.3-manual") {
             contentHtml = `
                 <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px;">🌟 Novità Principali</h4>
                 <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 15px;">
@@ -2125,8 +2197,11 @@ if(btnAllVersions) {
         }
         
         // 2. Oggi
+        const currentVersionEl = document.getElementById('appVersionStamp');
+        const currentVersion = currentVersionEl ? (currentVersionEl.innerText || currentVersionEl.textContent).split(' - ')[0].trim() : "v24.3";
+        
         contentHtml += `<div style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px dashed #eee;">
-                            <h3 style="margin:0 0 10px; color:#ea580c; font-size: 1.1rem;">📅 Oggi (${formatDateDMY(now)} - Mattina) - v24.3</h3>
+                            <h3 style="margin:0 0 10px; color:#ea580c; font-size: 1.1rem;">📅 Oggi (${formatDateDMY(now)} - Mattina) - ${currentVersion}</h3>
                             <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top:5px;">🌟 Novità Principali</h4>
                             <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 10px;">
                                 <li><strong>Backup Versioni e AI:</strong> Integrata la nuova tabella per visualizzare lo storico delle versioni e i salvataggi personalizzati.</li>
@@ -2409,6 +2484,9 @@ btnPlanIntervention.addEventListener('click', async () => {
         telefono: iTelefono ? iTelefono.value : "",
         dispositivi: dispFinale,
         matricola: matricolaText,
+        operatoreValutazione: blocksData.operatoreValutazioneStr,
+        esito: blocksData.esitoStr,
+        statoValutazione: blocksData.statoValutazioneStr,
         interventiList: blocksData.array, // Nuovo payload strutturato
         note: iNote.value,
         dataPrevista: dProgrammata,
@@ -2495,6 +2573,9 @@ newInterventionForm.addEventListener('submit', async (e) => {
         telefono: iTelefono ? iTelefono.value : "",
         dispositivi: dispFinale,
         matricola: matricolaTxt,
+        operatoreValutazione: blocksData.operatoreValutazioneStr,
+        esito: blocksData.esitoStr,
+        statoValutazione: blocksData.statoValutazioneStr,
         interventiList: blocksData.array,
         note: iNote.value,
         operatore: localStorage.getItem('antimo_user_name') || "Sconosciuto",
