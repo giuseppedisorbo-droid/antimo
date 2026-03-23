@@ -157,14 +157,26 @@ async function callGemini(promptText) {
         let data = await response.json();
 
         if (data.error && data.error.message && data.error.message.includes("is not found")) {
-            console.warn("gemini-1.5-flash not found. Fallback to gemini-1.5-pro...");
-            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiApiKey}`, fetchOptions);
-            data = await response.json();
-            
-            if (data.error && data.error.message && data.error.message.includes("is not found")) {
-                console.warn("gemini-1.5-pro not found. Fallback to gemini-pro...");
-                response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`, fetchOptions);
-                data = await response.json();
+            console.warn("Static model not found. Attempting dynamic discovery via ListModels...");
+            try {
+                const listResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiApiKey}`);
+                const listData = await listResp.json();
+                
+                if (listData.models && listData.models.length > 0) {
+                    let bestModel = listData.models.find(m => m.name.includes("flash") && m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"));
+                    if (!bestModel) bestModel = listData.models.find(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"));
+                    
+                    if (bestModel) {
+                        const actualModelName = bestModel.name.replace('models/', '');
+                        console.log("Dynamically resolved to model:", actualModelName);
+                        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${actualModelName}:generateContent?key=${geminiApiKey}`, fetchOptions);
+                        data = await response.json();
+                    } else {
+                        throw new Error("Nessun modello compatibile con 'generateContent' trovato per questa API Key.");
+                    }
+                }
+            } catch(dynErr) {
+                console.error("Dynamic discovery failed", dynErr);
             }
         }
         
