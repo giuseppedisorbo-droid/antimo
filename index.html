@@ -713,30 +713,7 @@
           }
       });
 
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js').then(reg => {
-            console.log('SW registrato:', reg.scope);
-            reg.addEventListener('updatefound', () => {
-              const newWorker = reg.installing;
-              newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  console.log('Nuovo aggiornamento disponibile. Ricarico...');
-                  window.location.reload(true);
-                }
-              });
-            });
-          }).catch(err => console.error('Errore SW:', err));
-        });
 
-        let refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (!refreshing) {
-            refreshing = true;
-            window.location.reload(true);
-          }
-        });
-      }
 
       function nukeCache() {
         if ('serviceWorker' in navigator) {

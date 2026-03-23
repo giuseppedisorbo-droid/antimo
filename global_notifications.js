@@ -67,3 +67,28 @@ if(db) {
         }
     });
 }
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').then(reg => {
+            console.log('SW registrato a livello globale:', reg.scope);
+            reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        console.log('Nuovo aggiornamento disponibile. Ricarico la pagina...');
+                        window.location.reload(true);
+                    }
+                });
+            });
+        }).catch(err => console.error('Errore registrazione SW:', err));
+    });
+
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+            refreshing = true;
+            window.location.reload(true);
+        }
+    });
+}

@@ -38,6 +38,8 @@ window.decodeCodeToLabel = function(codeRaw, type = 'interventi') {
     }).join(', ');
 };
 
+
+
 async function loadDropdownLists() {
     const defaultTypes = ['Visita', 'Sostituzione', 'Ritiro', 'Consegna', 'Manutenzione', 'Installazione', 'Riparazione'];
     const defaultDevices = ['Concentratore', 'Ventilatore', 'Aspiratore', 'D3', 'Stativo', 'Cpap', 'AutoCpap', 'Saturimetro'];
@@ -68,7 +70,9 @@ async function loadDropdownLists() {
         if(cached) window.antimoDropdownLists = JSON.parse(cached);
     }
 }
-loadDropdownLists();
+loadDropdownLists().then(() => {
+    initDynamicBlocks('dynamicProgInterventionsContainer', 'btnAddProgInterventionBlock');
+});
 
 // DOM
 const form = document.querySelector('form');
@@ -327,10 +331,6 @@ function initDynamicBlocks(containerId, addBtnId) {
 
     btnAdd.addEventListener('click', () => addBlock());
 }
-
-setTimeout(() => {
-    initDynamicBlocks('dynamicProgInterventionsContainer', 'btnAddProgInterventionBlock');
-}, 100);
 
 function extractDynamicBlocksData(containerId) {
     const container = document.getElementById(containerId);
