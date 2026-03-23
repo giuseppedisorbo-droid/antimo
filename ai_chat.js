@@ -176,7 +176,7 @@ async function callGemini(promptText) {
         console.error("Gemini Api exception:", err);
         const l = document.getElementById('aiChatLoader');
         if(l) l.remove();
-        appendMessage('assistant', "Errore di connessione a Gemini API. Verifica che la chiave sia corretta e funzionante.");
+        appendMessage('assistant', `**Errore Gemini API:** ${err.message} \n\nVerifica che la chiave sia corretta dal pannello Admin e che abbia i permessi abilitati.`);
     }
 }
 
