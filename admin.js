@@ -485,6 +485,7 @@ function renderNonEseguitiTable(dataArray) {
 // Filtri
 function applyFilters() {
     let filtrati = [...tuttiGliInterventi];
+    let filtratiProgrammati = [...tuttiGliInterventiProgrammati];
 
     // Filtro Ricerca Testo (combinato)
     const searchVal = filterSearch.value.toLowerCase().trim();
@@ -496,6 +497,11 @@ function applyFilters() {
             i.paziente.toLowerCase().includes(combinedSearch) ||
             (i.destinazione || "").toLowerCase().includes(combinedSearch) ||
             (i.localita || "").toLowerCase().includes(combinedSearch)
+        );
+        filtratiProgrammati = filtratiProgrammati.filter(i =>
+            (i.paziente && i.paziente.toLowerCase().includes(combinedSearch)) ||
+            (i.destinazione && i.destinazione.toLowerCase().includes(combinedSearch)) ||
+            (i.localita && i.localita.toLowerCase().includes(combinedSearch))
         );
     }
 
