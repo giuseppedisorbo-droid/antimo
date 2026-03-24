@@ -129,11 +129,19 @@ function showLoader() {
 }
 
 // 4. Gemini Call
-async function callGemini(promptText) {
+async function callGemini(promptText, fileObj = null) {
     if (!geminiApiKey) {
         appendMessage('assistant', "L'Amministratore non ha ancora configurato la Chiave API di Gemini. Accedi al pannello Admin -> Configurazione AI per salvarla.");
         return;
     }
+
+    // Show User Message immediately
+    let displayUserHtml = promptText;
+    if (fileObj) {
+        displayUserHtml += `<br><img src="${fileObj.data}" style="max-height: 120px; border-radius: 8px; margin-top: 10px; border: 1px solid #ccc;">`;
+    }
+    appendMessage('user', displayUserHtml);
+    showLoader();
 
     const aiResponseStyleElement = document.getElementById('aiResponseStyle');
     let dynamicPrompt = promptText;
@@ -145,8 +153,19 @@ async function callGemini(promptText) {
         }
     }
 
+    let userParts = [{ text: dynamicPrompt }];
+    if (fileObj) {
+        const base64Data = fileObj.data.split(',')[1];
+        userParts.push({
+            inlineData: {
+                data: base64Data,
+                mimeType: fileObj.mimeType
+            }
+        });
+    }
+
     // Prepare message structure matching Gemini v1beta
-    const promptObj = { role: "user", parts: [{ text: dynamicPrompt }] };
+    const promptObj = { role: "user", parts: userParts };
     let reqBodyContents = [];
 
     // Always inject System Context first manually as a user prompt (since Flash sometimes balks at systemInstruction depending on version)
@@ -201,8 +220,11 @@ async function callGemini(promptText) {
         
         if (data.error) throw new Error(data.error.message);
 
+        const loader = document.getElementById('aiChatLoader');
+        if(loader) loader.remove();
+
         let reply = data.candidates[0].content.parts[0].text;
-        chatHistory.push(promptObj);
+        chatHistory.push({ role: "user", parts: [{ text: promptText }] }); // Store only text in history to avoid huge image contexts
         chatHistory.push({ role: "model", parts: [{ text: reply }] });
 
         // Intercettazione AUTO_PROMPT
@@ -267,13 +289,67 @@ async function logInteractionToAdmin(promptTxt, tokens, durationMs, cost) {
     }
 }
 
-// 6. Events Handler
+// 6. Events Handler & Multi-modal File Upload
+let currentAiFile = null;
+const btnBrowseAiFile = document.getElementById('btnBrowseAiFile');
+const aiChatFile = document.getElementById('aiChatFile');
+const aiChatPreviewContainer = document.getElementById('aiChatPreviewContainer');
+
+if (btnBrowseAiFile) {
+    btnBrowseAiFile.addEventListener('click', () => {
+        if (aiChatFile) aiChatFile.click();
+    });
+}
+
+if (aiChatFile) {
+    aiChatFile.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            currentAiFile = {
+                data: ev.target.result,
+                mimeType: file.type
+            };
+            
+            if (aiChatPreviewContainer) {
+                aiChatPreviewContainer.innerHTML = `
+                    <div style="position: relative; width: 60px; height: 60px; border-radius: 8px; border: 1px solid #ccc; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <img src="${ev.target.result}" style="width:100%; height:100%; object-fit:cover;">
+                        <button id="btnRemoveAiFile" style="position:absolute; top: -5px; right: -5px; background: #ef4444; color: white; border: none; border-radius: 50%; font-size: 10px; width: 18px; height: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;">&times;</button>
+                    </div>
+                `;
+                aiChatPreviewContainer.classList.remove('hidden');
+                
+                document.getElementById('btnRemoveAiFile').addEventListener('click', () => {
+                    currentAiFile = null;
+                    aiChatPreviewContainer.classList.add('hidden');
+                    aiChatPreviewContainer.innerHTML = '';
+                    aiChatFile.value = '';
+                });
+            }
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
 if (btnSendAiChat) {
     btnSendAiChat.addEventListener('click', () => {
         const text = aiChatInput.value.trim();
-        if(!text) return;
+        if(!text && !currentAiFile) return;
         aiChatInput.value = '';
-        callGemini(text);
+        
+        const fileToPass = currentAiFile;
+        // Reset immediately to allow next inputs
+        currentAiFile = null;
+        if (aiChatPreviewContainer) {
+            aiChatPreviewContainer.classList.add('hidden');
+            aiChatPreviewContainer.innerHTML = '';
+        }
+        if (aiChatFile) aiChatFile.value = '';
+        
+        callGemini(text, fileToPass);
     });
 }
 if (aiChatInput) {
@@ -281,6 +357,41 @@ if (aiChatInput) {
         if(e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             btnSendAiChat.click();
+        }
+    });
+
+    // Supporta l'incollare di immagini
+    aiChatInput.addEventListener('paste', (e) => {
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf("image") === 0) {
+                const blob = items[i].getAsFile();
+                
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    currentAiFile = {
+                        data: ev.target.result,
+                        mimeType: blob.type
+                    };
+                    if (aiChatPreviewContainer) {
+                        aiChatPreviewContainer.innerHTML = `
+                            <div style="position: relative; width: 60px; height: 60px; border-radius: 8px; border: 1px solid #ccc; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <img src="${ev.target.result}" style="width:100%; height:100%; object-fit:cover;">
+                                <button id="btnRemoveAiFile" style="position:absolute; top: -5px; right: -5px; background: #ef4444; color: white; border: none; border-radius: 50%; font-size: 10px; width: 18px; height: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;">&times;</button>
+                            </div>
+                        `;
+                        aiChatPreviewContainer.classList.remove('hidden');
+                        document.getElementById('btnRemoveAiFile').addEventListener('click', () => {
+                            currentAiFile = null;
+                            aiChatPreviewContainer.classList.add('hidden');
+                            aiChatPreviewContainer.innerHTML = '';
+                            if (aiChatFile) aiChatFile.value = '';
+                        });
+                    }
+                };
+                reader.readAsDataURL(blob);
+                break;
+            }
         }
     });
 }

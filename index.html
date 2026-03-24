@@ -99,14 +99,16 @@
                         </select>
                         <input type="date" id="msgSearchDate" style="font-size: 0.85rem; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; max-width: 40px;">
                     </div>
-                    <div style="display: flex; gap: 5px; justify-content: flex-start; width: 100%; overflow-x: auto; padding-bottom: 5px; align-items: center;">
-                        <button id="btnMsgTabAll" class="btn btn-sm btn-primary btn-blue" style="padding: 4px 12px; margin: 0; font-size: 0.75rem; white-space: nowrap;">Tutti</button>
-                        <button id="btnMsgTabUnread" class="btn btn-sm btn-secondary" style="padding: 4px 12px; margin: 0; font-size: 0.75rem; white-space: nowrap;">Non Letti</button>
-                        <button id="btnMsgTabReceived" class="btn btn-sm btn-secondary" style="padding: 4px 12px; margin: 0; font-size: 0.75rem; white-space: nowrap;">Ricevuti</button>
-                        <button id="btnMsgTabSent" class="btn btn-sm btn-secondary" style="padding: 4px 12px; margin: 0; font-size: 0.75rem; white-space: nowrap;">Inviati</button>
-                        <button id="btnMsgTabDeleted" class="btn btn-sm btn-secondary" style="padding: 4px 12px; margin: 0; font-size: 0.75rem; white-space: nowrap;">Cestino</button>
-                        <button id="btnMsgTabResolved" class="btn btn-sm btn-secondary" style="padding: 4px 12px; margin: 0; font-size: 0.75rem; white-space: nowrap;">Risolti</button>
-                        <button id="btnEmptyTrash" class="btn btn-sm btn-danger hidden" style="padding: 4px 12px; margin: 0; margin-left: auto; font-size: 0.75rem; white-space: nowrap; background-color: #ef4444; color: white; border: none; font-weight: bold; border-radius: 6px;">🔥 Svuota</button>
+                    <div style="display: flex; gap: 8px; justify-content: flex-start; width: 100%; flex-wrap: wrap; padding-bottom: 5px; align-items: center;">
+                        <button id="btnMsgTabAll" class="btn btn-sm btn-primary btn-blue" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Tutti</button>
+                        <button id="btnMsgTabUnread" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Non Letti</button>
+                        <button id="btnMsgTabReceived" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Ricevuti</button>
+                        <button id="btnMsgTabSent" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Inviati</button>
+                        <button id="btnMsgTabInCharge" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">👷 Presi in Carico</button>
+                        <button id="btnMsgTabReplied" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">↩️ Risposti</button>
+                        <button id="btnMsgTabResolved" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">✅ Risolti</button>
+                        <button id="btnMsgTabDeleted" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Cestino</button>
+                        <button id="btnEmptyTrash" class="btn btn-sm btn-danger hidden" style="padding: 6px 14px; margin: 0; margin-left: auto; font-size: 0.75rem; white-space: nowrap; background-color: #ef4444; color: white; border: none; font-weight: bold; border-radius: 20px;">🔥 Svuota</button>
                     </div>
                 </div>
 
@@ -716,10 +718,17 @@
                     </div>
                 </div>
                 
+                <!-- Previews -->
+                <div id="aiChatPreviewContainer" class="hidden" style="background: white; padding: 10px 15px 0; display: flex; gap: 10px; overflow-x: auto; min-height: 80px; align-items: center;"></div>
+                
                 <!-- Input Box -->
                 <div style="background: white; padding: 15px; border-top: 1px solid #e2e8f0; display: flex; gap: 10px; align-items: flex-end;">
-                    <textarea id="aiChatInput" placeholder="Scrivi il tuo messaggio qui..." style="flex: 1; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-family: inherit; font-size: 0.9rem; resize: none; min-height: 48px; max-height: 120px;" rows="1"></textarea>
-                    <button id="btnSendAiChat" style="background: #6366f1; color: white; border: none; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                    <div style="position: relative;">
+                        <input type="file" id="aiChatFile" accept="image/*" style="display: none;">
+                        <button type="button" id="btnBrowseAiFile" style="background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); color: #6366f1; border-radius: 50%; font-size: 1.2rem; cursor: pointer; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" title="Allega immagine">📎</button>
+                    </div>
+                    <textarea id="aiChatInput" placeholder="Scrivi il tuo messaggio o carica un'immagine..." style="flex: 1; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-family: inherit; font-size: 0.9rem; resize: none; min-height: 44px; max-height: 120px;" rows="1"></textarea>
+                    <button id="btnSendAiChat" style="background: #6366f1; color: white; border: none; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                     </button>
                 </div>

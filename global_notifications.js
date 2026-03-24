@@ -32,7 +32,18 @@ if(db) {
         if(!badge) {
             badge = document.createElement('div');
             badge.id = 'globalFloatingNotification';
-            badge.style.cssText = "position: fixed; bottom: 20px; right: 20px; background: #e11d48; color: white; padding: 10px 15px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.4); z-index: 10000; display: flex; align-items: center; gap: 10px; max-width: 300px; cursor: pointer; border: 2px solid white;";
+        badge.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background-color: var(--orange);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            z-index: 10000;
+            display: flex; align-items: center; gap: 10px; max-width: 300px; cursor: pointer; border: 2px solid white;`;
             
             badge.onclick = () => {
                 if(window.location.pathname.endsWith('index.html') || window.location.pathname.endsWith('/') || window.location.pathname === '') {

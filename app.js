@@ -173,11 +173,13 @@ const btnMsgTabReceived = document.getElementById('btnMsgTabReceived');
 const btnMsgTabSent = document.getElementById('btnMsgTabSent');
 const btnMsgTabUnread = document.getElementById('btnMsgTabUnread');
 const btnMsgTabDeleted = document.getElementById('btnMsgTabDeleted');
+const btnMsgTabInCharge = document.getElementById('btnMsgTabInCharge');
+const btnMsgTabReplied = document.getElementById('btnMsgTabReplied');
 const btnEmptyTrash = document.getElementById('btnEmptyTrash');
 const msgSearchText = document.getElementById('msgSearchText');
 const msgSearchUser = document.getElementById('msgSearchUser');
 const msgSearchDate = document.getElementById('msgSearchDate');
-let currentMsgTab = 'all'; // 'all', 'received', 'sent', 'unread', 'deleted'
+let currentMsgTab = 'all'; // 'all', 'received', 'sent', 'unread', 'in_charge', 'replied', 'resolved', 'deleted'
 
 // Nuovi Toggles Logic
 let isPlannedVisible = false;
@@ -495,6 +497,8 @@ function updateMsgTabsUI() {
     if(btnMsgTabUnread) btnMsgTabUnread.className = (currentMsgTab === 'unread') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
     if(btnMsgTabDeleted) btnMsgTabDeleted.className = (currentMsgTab === 'deleted') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
     if(btnMsgTabResolved) btnMsgTabResolved.className = (currentMsgTab === 'resolved') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
+    if(btnMsgTabInCharge) btnMsgTabInCharge.className = (currentMsgTab === 'in_charge') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
+    if(btnMsgTabReplied) btnMsgTabReplied.className = (currentMsgTab === 'replied') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
 }
 
 if(btnMsgTabAll) btnMsgTabAll.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'all'; updateMsgTabsUI(); renderMessagesUI(); });
@@ -503,6 +507,8 @@ if(btnMsgTabSent) btnMsgTabSent.addEventListener('click', (e) => { e.preventDefa
 if(btnMsgTabUnread) btnMsgTabUnread.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'unread'; updateMsgTabsUI(); renderMessagesUI(); });
 if(btnMsgTabDeleted) btnMsgTabDeleted.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'deleted'; updateMsgTabsUI(); renderMessagesUI(); });
 if(btnMsgTabResolved) btnMsgTabResolved.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'resolved'; updateMsgTabsUI(); renderMessagesUI(); });
+if(btnMsgTabInCharge) btnMsgTabInCharge.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'in_charge'; updateMsgTabsUI(); renderMessagesUI(); });
+if(btnMsgTabReplied) btnMsgTabReplied.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'replied'; updateMsgTabsUI(); renderMessagesUI(); });
 
 if(btnEmptyTrash) btnEmptyTrash.addEventListener('click', async (e) => {
     e.preventDefault();
@@ -579,7 +585,7 @@ function renderMessagesUI() {
     const searchDate = (msgSearchDate && msgSearchDate.value) ? msgSearchDate.value : "";
     
     // Calculate counts for categories
-    let countAll = 0, countUnread = 0, countReceived = 0, countSent = 0, countDeleted = 0, countResolved = 0;
+    let countAll = 0, countUnread = 0, countReceived = 0, countSent = 0, countDeleted = 0, countResolved = 0, countInCharge = 0, countReplied = 0;
     
     messagesDataCache.forEach(item => {
         const d = item.data;
@@ -600,16 +606,22 @@ function renderMessagesUI() {
             if (dtStr !== searchDate) return;
         }
 
-        // Tally categories
+        // Tally categories mutually exclusive funnel
         if (d.eliminato === true) {
             countDeleted++;
         } else if (d.isResolved === true) {
             countResolved++;
+        } else if (d.haRisposto === true) {
+            countReplied++;
+            countAll++;
+        } else if (d.presoInCarico === true) {
+            countInCharge++;
+            countAll++;
         } else {
             countAll++;
             if (d.letto !== true) countUnread++;
-            if ((rN === "Bacheca (Tutti)" || rN.includes(currentUser)) && !d.presoInCarico) countReceived++;
-            if (sN === currentUser && !d.presoInCarico) countSent++;
+            if ((rN === "Bacheca (Tutti)" || rN.includes(currentUser))) countReceived++;
+            if (sN === currentUser) countSent++;
         }
     });
 
@@ -617,8 +629,10 @@ function renderMessagesUI() {
     if(btnMsgTabUnread) btnMsgTabUnread.innerHTML = `Non Letti (${countUnread})`;
     if(btnMsgTabReceived) btnMsgTabReceived.innerHTML = `Ricevuti (${countReceived})`;
     if(btnMsgTabSent) btnMsgTabSent.innerHTML = `Inviati (${countSent})`;
+    if(btnMsgTabInCharge) btnMsgTabInCharge.innerHTML = `👷 Presi in Carico (${countInCharge})`;
+    if(btnMsgTabReplied) btnMsgTabReplied.innerHTML = `↩️ Risposti (${countReplied})`;
     if(btnMsgTabDeleted) btnMsgTabDeleted.innerHTML = `Cestino (${countDeleted})`;
-    if(btnMsgTabResolved) btnMsgTabResolved.innerHTML = `Risolti (${countResolved})`;
+    if(btnMsgTabResolved) btnMsgTabResolved.innerHTML = `✅ Risolti (${countResolved})`;
 
     if(btnEmptyTrash) {
         if (currentMsgTab === 'deleted' && countDeleted > 0) {
@@ -637,19 +651,23 @@ function renderMessagesUI() {
         if (currentMsgTab === 'deleted') {
             if (d.eliminato !== true) return false;
         } else if (currentMsgTab === 'resolved') {
-            if (d.isResolved !== true || d.eliminato === true) return false;
+            if (d.isResolved !== true || d.eliminato) return false;
+        } else if (currentMsgTab === 'replied') {
+            if (d.haRisposto !== true || d.isResolved || d.eliminato) return false;
+        } else if (currentMsgTab === 'in_charge') {
+            if (d.presoInCarico !== true || d.haRisposto || d.isResolved || d.eliminato) return false;
+        } else if (currentMsgTab === 'all') {
+            if (d.eliminato || d.isResolved) return false;
         } else {
-            if (d.eliminato === true || d.isResolved === true) return false;
-        }
-
-        if (currentMsgTab === 'received') {
-            if (rN !== "Bacheca (Tutti)" && !rN.includes(currentUser)) return false;
-            if (d.presoInCarico === true) return false;
-        } else if (currentMsgTab === 'sent') {
-            if (sN !== currentUser) return false;
-            if (d.presoInCarico === true) return false;
-        } else if (currentMsgTab === 'unread') {
-            if (d.letto === true) return false;
+            // received, sent, unread
+            if (d.eliminato || d.isResolved || d.haRisposto || d.presoInCarico) return false;
+            if (currentMsgTab === 'received') {
+                if (rN !== "Bacheca (Tutti)" && !rN.includes(currentUser)) return false;
+            } else if (currentMsgTab === 'sent') {
+                if (sN !== currentUser) return false;
+            } else if (currentMsgTab === 'unread') {
+                if (d.letto === true) return false;
+            }
         }
 
         if (searchUser) {
@@ -724,7 +742,8 @@ function renderMessagesUI() {
                     <div>
                         ${data.eliminato ? '<span style="font-size:0.75rem; background:#ef4444; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">🗑️ CESTINO</span>' : ''}
                         ${data.isResolved && !data.eliminato ? '<span style="font-size:0.75rem; background:#10b981; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">✅ RISOLTO</span>' : ''}
-                        ${data.presoInCarico && !data.eliminato && !data.isResolved ? `<span style="font-size:0.75rem; background:#3b82f6; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">👷 Preso in Carico da ${data.presoInCaricoDa || 'Te'}</span>` : ''}
+                        ${data.haRisposto && !data.eliminato && !data.isResolved ? `<span style="font-size:0.75rem; background:#6366f1; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">↩️ RISPOSTO</span>` : ''}
+                        ${data.presoInCarico && !data.eliminato && !data.isResolved && !data.haRisposto ? `<span style="font-size:0.75rem; background:#3b82f6; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">👷 Preso in Carico da ${data.presoInCaricoDa || 'Te'}</span>` : ''}
                         ${data.isNotification && !data.eliminato && !data.isResolved ? '<span style="font-size:0.75rem; background:#f59e0b; color:white; padding:2px 6px; border-radius:12px; font-weight:bold;">📌 NOTIFICA</span>' : ''}
                     </div>
                 </div>
@@ -804,6 +823,7 @@ function renderMessagesUI() {
                 replyBtn.style.cssText = "background: none; border: 1px solid #10b981; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #047857; background-color: rgba(16,185,129,0.1); font-weight: bold;";
                 replyBtn.onclick = () => {
                     window.pendingReplyRecipients = [sN];
+                    window.replyingToMsgId = docSnapId;
                     if(msgText) {
                         msgText.placeholder = `Rispondi a ${sN}...`;
                         msgText.focus();
@@ -827,6 +847,7 @@ function renderMessagesUI() {
                     const currentUser = localStorage.getItem('antimo_user_name') || "Sconosciuto";
                     allRecs = [...new Set(allRecs)].filter(r => r !== currentUser);
                     window.pendingReplyRecipients = allRecs;
+                    window.replyingToMsgId = docSnapId;
                     
                     if (msgText) {
                         msgText.placeholder = `Rispondi a tutti (${allRecs.join(', ')})...`;
@@ -1048,6 +1069,7 @@ if(btnCloseWaSelect) {
     btnCloseWaSelect.addEventListener('click', () => {
         waSelectModal.classList.add('hidden');
         window.pendingReplyRecipients = null;
+        window.replyingToMsgId = null;
         if (msgAttachmentsInput) msgAttachmentsInput.value = '';
         if (msgPreviewContainer) { msgPreviewContainer.innerHTML = ''; msgPreviewContainer.classList.add('hidden'); }
         pendingMessageFiles = [];
@@ -1089,6 +1111,16 @@ async function processMessageSave(text, isNotif, recipients = "Bacheca (Tutti)")
             fileUrls: fileUrls
         };
         const docRef = await addDoc(collection(db, "messaggi"), docD);
+
+        // Se è una risposta a un messaggio specifico, aggiorna l'originale
+        if (window.replyingToMsgId) {
+            try {
+                const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                await updateDoc(doc(db, "messaggi", window.replyingToMsgId), { haRisposto: true, rispostoDa: senderName });
+            } catch(e) { console.error("Errore update haRisposto", e); }
+            window.replyingToMsgId = null;
+        }
+
         return docRef.id;
     } catch(err) {
         console.error("Errore invio msg", err);
@@ -2650,6 +2682,23 @@ newInterventionForm.addEventListener('submit', async (e) => {
                 }
                 activeProgFbId = null;
                 activeProgItem = null;
+            }
+            
+            // Nuova logica: se salvo un intervento per un paziente, chiudo in automatico i suoi vecchi N.ESEG.
+            try {
+                const { collection, query, where, getDocs, doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                const qNeseg = query(
+                    collection(db, "programmati"), 
+                    where("paziente", "==", invToSave.paziente),
+                    where("status", "==", "justified_not_executed")
+                );
+                const snapsNeseg = await getDocs(qNeseg);
+                snapsNeseg.forEach(async (d) => {
+                    await updateDoc(doc(db, "programmati", d.id), { status: "completed" });
+                    console.log(`Vecchio N.ESEG ${d.id} chiuso automaticamente per il paziente ${invToSave.paziente}`);
+                });
+            } catch(e) {
+                console.error("Errore pulizia vecchi N.ESEG", e);
             }
             
             cloudSaveSuccess = true;
