@@ -208,45 +208,7 @@
 
     </div>
 
-    <!-- Modal Contenuto Fatture -->
-    <div id="raw-xml-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
-        <div style="background: white; padding: 25px; border-radius: 12px; width: 95%; max-width: 1200px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 15px;">
-                <h3 style="margin: 0; color: #1e293b;"><i class="fas fa-file-invoice"></i> Contenuto Raw Fatture XML</h3>
-                <button type="button" onclick="document.getElementById('raw-xml-modal').style.display='none'" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b;">&times;</button>
-            </div>
-            
-            <div style="display: flex; gap: 10px; margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 8px;">
-                <input type="text" id="raw-search-input" placeholder="Cerca ovunque (fornitore, articolo, importo...)" style="flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;">
-                <select id="raw-file-filter" style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; min-width: 200px;">
-                    <option value="">-- Tutti i File --</option>
-                </select>
-            </div>
-            
-            <div style="overflow-y: auto; flex: 1;">
-                <table class="staging-table" id="raw-xml-table">
-                    <thead>
-                        <tr>
-                            <th>File</th>
-                            <th>Data</th>
-                            <th>N. Fattura</th>
-                            <th>Fornitore</th>
-                            <th>Dettaglio/Articolo</th>
-                            <th>Q.tà</th>
-                            <th>Prezzo Un.</th>
-                            <th>Aliquota IVA</th>
-                            <th>Prezzo Tot.</th>
-                        </tr>
-                    </thead>
-                    <tbody id="raw-xml-tbody">
-                        <!-- Generato via JS -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
     <!-- Il motore logico andrà qui -->
-    <script src="import_ai.js"></script>
+    <script src="import_ai.js?v=2"></script>
 </body>
 </html>

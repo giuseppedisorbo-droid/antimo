@@ -164,7 +164,11 @@ async function parseXMLFattura(file) {
             date: dataFattura,
             fornitore: nomeFornitore || "Sconosciuto",
             dettaglio: desc,
-            amount: prezzoTot, // Costs are usually entered as positive numbers in the form, the logic handles it based on Type
+            amount: prezzoTot,
+            quantita: quantita,
+            prezzoUnitario: prezzoUnitario,
+            aliquotaIVA: aliquotaIVA,
+            fileSorgente: file.name,
             predictedType: prediction.type,
             predictedCategory: prediction.category,
             predictedDescription: prediction.description,
@@ -289,7 +293,10 @@ function renderStagingTable() {
         if (record.status === 'saved') statusIcon = '<i class="fas fa-check-circle" style="color:#10b981;"></i>';
         else if (record.status === 'error') {
             statusIcon = '<i class="fas fa-exclamation-triangle" style="color:#ef4444;" title="' + record.errorMsg + '"></i>';
-            statusText = `<div style="color:#ef4444; font-size:0.7em; font-weight:bold; max-width: 60px;">${record.errorMsg}</div>`;
+            statusText = `<div style="color:#ef4444; font-size:0.7em; font-weight:bold; max-width: 100px; margin-bottom:5px;">${record.errorMsg}</div>`;
+            if (record.errorMsg && record.errorMsg.includes('Fattura già caricata')) {
+                statusText += `<button class="btn-small override-btn" data-idx="${index}" style="background:#f59e0b; color:white; border:none; border-radius:4px; font-size: 0.7em; cursor:pointer;" title="Forza re-importazione (es. se era stata cancellata)">Forza Invio</button>`;
+            }
         }
 
         tr.innerHTML = `
@@ -345,6 +352,16 @@ function renderStagingTable() {
     document.querySelectorAll('.staging-desc').forEach(el => {
         el.addEventListener('change', (e) => {
             stagingRecords[e.target.getAttribute('data-idx')].predictedDescription = e.target.value;
+        });
+    });
+
+    // Override duplicate warnings
+    document.querySelectorAll('.override-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const idx = e.target.getAttribute('data-idx');
+            stagingRecords[idx].status = 'ready';
+            stagingRecords[idx].errorMsg = null;
+            renderStagingTable();
         });
     });
 }
