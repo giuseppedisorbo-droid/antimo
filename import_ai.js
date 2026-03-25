@@ -13,6 +13,7 @@ const firebaseConfig = {
 const _firebaseApp = firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const dataCollection = db.collection('financial_records');
+const anagraficheCollection = db.collection('eubiotech_anagrafiche');
 
 let historicalData = []; // To train the AI
 let stagingRecords = []; // Records waiting to be saved
@@ -20,6 +21,7 @@ let uniqueTypes = new Set();
 let uniqueCategories = new Set();
 let uniqueDescriptions = new Set();
 let rawXmlData = []; // Store raw XML content independently of staging records
+let extractedAnagrafiche = []; // Store detected master data (Fornitori/Clienti)
 
 document.addEventListener('DOMContentLoaded', async () => {
     
@@ -113,10 +115,58 @@ async function parseXMLFattura(file) {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(text, "text/xml");
     
-    // Header Info (Fornitore, Data)
-    const cedentePrestatore = xmlDoc.querySelector("CedentePrestatore DatiAnagrafici Anagrafica Denominazione");
-    const nomeFornitore = cedentePrestatore ? cedentePrestatore.textContent : 
+    // Extract Basic Information
+    const cedenteNode = xmlDoc.querySelector("CedentePrestatore DatiAnagrafici Anagrafica Denominazione");
+    const nomeFornitore = cedenteNode ? cedenteNode.textContent : 
                           (xmlDoc.querySelector("CedentePrestatore DatiAnagrafici Anagrafica Nome")?.textContent + " " + xmlDoc.querySelector("CedentePrestatore DatiAnagrafici Anagrafica Cognome")?.textContent);
+
+    // --- ANAGRAFICA EXTRACTION (Cedente/Fornitore) ---
+    const cpNode = xmlDoc.querySelector("CedentePrestatore");
+    if (cpNode) {
+        const den = cpNode.querySelector("DatiAnagrafici Anagrafica Denominazione")?.textContent || 
+                   (cpNode.querySelector("DatiAnagrafici Anagrafica Nome")?.textContent + " " + cpNode.querySelector("DatiAnagrafici Anagrafica Cognome")?.textContent);
+        const piva = cpNode.querySelector("DatiAnagrafici IdFiscaleIVA IdCodice")?.textContent || "";
+        const cf = cpNode.querySelector("DatiAnagrafici CodiceFiscale")?.textContent || "";
+        const cap = cpNode.querySelector("Sede CAP")?.textContent || "";
+        const comune = cpNode.querySelector("Sede Comune")?.textContent || "";
+        const prov = cpNode.querySelector("Sede Provincia")?.textContent || "";
+        const ind = cpNode.querySelector("Sede Indirizzo")?.textContent || "";
+        const indirizzoPieno = `${ind} ${cap} ${comune} (${prov})`.replace(/\s+/g, ' ').trim();
+        
+        if (den && den.trim() !== "undefined undefined") {
+            extractedAnagrafiche.push({
+                tipo: 'fornitore',
+                ragioneSociale: den.trim(),
+                piva: piva,
+                cf: cf,
+                indirizzo: indirizzoPieno
+            });
+        }
+    }
+
+    // --- ANAGRAFICA EXTRACTION (Cessionario/Cliente) ---
+    const ccNode = xmlDoc.querySelector("CessionarioCommittente");
+    if (ccNode) {
+        const den = ccNode.querySelector("DatiAnagrafici Anagrafica Denominazione")?.textContent || 
+                   (ccNode.querySelector("DatiAnagrafici Anagrafica Nome")?.textContent + " " + ccNode.querySelector("DatiAnagrafici Anagrafica Cognome")?.textContent);
+        const piva = ccNode.querySelector("DatiAnagrafici IdFiscaleIVA IdCodice")?.textContent || "";
+        const cf = ccNode.querySelector("DatiAnagrafici CodiceFiscale")?.textContent || "";
+        const cap = ccNode.querySelector("Sede CAP")?.textContent || "";
+        const comune = ccNode.querySelector("Sede Comune")?.textContent || "";
+        const prov = ccNode.querySelector("Sede Provincia")?.textContent || "";
+        const ind = ccNode.querySelector("Sede Indirizzo")?.textContent || "";
+        const indirizzoPieno = `${ind} ${cap} ${comune} (${prov})`.replace(/\s+/g, ' ').trim();
+
+        if (den && den.trim() !== "undefined undefined") {
+            extractedAnagrafiche.push({
+                tipo: 'cliente',
+                ragioneSociale: den.trim(),
+                piva: piva,
+                cf: cf,
+                indirizzo: indirizzoPieno
+            });
+        }
+    }
     
     const datiGenerali = xmlDoc.querySelector("DatiGeneraliDocumento Data");
     const dataFattura = datiGenerali ? datiGenerali.textContent : new Date().toISOString().split('T')[0];
@@ -372,6 +422,36 @@ async function saveToGestionale() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvataggio...';
     
     let savedCount = 0;
+    
+    // --- AUTO-CREATE ORPHANED ANAGRAFICHE ---
+    let uniqueAna = [];
+    let seenRS = new Set();
+    extractedAnagrafiche.forEach(a => {
+        if (!seenRS.has(a.ragioneSociale.toLowerCase())) {
+             uniqueAna.push(a);
+             seenRS.add(a.ragioneSociale.toLowerCase());
+        }
+    });
+
+    for (let currentAna of uniqueAna) {
+        try {
+            const rsSnap = await anagraficheCollection.where('ragioneSociale', '==', currentAna.ragioneSociale).get();
+            if (rsSnap.empty) {
+                await anagraficheCollection.add({
+                    tipo: currentAna.tipo,
+                    ragioneSociale: currentAna.ragioneSociale,
+                    piva: currentAna.piva,
+                    cf: currentAna.cf,
+                    sdi: '',
+                    pec: '',
+                    indirizzo: currentAna.indirizzo,
+                    email: '',
+                    telefono: '',
+                    updatedAt: new Date().toISOString()
+                });
+            }
+        } catch(e) { console.error("Error saving anagrafica auto", e); }
+    }
     
     for (let i = 0; i < stagingRecords.length; i++) {
         const record = stagingRecords[i];
