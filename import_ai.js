@@ -121,6 +121,15 @@ async function parseXMLFattura(file) {
     const datiGenerali = xmlDoc.querySelector("DatiGeneraliDocumento Data");
     const dataFattura = datiGenerali ? datiGenerali.textContent : new Date().toISOString().split('T')[0];
 
+    const numeroNode = xmlDoc.querySelector("DatiGeneraliDocumento Numero");
+    const numeroFattura = numeroNode ? numeroNode.textContent : "N/A";
+
+    const isDuplicate = historicalData.some(rec => 
+        rec.numero === numeroFattura && 
+        rec.fornitore === nomeFornitore && 
+        numeroFattura !== "N/A"
+    );
+
     // Read lines (Articoli / Servizi)
     const linee = xmlDoc.querySelectorAll("DettaglioLinee");
     
@@ -134,6 +143,7 @@ async function parseXMLFattura(file) {
         // Salva TUTTE le righe nell'array raw per il visualizzatore Raw XML
         rawXmlData.push({
             file: file.name,
+            numero: numeroFattura,
             date: dataFattura,
             fornitore: nomeFornitore || "Sconosciuto",
             dettaglio: desc,
@@ -150,6 +160,7 @@ async function parseXMLFattura(file) {
         
         stagingRecords.push({
             id: Date.now() + Math.random().toString(36),
+            numero: numeroFattura,
             date: dataFattura,
             fornitore: nomeFornitore || "Sconosciuto",
             dettaglio: desc,
@@ -158,7 +169,8 @@ async function parseXMLFattura(file) {
             predictedCategory: prediction.category,
             predictedDescription: prediction.description,
             confidence: prediction.confidence,
-            status: 'ready' // ready, saved, error
+            status: isDuplicate ? 'error' : 'ready', // ready, saved, error
+            errorMsg: isDuplicate ? "Fattura già caricata (Stesso Fornitore e Numero)" : null
         });
     });
 }
@@ -272,11 +284,21 @@ function renderStagingTable() {
             defaultDescOpts = defaultDescOpts.replace(`value="${record.predictedDescription}"`, `value="${record.predictedDescription}" selected`);
         }
 
+        let statusIcon = '<i class="fas fa-file-invoice" style="color:#64748b;"></i>';
+        let statusText = '';
+        if (record.status === 'saved') statusIcon = '<i class="fas fa-check-circle" style="color:#10b981;"></i>';
+        else if (record.status === 'error') {
+            statusIcon = '<i class="fas fa-exclamation-triangle" style="color:#ef4444;" title="' + record.errorMsg + '"></i>';
+            statusText = `<div style="color:#ef4444; font-size:0.7em; font-weight:bold; max-width: 60px;">${record.errorMsg}</div>`;
+        }
+
         tr.innerHTML = `
             <td>
-                ${record.status === 'saved' ? '<i class="fas fa-check-circle" style="color:#10b981;"></i>' : '<i class="fas fa-file-invoice" style="color:#64748b;"></i>'}
+                ${statusIcon}
+                ${statusText}
             </td>
             <td>${record.date}</td>
+            <td style="font-size: 0.8em; color:#475569; font-family: monospace;"><b>${record.numero || '-'}</b></td>
             <td style="font-size: 0.9em;"><strong>${record.fornitore}</strong></td>
             <td>
                 <select class="staging-select staging-desc" data-idx="${index}" ${record.status==='saved'?'disabled':''}>
@@ -346,6 +368,7 @@ async function saveToGestionale() {
         }
         
         const payload = {
+            numero: record.numero || "N/A",
             date: record.date,
             type: record.predictedType,
             category: record.predictedCategory,
@@ -447,7 +470,7 @@ function renderRawXmlModal() {
     tbody.innerHTML = '';
     
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #64748b;">Nessun dato corrispondente trovato o nessun file caricato.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #64748b;">Nessun dato corrispondente trovato o nessun file caricato.</td></tr>';
         return;
     }
     
@@ -456,6 +479,7 @@ function renderRawXmlModal() {
         tr.innerHTML = `
             <td style="font-size: 0.8em; color: #64748b; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${d.file}">${d.file}</td>
             <td style="font-size: 0.85em;">${d.date}</td>
+            <td style="font-family: monospace; font-weight: bold; color:#475569;">${d.numero || '-'}</td>
             <td style="font-size: 0.9em; font-weight: 500;">${d.fornitore}</td>
             <td style="font-size: 0.85em; color: #475569;">${d.dettaglio}</td>
             <td style="font-family: monospace; text-align: center;">${d.quantita}</td>

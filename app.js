@@ -1177,6 +1177,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 tr.setAttribute('data-id', item.id);
                 tr.innerHTML = `
                     <td>${displayDate}</td>
+                    <td style="font-family: monospace; font-size: 0.9em; color:#475569;"><b>${item.numero || '-'}</b></td>
                     <td><strong>${displayType}</strong></td>
                     <td>${item.category}</td>
                     <td>${item.description || '-'}</td>
@@ -3979,6 +3980,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                  tr.innerHTML = `
                      <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.85em;">${displayDate}</td>
+                     <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.9em; font-family: monospace; font-weight: bold; color:#475569;">${item.numero || '-'}</td>
                      <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.9em; font-weight: 500;">${item.fornitore || '-'}</td>
                      <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.9em;">${item.cliente || '-'}</td>
                      <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.8em;"><strong>${displayType}</strong></td>
