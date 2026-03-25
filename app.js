@@ -4193,7 +4193,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <td style="font-size: 0.85em; color: #475569; padding:8px;">${d.dettaglio}</td>
                 <td style="font-family: monospace; text-align: center; padding:8px;">${d.quantita}</td>
                 <td style="font-family: monospace; text-align: right; padding:8px;">${formatCurrency(d.prezzoUnitario)}</td>
-                <td style="font-family: monospace; text-align: right; padding:8px;">${d.aliquotaIVA}%</td>
                 <td style="font-family: monospace; font-weight: bold; color: #0f172a; text-align: right; padding:8px;">${formatCurrency(d.amount)}</td>
             `;
             tbody.appendChild(tr);
