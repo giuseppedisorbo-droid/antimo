@@ -3995,4 +3995,204 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         drilldownModal.classList.remove('hidden');
     }
+
+    // --- RAW XML VIEWER MODAL LOGIC ---
+    let rawXmlState = { sortCol: 'date', sortAsc: false, query: '', fileFilter: '', typeFilter: [], catFilter: [] };
+    
+    const showRawBtn = document.getElementById('show-raw-xml-btn');
+    const rawXmlModal = document.getElementById('raw-xml-modal');
+    const closeRawBtn = document.getElementById('close-raw-xml');
+    
+    if (showRawBtn && rawXmlModal) {
+        showRawBtn.addEventListener('click', () => {
+            try {
+                const rawFileFilter = document.getElementById('raw-file-filter');
+                const uniqueFiles = Array.from(new Set(appData.map(d => d.fileSorgente).filter(Boolean))).sort();
+                const curr = rawFileFilter.value;
+                rawFileFilter.innerHTML = '<option value="">-- Tutti i File --</option>' + 
+                    uniqueFiles.map(f => `<option value="${f}" ${f===curr?'selected':''}>${f}</option>`).join('');
+                    
+                renderRawXmlTable();
+                rawXmlModal.classList.remove('hidden');
+            } catch (err) {
+                console.error("Error opening Raw XML modal:", err);
+                alert("Errore apertura finestra: " + err.message + "\nAssicurati di aver premuto Aggiorna (Ctrl+F5).");
+            }
+        });
+        
+        closeRawBtn.addEventListener('click', () => rawXmlModal.classList.add('hidden'));
+        
+        document.getElementById('raw-search-input').addEventListener('input', e => {
+            rawXmlState.query = e.target.value.toLowerCase().trim();
+            renderRawXmlTable();
+        });
+        document.getElementById('raw-file-filter').addEventListener('change', e => {
+            rawXmlState.fileFilter = e.target.value;
+            renderRawXmlTable();
+        });
+        
+        document.querySelectorAll('.sortable-raw').forEach(th => {
+            th.addEventListener('click', () => {
+                const col = th.getAttribute('data-sort');
+                if (rawXmlState.sortCol === col) rawXmlState.sortAsc = !rawXmlState.sortAsc;
+                else { rawXmlState.sortCol = col; rawXmlState.sortAsc = false; }
+                renderRawXmlTable();
+            });
+        });
+
+        const rawTypesDropdown = document.getElementById('raw-type-dropdown');
+        const rawCatsDropdown = document.getElementById('raw-cat-dropdown');
+        
+        document.getElementById('raw-type-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            rawTypesDropdown.classList.toggle('hidden');
+            rawCatsDropdown.classList.add('hidden');
+            populateRawDropdowns();
+        });
+        document.getElementById('raw-cat-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            rawCatsDropdown.classList.toggle('hidden');
+            rawTypesDropdown.classList.add('hidden');
+            populateRawDropdowns();
+        });
+        
+        window.addEventListener('click', (e) => {
+            if (!document.getElementById('raw-type-btn').contains(e.target) && !rawTypesDropdown.contains(e.target)) {
+                rawTypesDropdown.classList.add('hidden');
+            }
+            if (!document.getElementById('raw-cat-btn').contains(e.target) && !rawCatsDropdown.contains(e.target)) {
+                rawCatsDropdown.classList.add('hidden');
+            }
+            if (e.target === rawXmlModal) rawXmlModal.classList.add('hidden');
+        });
+        
+        document.getElementById('raw-type-sel-all').addEventListener('click', () => {
+            document.querySelectorAll('#raw-type-checkboxes input').forEach(cb => cb.checked = true);
+            updateRawFilters();
+        });
+        document.getElementById('raw-type-desel-all').addEventListener('click', () => {
+            document.querySelectorAll('#raw-type-checkboxes input').forEach(cb => cb.checked = false);
+            updateRawFilters();
+        });
+        document.getElementById('raw-cat-sel-all').addEventListener('click', () => {
+            document.querySelectorAll('#raw-cat-checkboxes input').forEach(cb => cb.checked = true);
+            updateRawFilters();
+        });
+        document.getElementById('raw-cat-desel-all').addEventListener('click', () => {
+            document.querySelectorAll('#raw-cat-checkboxes input').forEach(cb => cb.checked = false);
+            updateRawFilters();
+        });
+    }
+
+    function populateRawDropdowns() {
+        const typeContainer = document.getElementById('raw-type-checkboxes');
+        const catContainer = document.getElementById('raw-cat-checkboxes');
+        
+        if (typeContainer.innerHTML.trim() === '') {
+            const types = Array.from(new Set(appData.map(d => d.type).filter(Boolean))).sort();
+            typeContainer.innerHTML = types.map(t => `<label><input type="checkbox" value="${t}"> ${t}</label>`).join('');
+            typeContainer.querySelectorAll('input').forEach(cb => cb.addEventListener('change', updateRawFilters));
+        }
+        if (catContainer.innerHTML.trim() === '') {
+            const cats = Array.from(new Set(appData.map(d => d.category).filter(Boolean))).sort();
+            catContainer.innerHTML = cats.map(c => `<label><input type="checkbox" value="${c}"> ${c}</label>`).join('');
+            catContainer.querySelectorAll('input').forEach(cb => cb.addEventListener('change', updateRawFilters));
+        }
+    }
+
+    function updateRawFilters() {
+        rawXmlState.typeFilter = Array.from(document.querySelectorAll('#raw-type-checkboxes input:checked')).map(cb => cb.value);
+        rawXmlState.catFilter = Array.from(document.querySelectorAll('#raw-cat-checkboxes input:checked')).map(cb => cb.value);
+        renderRawXmlTable();
+    }
+
+    function renderRawXmlTable() {
+        const tbody = document.getElementById('raw-xml-tbody');
+        if (!tbody) return;
+        
+        let data = appData.map(item => ({
+            fileSorgente: item.fileSorgente || 'Inserimento Manuale',
+            date: item.date,
+            numero: item.numero || '-',
+            fornitore: item.fornitore || '-',
+            type: item.type || '-',
+            category: item.category || '-',
+            description: item.description || '-',
+            dettaglio: item.dettaglio || '-',
+            quantita: item.quantita || 1,
+            prezzoUnitario: item.prezzoUnitario !== undefined ? item.prezzoUnitario : item.amount,
+            aliquotaIVA: item.aliquotaIVA || 0,
+            amount: item.amount || 0
+        }));
+
+        if (rawXmlState.fileFilter) data = data.filter(d => d.fileSorgente === rawXmlState.fileFilter);
+        if (rawXmlState.typeFilter.length > 0) data = data.filter(d => rawXmlState.typeFilter.includes(d.type));
+        if (rawXmlState.catFilter.length > 0) data = data.filter(d => rawXmlState.catFilter.includes(d.category));
+        
+        if (rawXmlState.query) {
+            const q = rawXmlState.query;
+            data = data.filter(d => 
+                `${d.fornitore} ${d.dettaglio} ${d.fileSorgente} ${d.numero} ${d.type} ${d.category} ${d.description}`.toLowerCase().includes(q)
+            );
+        }
+
+        data.sort((a, b) => {
+            let valA = a[rawXmlState.sortCol];
+            let valB = b[rawXmlState.sortCol];
+            if (typeof valA === 'string') valA = valA.toLowerCase();
+            if (typeof valB === 'string') valB = valB.toLowerCase();
+            if (valA < valB) return rawXmlState.sortAsc ? -1 : 1;
+            if (valA > valB) return rawXmlState.sortAsc ? 1 : -1;
+            return 0;
+        });
+
+        document.querySelectorAll('.sortable-raw').forEach(th => {
+            th.classList.remove('active');
+            th.querySelector('.sort-icon-raw').innerHTML = '';
+            if (th.getAttribute('data-sort') === rawXmlState.sortCol) {
+                th.classList.add('active');
+                th.querySelector('.sort-icon-raw').innerHTML = rawXmlState.sortAsc ? ' &#9650;' : ' &#9660;';
+            }
+        });
+
+        const activeContainer = document.getElementById('raw-active-filters-container');
+        let activeTags = [];
+        if (rawXmlState.typeFilter.length > 0) activeTags.push(`<b>Tipi:</b> ${rawXmlState.typeFilter.join(', ')}`);
+        if (rawXmlState.catFilter.length > 0) activeTags.push(`<b>Categorie:</b> ${rawXmlState.catFilter.join(', ')}`);
+        
+        if (activeTags.length > 0) activeContainer.innerHTML = 'Filtri Attivi: ' + activeTags.join(' | ');
+        activeContainer.style.display = activeTags.length > 0 ? 'block' : 'none';
+
+        tbody.innerHTML = '';
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 20px; color: #64748b;">Nessun dato corrispondente ai filtri.</td></tr>';
+            return;
+        }
+
+        const typeLabelsShort = { 'REVENUE_EUBIOS': 'RICAVI EUBIOS', 'COSTS_EUBIOS': 'COSTI EUBIOS', 'REVENUE_EUBIOTECH': 'RICAVI EUBIOTECH', 'Costi risorse umane': 'C. RISORSE UMANE', 'Costi altri': 'ALTRI COSTI' };
+
+        data.forEach(d => {
+            const tr = document.createElement('tr');
+            let dispDate = d.date;
+            try { const p = d.date.split('-'); if(p.length===3) dispDate = `${p[2]}/${p[1]}/${p[0]}`; } catch(e){}
+            const dispType = typeLabelsShort[d.type] || d.type;
+
+            tr.innerHTML = `
+                <td style="font-size: 0.8em; color: #64748b; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${d.fileSorgente}">${d.fileSorgente}</td>
+                <td style="font-size: 0.85em; padding:8px;">${dispDate}</td>
+                <td style="font-family: monospace; font-weight: bold; color:#475569; padding:8px;">${d.numero}</td>
+                <td style="font-size: 0.9em; font-weight: 500; padding:8px;">${d.fornitore}</td>
+                <td style="font-size: 0.8em; padding:8px;"><strong>${dispType}</strong></td>
+                <td style="font-size: 0.85em; padding:8px;">${d.category}</td>
+                <td style="font-size: 0.85em; color: #475569; padding:8px;">${d.description}</td>
+                <td style="font-size: 0.85em; color: #475569; padding:8px;">${d.dettaglio}</td>
+                <td style="font-family: monospace; text-align: center; padding:8px;">${d.quantita}</td>
+                <td style="font-family: monospace; text-align: right; padding:8px;">${formatCurrency(d.prezzoUnitario)}</td>
+                <td style="font-family: monospace; text-align: right; padding:8px;">${d.aliquotaIVA}%</td>
+                <td style="font-family: monospace; font-weight: bold; color: #0f172a; text-align: right; padding:8px;">${formatCurrency(d.amount)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
 });
