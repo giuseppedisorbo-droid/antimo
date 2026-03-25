@@ -3807,10 +3807,15 @@ if(valPeriod) {
 
 function initValuationDropdowns() {
     const currentUser = localStorage.getItem('antimo_user_name') || "";
+    const userEmail = (localStorage.getItem('antimo_user_email') || "").toLowerCase();
+    
+    // Bypass di sicurezza per amministratori originali
     let isDirezione = false;
+    if (userEmail.includes('eubios') || userEmail.includes('giuseppe') || currentUser.toLowerCase().includes('antimo')) isDirezione = true;
+
     if(window.anagrafiche) {
         const u = window.anagrafiche.find(a => (a.ragioneSociale || (a.nome + " " + (a.cognome||""))).trim() === currentUser);
-        if(u && u.ruolo && u.ruolo.toUpperCase() === 'DIREZIONE') isDirezione = true;
+        if(u && u.ruolo && u.ruolo.toUpperCase().includes('DIREZ')) isDirezione = true;
     }
 
     if(valRole && window.antimoDropdownLists && window.antimoDropdownLists.ruoli) {
@@ -3898,9 +3903,6 @@ if(btnCalculateValuation) {
             }
 
 
-            const valExcludeTextEl = document.getElementById('valExcludeText');
-            const excludeTxt = valExcludeTextEl ? valExcludeTextEl.value.trim().toLowerCase() : "";
-
             const { collection, getDocs, query, where, doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
             
             // Esposizione per funzione Elimina Test
@@ -3933,8 +3935,16 @@ if(btnCalculateValuation) {
             
             // SECURITY: Forza filtro se non è direzione
             const currentUser = localStorage.getItem('antimo_user_name') || "";
+            const userEmail = (localStorage.getItem('antimo_user_email') || "").toLowerCase();
+            let isDirCalc = false;
+            
+            // Bypass sicurezza per amministratori base (risolve problema "Non funziona nulla")
+            if (userEmail.includes('eubios') || userEmail.includes('giuseppe') || currentUser.toLowerCase().includes('antimo')) isDirCalc = true;
+
             const currentUserRole = cacheRuoliApp[currentUser] || "Sconosciuto";
-            if (currentUserRole.toUpperCase() !== 'DIREZIONE') {
+            if (currentUserRole.toUpperCase().includes('DIREZ')) isDirCalc = true;
+
+            if (!isDirCalc) {
                 oFilter = currentUser;
             }
 
@@ -3963,12 +3973,6 @@ if(btnCalculateValuation) {
                 tipis.forEach(tCode => {
                     if (valInterventi[tCode]) curVal += valInterventi[tCode];
                 });
-                
-                // Filtro Esclusione Testuale
-                if (excludeTxt) {
-                    const searchableString = (opStr + " " + (data.paziente||"") + " " + (data.note||"") + " " + msgTipo).toLowerCase();
-                    if (searchableString.includes(excludeTxt)) return;
-                }
 
                 validCount++;
                 sumVal += curVal;
