@@ -352,24 +352,10 @@ function toggleTarget(target) {
     updateHeaderFiltersUI();
     updateUI();
 
-    // Porta in primo piano la sezione attiva come richiesto
+    // Porta in primo piano ripristinando la visuale in alto per mantenere visibile lo spazio verde!
     setTimeout(() => {
-        if (target === 'oggi' || target === 'eseguiti' || target === 'neseg') {
-            if (activitiesListContainer && !activitiesListContainer.classList.contains('hidden')) {
-                activitiesListContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-        } else if (target === 'np') {
-            const npCont = document.getElementById('npSection');
-            if (npCont && !npCont.classList.contains('hidden')) {
-                npCont.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-        } else if (target === 'domani' || target === 'planned') {
-            const progCont = document.getElementById('programmatiContainer');
-            if (progCont && !progCont.classList.contains('hidden')) {
-                progCont.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-        }
-    }, 100);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 50);
 }
 
 if(btnMostraOggi) btnMostraOggi.addEventListener('click', () => toggleTarget('oggi'));
@@ -4186,7 +4172,11 @@ if(magicSearchApp) {
                         ${tipoDecoded ? `<div style="font-size: 0.85rem; color: #b45309;">📝 ${tipoDecoded}</div>` : ''}
                         ${techStr ? `<div style="font-size: 0.8rem; color: var(--blue-primary); font-weight: 600;">👨‍🔧 ${techStr}</div>` : ''}
                         ${item.note ? `<div style="font-size: 0.8rem; color: #666; font-style: italic; background: #f1f5f9; padding: 6px; border-radius: 4px; margin-top: 4px;">Note: ${item.note}</div>` : ''}
-                        ${item.fileUrls && item.fileUrls.length > 0 ? `<div style="font-size: 0.8rem; color: #2563eb; background: #e0f2fe; display: inline-block; padding: 2px 6px; border-radius: 4px; align-self: flex-start; margin-top: 4px; font-weight: 600;">📎 ${item.fileUrls.length} Allegat${item.fileUrls.length > 1 ? 'i' : 'o'} (Da app per PC)</div>` : ''}
+                        ${item.fileUrls && item.fileUrls.length > 0 ? 
+                            `<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
+                                ${item.fileUrls.map((url, i) => `<a href="${url}" target="_blank" style="font-size: 0.8rem; color: #2563eb; background: #e0f2fe; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; text-decoration: none; font-weight: 600; border: 1px solid #bae6fd; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">📎 Apri Allegato ${i+1}</a>`).join('')}
+                            </div>` 
+                            : ''}
                     `;
                     magicSearchResultsContainer.appendChild(div);
                 });
