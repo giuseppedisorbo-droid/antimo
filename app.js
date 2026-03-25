@@ -1,4031 +1,3996 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, updateDoc, serverTimestamp, enableIndexedDbPersistence, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
-
-// ====== CONFIGURAZIONE FIREBASE ======
-// INSERISCI QUI I DATI DEL TUO PROGETTO FIREBASE. LI TROVI NELLE IMPOSTAZIONI DI FIREBASE CONSOLE.
+// --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
-  apiKey: "AIzaSyB6CLQZHPG60LqsIKHAlS_Wt5OFXqfwqkw",
-  authDomain: "antimo-6a86b.firebaseapp.com",
-  projectId: "antimo-6a86b",
-  storageBucket: "antimo-6a86b.firebasestorage.app",
-  messagingSenderId: "671676764068",
-  appId: "1:671676764068:web:95027e0babe3f30042fb31",
-  measurementId: "G-WTWNH23PLS"
+    apiKey: "AIzaSyC0OFuNjPa8TrOGUfWMELBHS2tB07U7Pu4",
+    authDomain: "eubiotech.firebaseapp.com",
+    projectId: "eubiotech",
+    storageBucket: "eubiotech.firebasestorage.app",
+    messagingSenderId: "55119431815",
+    appId: "1:55119431815:web:5b5ab02b59b1ce51119022",
+    measurementId: "G-L59VJ4OJ69"
 };
 
-let app, db, storage;
-let isFirebaseConfigured = firebaseConfig.apiKey !== "INSERISCI_QUI_API_KEY";
+// Initialize Firebase
+const _firebaseApp = firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const storage = firebase.storage();
 
-if (isFirebaseConfigured) {
+// Collection reference
+const dataCollection = db.collection('financial_records');
+const anagraficheCollection = db.collection('anagrafiche');
+const fattureCollection = db.collection('fatture');
+
+// --- Global State & UI Elements ---
+let appData = [];
+let anagraficheData = [];
+let customGroupings = []; // Added for custom causali groupings
+let isDataLoaded = false;
+let tableBody = null;
+let filtersGeneratedOnce = false;
+
+// Form Elements
+let form, dateInput, typeInput, categorySelect, customCategoryInput, descInput, amountInput, submitBtn, cancelEditBtn, tableHeadRow;
+let editingId = null;
+// Buttons & Imports
+let clearBtn, loadBackupBtn, importExtraBtn, importExtraFile, exportBackupBtn, importBackupBtn, importBackupFile;
+// Filter Elements
+let filterContainer, toggleFiltersBtn, globalClearFiltersBtn, clearFiltersBtn;
+let yearFiltersContainer, monthFiltersContainer, typeFiltersContainer, categoryFiltersContainer, groupBySelect;
+let actionsMenuBtn, actionsDropdownContent;
+// Settings Modal Elements
+let settingsBtn, settingsModal, closeSettingsModal, saveGroupBtn, cancelGroupBtn;
+let newGroupNameInput, customGroupsContainer, settingsFormTitle, settingsFormArea;
+let settingsTypesContainer, settingsCategoriesContainer, settingsDescriptionsContainer;
+let editingGroupId = null; // Track if we're editing an existing custom group
+
+// Context Menu Elements
+let contextMenu, ctxEditBtn, ctxDeleteBtn;
+let contextMenuTargetId = null;
+// Summary Cards Elements
+let sumRevenueEubiosEl, sumRevenueTechEl, sumCogsEl, sumOpexEl, sumProfitEl;
+
+// Filter State
+let filterState = {
+    years: new Set(),
+    months: new Set([1,2,3,4,5,6,7,8,9,10,11,12]), // 1 to 12
+    types: new Set(),
+    categories: new Set(),
+    descriptions: new Set(),
+    customGroups: new Set(), // Added for custom group filtering
+    sortCols: [{ col: 'date', dir: 'desc' }], // Multi-level sorting array
+    groupBy: 'year',
+    searchQuery: '',
+    columnFilters: {
+        type: '',
+        category: '',
+        description: ''
+    }
+};
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Initialize State
+    const DATA_KEY = 'EUBIOTECH_financial_data';
+    const CUSTOM_GROUPS_KEY = 'EUBIOTECH_custom_groups';
+
+    // Variables initialized here to prevent ReferenceErrors
+    tableBody = document.getElementById('data-body');
+
+
+    // Show loading state
+    if(tableBody) {
+        tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px;">Caricamento dati dal Cloud... <span style="display:inline-block; animation: spin 1s infinite linear;">⚙️</span></td></tr>';
+    }
+
     try {
-        app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
+        // Load from Firestore
+        const [snapshot, anagraficheSnapshot] = await Promise.all([
+            dataCollection.get(),
+            anagraficheCollection.get()
+        ]);
         
-        // Abilita la persistenza offline (cache locale di Firebase)
-        enableIndexedDbPersistence(db).catch((err) => {
-            console.warn("Firebase Persistence offline error: ", err.code);
+        appData = [];
+        anagraficheData = [];
+        
+        anagraficheSnapshot.forEach(doc => {
+            anagraficheData.push({ id: doc.id, ...doc.data() });
+        });
+        const descriptionsSet = new Set();
+        const providersSet = new Set();
+        const clientsSet = new Set();
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            // Just gather all unique descriptions across the system
+            if (data.description) descriptionsSet.add(data.description);
+            if (data.fornitore) providersSet.add(data.fornitore);
+            if (data.cliente) clientsSet.add(data.cliente);
         });
 
-        storage = getStorage(app);
-        console.log("Firebase Inizializzato con successo.");
-    } catch(e) {
-        console.error("Errore inizializzazione Firebase", e);
-        isFirebaseConfigured = false;
-    }
-} else {
-    console.warn("Firebase non configurato. I dati verranno salvati solo in locale (localStorage) finché non aggiornerai le chiavi in app.js.");
-    // Piccola notifica la prima volta
-    if(!sessionStorage.getItem('fb_warned')) {
-        alert("Attenzione: Firebase non è configurato. Inserisci le tue chiavi in app.js per abilitare il salvataggio in Cloud. Per ora i dati restano sul dispositivo.");
-        sessionStorage.setItem('fb_warned', 'true');
-    }
-}
-// =====================================
+        const descriptions = Array.from(descriptionsSet).sort();
+        const providers = Array.from(providersSet).sort();
+        const clients = Array.from(clientsSet).sort();
 
-// Liste Dinamiche Dropdown
-window.antimoDropdownLists = { interventi: [], dispositivi: [], ruoli: [] };
-window.decodeCodeToLabel = function(codeRaw, type = 'interventi') {
-    if(!codeRaw) return "";
-    let codes = codeRaw.split(',').map(c => c.trim());
-    return codes.map(c => {
-        let listStr = type === 'interventi' ? 'interventi' : (type === 'ruoli' ? 'ruoli' : 'dispositivi');
-        let found = window.antimoDropdownLists[listStr].find(item => item.id === c);
-        return found ? found.desc : c;
-    }).join(', ');
-};
-
-async function loadDropdownLists() {
-    const defaultTypes = ['Visita', 'Sostituzione', 'Ritiro', 'Consegna', 'Manutenzione', 'Installazione', 'Riparazione'];
-    const defaultDevices = ['Concentratore', 'Ventilatore', 'Aspiratore', 'D3', 'Stativo', 'Cpap', 'AutoCpap', 'Saturimetro'];
-    const defaultRoles = ["TECNICO", "TRASPORTATORE", "AMMINISTRATIVO", "MAGAZZINO", "LOGISTICA", "DIREZIONE", "PRODUZIONE O2", "CONSULENTE E", "CONSULENTE D", "CONSULENTE M"];
-    
-    // Default se Firebase non è configurato o offline primissimo avvio
-    // Per retrocompatibilità al 100%, l'ID delle voci default combacia col loro nome testo originario.
-    let baseDropdownLists = {
-        interventi: defaultTypes.map(t => ({ id: t, desc: t })),
-        dispositivi: defaultDevices.map(d => ({ id: d, desc: d })),
-        ruoli: defaultRoles.map(r => ({ id: r, desc: r }))
-    };
-    
-    window.antimoDropdownLists = baseDropdownLists;
-
-    if(isFirebaseConfigured) {
-        try {
-            const docRef = doc(db, "configurazioni", "liste_dropdown");
-            const docSnap = await getDoc(docRef);
-            if(docSnap.exists()) {
-                const cloudData = docSnap.data();
-                
-                let needsUpdate = false;
-                if(!cloudData.interventi) { cloudData.interventi = baseDropdownLists.interventi; needsUpdate = true; }
-                if(!cloudData.dispositivi) { cloudData.dispositivi = baseDropdownLists.dispositivi; needsUpdate = true; }
-                if(!cloudData.ruoli) { cloudData.ruoli = baseDropdownLists.ruoli; needsUpdate = true; }
-                
-                window.antimoDropdownLists = cloudData;
-                
-                if(needsUpdate) {
-                    await setDoc(docRef, window.antimoDropdownLists);
-                }
-                
-                localStorage.setItem('antimo_dropdown_lists', JSON.stringify(window.antimoDropdownLists));
-            } else {
-                await setDoc(docRef, window.antimoDropdownLists);
-                localStorage.setItem('antimo_dropdown_lists', JSON.stringify(window.antimoDropdownLists));
-            }
-        } catch(e) {
-            console.error("Errore fetch liste dropdown, uso cache", e);
-            let cached = localStorage.getItem('antimo_dropdown_lists');
-            if(cached) {
-                window.antimoDropdownLists = JSON.parse(cached);
-                if(!window.antimoDropdownLists.ruoli) window.antimoDropdownLists.ruoli = baseDropdownLists.ruoli;
-            }
+        // 3. Popola i select per l'interfaccia principale
+        const buildOptionsHtml = (arr) => arr.map(item => `<option value="${item.replace(/"/g, '&quot;')}">${item.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</option>`).join('');
+        
+        const descSelect = document.getElementById('description-input');
+        if (descSelect) {
+            descSelect.innerHTML = `<option value="" selected>Nessuna descrizione</option>` +
+                                   buildOptionsHtml(descriptions) +
+                                   `<option value="altro">+ Aggiungi nuova voce...</option>`;
         }
         
-        // Fetch Operatori Sanitari
-        window.operatoriSanitari = [];
-        try {
-            const qOps = query(collection(db, "anagrafiche"), where("qualifica", "==", "Operatore sanitario"));
-            const opsSnap = await getDocs(qOps);
-            opsSnap.forEach(d => {
-                const data = d.data();
-                window.operatoriSanitari.push({id: d.id, nome: (data.nome + " " + (data.cognome||"")).trim()});
-            });
-        } catch(e) { console.error("Errore fetch operatori sanitari", e); }
+        const provSelect = document.getElementById('fornitore-input');
+        if (provSelect) {
+            provSelect.innerHTML = `<option value="" selected>Nessun fornitore</option>` +
+                                   buildOptionsHtml(providers);
+        }
         
-    } else {
-        let cached = localStorage.getItem('antimo_dropdown_lists');
-        if(cached) window.antimoDropdownLists = JSON.parse(cached);
-    }
-}
-// Chiamiamo il caricamento
-loadDropdownLists().then(() => {
-    initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
-    initDynamicBlocks('dynamicProgInterventionsContainer', 'btnAddProgInterventionBlock');
-});
-
-// Stato App
-let completedInterventions = JSON.parse(localStorage.getItem('antimo_interventions')) || [];
-let plannedInterventions = JSON.parse(localStorage.getItem('antimo_plannedInterventions')) || [];
-
-let currentAttachments = [];
-let currentProgAttachments = []; // Novita: Array allegati per la programmazione
-let pendingFileUrlsProgrammati = []; // Trasferisce gli allegati dal programmato all'attivo
-let requireKm = JSON.parse(localStorage.getItem('antimo_requireKm')); 
-if (requireKm === null) requireKm = false; // default
-
-
-// DOM Elements
-const interventionSection = document.getElementById('interventionSection');
-const activeInterventionSection = document.getElementById('activeInterventionSection');
-const interventiCount = document.getElementById('interventiCount');
-const nesegCount = document.getElementById('nesegCount');
-const programmatiCount = document.getElementById('programmatiCount');
-const filterTecnicoOggi = document.getElementById('filterTecnicoOggi');
-
-const newInterventionForm = document.getElementById('newInterventionForm');
-const btnToggleNuovoIntervento = document.getElementById('btnToggleNuovoIntervento');
-const btnCloseInterventionSection = document.getElementById('btnCloseInterventionSection');
-const btnStartIntervention = document.getElementById('btnStartIntervention');
-const btnPlanIntervention = document.getElementById('btnPlanIntervention');
-const btnViewActivities = document.getElementById('btnViewActivities');
-const btnShareCSV = document.getElementById('btnShareCSV');
-const btnManualSyncMobile = document.getElementById('btnManualSyncMobile');
-const activitiesListContainer = document.getElementById('activitiesListContainer');
-const activitiesList = document.getElementById('activitiesList');
-const plannedInterventionsSection = document.getElementById('plannedInterventionsSection');
-const plannedList = document.getElementById('plannedList');
-const npInterventionsSection = document.getElementById('npInterventionsSection');
-const npList = document.getElementById('npList');
-const oggiInterventionsSection = document.getElementById('oggiInterventionsSection');
-const oggiList = document.getElementById('oggiList');
-const domaniInterventionsSection = document.getElementById('domaniInterventionsSection');
-const domaniList = document.getElementById('domaniList');
-
-// Buttons for Toggling Sections
-const btnMostraProgrammati = document.getElementById('btnMostraProgrammati');
-const btnMostraP = document.getElementById('btnMostraP');
-const btnCalendar = document.getElementById('btnCalendarLink'); // changed to Link!
-const btnMostraEseguiti = document.getElementById('btnMostraEseguiti');
-const btnMostraNP = document.getElementById('btnMostraNP');
-const btnMostraNeseguiti = document.getElementById('btnMostraNeseguiti');
-const npCount = document.getElementById('npCount');
-const btnMostraOggi = document.getElementById('btnMostraOggi');
-const btnMostraDomani = document.getElementById('btnMostraDomani');
-const oggiCount = document.getElementById('oggiCount');
-const domaniCount = document.getElementById('domaniCount');
-
-// Messaggistica
-const messagesSection = document.getElementById('messagesSection');
-const btnToggleMessages = document.getElementById('btnToggleMessages');
-const messagesContainer = document.getElementById('messagesContainer');
-const messagesList = document.getElementById('messagesList');
-const newMessageForm = document.getElementById('newMessageForm');
-const msgText = document.getElementById('msgText');
-const msgIsNotification = document.getElementById('msgIsNotification');
-const btnTopNotification = document.getElementById('btnTopNotification');
-const topNotificationText = document.getElementById('topNotificationText');
-
-// Nodi Ricerca e Filtro Bacheca
-const btnMsgTabAll = document.getElementById('btnMsgTabAll');
-const btnMsgTabReceived = document.getElementById('btnMsgTabReceived');
-const btnMsgTabSent = document.getElementById('btnMsgTabSent');
-const btnMsgTabUnread = document.getElementById('btnMsgTabUnread');
-const btnMsgTabDeleted = document.getElementById('btnMsgTabDeleted');
-const btnMsgTabInCharge = document.getElementById('btnMsgTabInCharge');
-const btnMsgTabReplied = document.getElementById('btnMsgTabReplied');
-const btnEmptyTrash = document.getElementById('btnEmptyTrash');
-const msgSearchText = document.getElementById('msgSearchText');
-const msgSearchUser = document.getElementById('msgSearchUser');
-const msgSearchDate = document.getElementById('msgSearchDate');
-let currentMsgTab = 'all'; // 'all', 'received', 'sent', 'unread', 'in_charge', 'replied', 'resolved', 'deleted'
-
-// Nuovi Toggles Logic
-let isPlannedVisible = false;
-let isNpVisible = false;
-let isNesegVisible = false;
-let isOggiVisible = false;
-let isDomaniVisible = false;
-let isEseguitiVisible = false;
-let selectedCalendarDate = null;
-let allExpanded = false;
-
-// Tracker for 1-Step Form Programmed interventions
-let activeProgFbId = null;
-let activeProgItem = null;
-
-const globalToggleCardContainer = document.getElementById('globalToggleCardContainer');
-const btnToggleAllCollapse = document.getElementById('btnToggleAllCollapse');
-
-if(btnToggleAllCollapse) {
-    btnToggleAllCollapse.addEventListener('click', () => {
-        allExpanded = !allExpanded;
-        const expandedViews = document.querySelectorAll('.card-expanded-view');
-        const icons = document.querySelectorAll('.expand-icon');
-        expandedViews.forEach(el => {
-            if (allExpanded) el.classList.remove('hidden');
-            else el.classList.add('hidden');
-        });
-        icons.forEach(el => {
-            if (allExpanded) el.classList.add('rotate-icon');
-            else el.classList.remove('rotate-icon');
-        });
-        btnToggleAllCollapse.innerHTML = allExpanded ? `<span class="btn-icon">⏫</span> CHIUDI TUTTE LE SCHEDE` : `<span class="btn-icon">⏬</span> APRI TUTTE LE SCHEDE`;
-    });
-}
-
-function setupAccordionCard(cardContainer) {
-    const compactView = cardContainer.querySelector('.card-compact-view');
-    const expandedView = cardContainer.querySelector('.card-expanded-view');
-    const icon = cardContainer.querySelector('.expand-icon');
-    
-    if (allExpanded && expandedView) {
-        expandedView.classList.remove('hidden');
-        if (icon) icon.classList.add('rotate-icon');
-    }
-    
-    if (compactView && expandedView) {
-        compactView.addEventListener('click', (e) => {
-            if (e.target.tagName.toLowerCase() === 'button' || e.target.closest('button')) return;
-            const isHidden = expandedView.classList.contains('hidden');
-            if (isHidden && !allExpanded) {
-                document.querySelectorAll('.card-expanded-view').forEach(el => el.classList.add('hidden'));
-                document.querySelectorAll('.expand-icon').forEach(el => el.classList.remove('rotate-icon'));
-            }
-            if (isHidden) {
-                expandedView.classList.remove('hidden');
-                if (icon) icon.classList.add('rotate-icon');
-            } else {
-                expandedView.classList.add('hidden');
-                if (icon) icon.classList.remove('rotate-icon');
-            }
-        });
-    }
-}
-
-function updateHeaderFiltersUI() {
-    const list = [
-        { btn: btnMostraOggi, active: isOggiVisible },
-        { btn: btnMostraDomani, active: isDomaniVisible },
-        { btn: btnMostraP, active: isPlannedVisible && !selectedCalendarDate },
-        { btn: btnMostraNP, active: isNpVisible },
-        { btn: btnMostraEseguiti, active: isEseguitiVisible },
-        { btn: btnCalendar, active: !!selectedCalendarDate }
-    ];
-    list.forEach(item => {
-        if (item.btn) {
-            if (item.active) item.btn.classList.add('active-filter');
-            else item.btn.classList.remove('active-filter');
+        const cliSelect = document.getElementById('cliente-input');
+        if (cliSelect) {
+            cliSelect.innerHTML = `<option value="" selected>Nessun cliente</option>` +
+                                  buildOptionsHtml(clients);
         }
-    });
-    
-    const anyListVisible = isOggiVisible || isDomaniVisible || isPlannedVisible || isNpVisible || isEseguitiVisible;
-    if (anyListVisible && globalToggleCardContainer) globalToggleCardContainer.classList.remove('hidden');
-    else if (globalToggleCardContainer) globalToggleCardContainer.classList.add('hidden');
-}
-
-function toggleTarget(target) {
-    const wasOn = (() => {
-        if(target === 'oggi') return isOggiVisible;
-        if(target === 'domani') return isDomaniVisible;
-        if(target === 'planned') return isPlannedVisible;
-        if(target === 'np') return isNpVisible;
-        if(target === 'eseguiti') return isEseguitiVisible;
-        if(target === 'neseg') return isNesegVisible;
-        return false;
-    })();
-
-    // Disattiva tutti
-    isOggiVisible = false;
-    isDomaniVisible = false;
-    isPlannedVisible = false;
-    isNpVisible = false;
-    isEseguitiVisible = false;
-    isNesegVisible = false;
-    selectedCalendarDate = null;
-
-    // Se non era già attivo, allora attivalo (effetto toggle esclusivo)
-    if (!wasOn) {
-        if (target === 'oggi') isOggiVisible = true;
-        if (target === 'domani') isDomaniVisible = true;
-        if (target === 'planned') isPlannedVisible = true;
-        if (target === 'np') isNpVisible = true;
-        if (target === 'eseguiti') isEseguitiVisible = true;
-        if (target === 'neseg') isNesegVisible = true;
-    }
-
-    if (isEseguitiVisible || isOggiVisible || isNesegVisible) {
-        activitiesListContainer.classList.remove('hidden');
-        if(btnViewActivities) btnViewActivities.innerHTML = `<span class="btn-icon">🙈</span> NASCONDI ATTIVITÀ`;
-        renderActivitiesList();
-    } else {
-        activitiesListContainer.classList.add('hidden');
-        if(btnViewActivities) btnViewActivities.innerHTML = `<span class="btn-icon">👁</span> VISUALIZZA ATTIVITÀ`;
-    }
-
-    updateHeaderFiltersUI();
-    updateUI();
-}
-
-if(btnMostraOggi) btnMostraOggi.addEventListener('click', () => toggleTarget('oggi'));
-if(btnMostraDomani) btnMostraDomani.addEventListener('click', () => toggleTarget('domani'));
-if(btnMostraP) btnMostraP.addEventListener('click', () => toggleTarget('planned'));
-if(btnMostraNP) btnMostraNP.addEventListener('click', () => toggleTarget('np'));
-if(btnMostraEseguiti) btnMostraEseguiti.addEventListener('click', () => toggleTarget('eseguiti'));
-if(btnMostraNeseguiti) btnMostraNeseguiti.addEventListener('click', () => toggleTarget('neseg'));
-
-if(btnToggleMessages) {
-    btnToggleMessages.addEventListener('click', () => {
-        messagesContainer.classList.toggle('hidden');
-        let badgeSpan = btnToggleMessages.querySelector('span');
-        let noteBadge = badgeSpan ? ' ' + badgeSpan.outerHTML : '';
-        btnToggleMessages.innerHTML = (messagesContainer.classList.contains('hidden') ? 'Mostra' : 'Nascondi') + noteBadge;
-    });
-}
-
-if(btnTopNotification) {
-    btnTopNotification.addEventListener('click', () => {
-        if(messagesContainer.classList.contains('hidden')) {
-            messagesContainer.classList.remove('hidden');
-            btnToggleMessages.textContent = 'Nascondi';
-        }
-        messagesSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-}
-
-if(btnToggleNuovoIntervento) {
-    btnToggleNuovoIntervento.addEventListener('click', () => {
-        interventionSection.classList.toggle('hidden');
-        if(!interventionSection.classList.contains('hidden')) {
-            interventionSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    });
-}
-
-if(btnCloseInterventionSection) {
-    btnCloseInterventionSection.addEventListener('click', () => {
-        interventionSection.classList.add('hidden');
-    });
-}
-
-// --- LOGICA BLOCCHI DINAMICI ---
-function createInterventionBlockHTML() {
-    const types = window.antimoDropdownLists && window.antimoDropdownLists.interventi ? window.antimoDropdownLists.interventi : [];
-    const devices = window.antimoDropdownLists && window.antimoDropdownLists.dispositivi ? window.antimoDropdownLists.dispositivi : [];
-    const operatori = window.operatoriSanitari || [];
-    
-    let typeOptions = types.map(t => `<option value="${t.id}">${t.desc}</option>`).join('');
-    let devOptions = devices.map(d => `<option value="${d.id}">${d.desc}</option>`).join('');
-    let opOptions = operatori.map(o => `<option value="${o.nome}">${o.nome}</option>`).join('');
-    
-    return `
-        <div class="dynamic-intervention-block" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 15px; background: #f8fafc; position: relative;">
-            <button type="button" class="btn-remove-block" style="position: absolute; top: -10px; right: -10px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">×</button>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 8px;">
-                    <label style="font-size: 0.8rem; color: #475569;">Tipo Intervento *</label>
-                    <select class="block-tipo" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: white;">
-                        <option value="">Seleziona...</option>
-                        ${typeOptions}
-                        <option value="Altro">Altro...</option>
-                    </select>
-                </div>
-                <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 8px;">
-                    <label style="font-size: 0.8rem; color: #475569;">Dispositivo</label>
-                    <select class="block-disp" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: white;">
-                        <option value="">Nessuno</option>
-                        ${devOptions}
-                        <option value="Altro">Altro...</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-group" style="margin-bottom: 10px;">
-                <label style="font-size: 0.8rem; color: #475569;">Matricola / Note Extra</label>
-                <input type="text" class="block-mat" placeholder="Es. SN123456" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: white;">
-            </div>
+        
+        snapshot.forEach(doc => {
+            const item = doc.data();
+            // Migrate legacy types just in case
+            if (item.type === 'COGS') item.type = 'COGS_TECH';
+            if (item.type === 'OPEX') item.type = 'OPEX_TECH';
             
-            <div style="border-top: 1px dashed #cbd5e1; padding-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
-                <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 0;">
-                    <label style="font-size: 0.75rem; color: #0284c7; font-weight: bold;">Operatore Sanitario (Opzionale)</label>
-                    <select class="block-operatore" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #bae6fd; font-size: 0.85rem; background: #f0f9ff;">
-                        <option value="">Nessuno</option>
-                        ${opOptions}
-                    </select>
-                </div>
-                <div class="form-group" style="flex: 1; min-width: 80px; margin-bottom: 0;">
-                    <label style="font-size: 0.75rem; color: #0284c7; font-weight: bold;">Esito / Punteggio</label>
-                    <input type="text" class="block-esito" placeholder="Es. Positivo, 95..." style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #bae6fd; font-size: 0.85rem; background: #f0f9ff;">
-                </div>
-                <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 0;">
-                    <label style="font-size: 0.75rem; color: #0284c7; font-weight: bold;">Stato Valutazione</label>
-                    <select class="block-stato-valutazione" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #bae6fd; font-size: 0.85rem; background: #f0f9ff;">
-                        <option value="">Nessuno</option>
-                        <option value="Svolta - A buon fine">✅ Svolta - A buon fine</option>
-                        <option value="Svolta - Da ripetere">🔄 Svolta - Da ripetere</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function initDynamicBlocks(containerId, addBtnId) {
-    const container = document.getElementById(containerId);
-    const btnAdd = document.getElementById(addBtnId);
-    
-    if(!container || !btnAdd) return;
-
-    // Configura blocco singolo
-    const addBlock = (data = null) => {
-        const div = document.createElement('div');
-        div.innerHTML = createInterventionBlockHTML();
-        const block = div.firstElementChild;
-        
-        block.querySelector('.btn-remove-block').addEventListener('click', () => {
-            if(container.children.length > 1) { 
-                block.remove();
-            } else {
-                alert("Devi mantenere almeno un blocco intervento.");
+            // Revert Costi risorse umane / Costi altri back to generic COSTI EUBIOTECH
+            if (item.type === 'Costi risorse umane' || item.type === 'Costi altri' || item.type === 'COGS_TECH' || item.type === 'OPEX_TECH') {
+                item.type = 'COSTS_EUBIOTECH';
+                // Fire and forget updating the backend
+                dataCollection.doc(item.id).update({ type: 'COSTS_EUBIOTECH' }).catch(e=>console.log(e));
             }
+            
+            // Migrate COSTS_EUBIOS to COSTS_EUBIOTECH if they match the specified categories
+            if (item.type === 'COSTS_EUBIOS') {
+                const cat = (item.category || '').toUpperCase().trim();
+                const movesToOpex = [
+                    'ALTRI ACQUISTI', 'ARVAL', 'CENE', 'CONSULENZA/PROGETTI', 'FORMAZIONE DIPENDENTI',
+                    'LEASEPLAN', 'ONERI BANCARI', 'POLIZZA ASSICURATIVA AXA', 'RIFORNIMENTO',
+                    'RIPARAZIONI AUTO', 'SANZIONI', 'SICUREZZA SUL LAVORO', 
+                    'SPESE LEGALI COSTITUZIONE SOCIETÀ-COMMERCIALISTA', 'TELEPASS', 'VISITE MEDICHE',
+                    'SPESE LEGALI', 'CONSULENZA', 'MANUTENZIONE AUTO', 'FORMAZIONE', 'ASSICURAZIONI'
+                ];
+                if (movesToOpex.includes(cat) || movesToOpex.some(m => cat.includes(m))) {
+                    item.type = 'COSTS_EUBIOTECH';
+                    // Safely update the backend
+                    dataCollection.doc(item.id).update({ type: 'COSTS_EUBIOTECH' }).catch(e=>console.error(e));
+                }
+            }
+            
+            appData.push(item);
         });
-
-        if(data) {
-            block.querySelector('.block-tipo').value = data.tipo || "";
-            let dispSelect = block.querySelector('.block-disp');
-            let dispMatched = Array.from(dispSelect.options).some(o => o.value === data.disp);
-            if(data.disp && !dispMatched) {
-                const opt = document.createElement('option');
-                opt.value = data.disp;
-                opt.textContent = data.disp;
-                dispSelect.insertBefore(opt, dispSelect.querySelector('option[value="Altro"]'));
-            }
-            dispSelect.value = data.disp || "";
-            block.querySelector('.block-mat').value = data.mat || "";
-        }
         
-        container.appendChild(block);
-    };
+        isDataLoaded = true;
 
-    // Assicurati che lo svuotamento parta pulito e con un blocco ready
-    container.innerHTML = '';
-    addBlock();
+        // Fallback: If absolutely empty from cloud AND we have local data, we could migrate it
+        if (appData.length === 0) {
+            const localStored = localStorage.getItem(DATA_KEY);
+            if (localStored) {
+                console.log("Migrando dati locali su Firebase...");
+                const localData = JSON.parse(localStored);
+                if (Array.isArray(localData) && localData.length > 0) {
+                    for (const item of localData) {
+                        if (item.type === 'COGS') item.type = 'COGS_TECH';
+                        if (item.type === 'OPEX') item.type = 'OPEX_TECH';
+                        appData.push(item);
+                        // Save individually to Cloud (async)
+                        dataCollection.doc(item.id).set(item).catch(e => console.error("Migrazione errore sul record", item.id, e));
+                    }
+                    console.log("Migrazione completata.");
+                }
+            } else if (typeof preloadData !== 'undefined' && Array.isArray(preloadData) && preloadData.length > 0) {
+                 // Or execute preload if entirely new system
+                 executePreload();
+            }
+        }
+    } catch (e) {
+        console.error("Error reading from Firestore:", e);
+        alert("Errore di connessione al database Cloud (Firebase). Sto caricando i dati offline locali se disponibili.");
+        
+        // Offline Fallback
+        const offlineStored = localStorage.getItem(DATA_KEY);
+        if (offlineStored) {
+            appData = JSON.parse(offlineStored);
+            if (!Array.isArray(appData)) appData = [];
+        } else {
+            appData = [];
+        }
+    }
 
-    // Event listener per il pulsante
-    btnAdd.addEventListener('click', () => addBlock());
+    // --- GLOBAL MIGRATION ---
+    // Apply migration rules to appData regardless of source (Cloud or Offline)
+    let needsLocalSave = false;
+    appData.forEach(item => {
+        if (item.type === 'COSTS_EUBIOS') {
+            const cat = (item.category || '').toUpperCase().trim();
+            const movesToOpex = [
+                'ALTRI ACQUISTI', 'ARVAL', 'CENE', 'CONSULENZA/PROGETTI', 'FORMAZIONE DIPENDENTI',
+                'LEASEPLAN', 'ONERI BANCARI', 'POLIZZA ASSICURATIVA AXA', 'RIFORNIMENTO',
+                'RIPARAZIONI AUTO', 'SANZIONI', 'SICUREZZA SUL LAVORO', 
+                'SPESE LEGALI COSTITUZIONE SOCIETÀ-COMMERCIALISTA', 'TELEPASS', 'VISITE MEDICHE',
+                'SPESE LEGALI', 'CONSULENZA', 'MANUTENZIONE AUTO', 'FORMAZIONE', 'ASSICURAZIONI',
+                'FONDO ACCANTONAMENTO', 'NOLEGGIO AUTO SOSTITUTIVA'
+            ];
+            if (movesToOpex.includes(cat) || movesToOpex.some(m => cat.includes(m))) {
+                item.type = 'OPEX_TECH';
+                needsLocalSave = true;
+                // Safely update the backend if it was from Cloud
+                dataCollection.doc(item.id).update({ type: 'OPEX_TECH' }).catch(()=>{});
+            }
+        }
+    });
+
+    if (needsLocalSave) {
+        localStorage.setItem(DATA_KEY, JSON.stringify(appData));
+    }
+
+    form = document.getElementById('data-entry-form');
+    dateInput = document.getElementById('date-input');
+    typeInput = document.getElementById('type-input');
+    categorySelect = document.getElementById('category-input');
+    customCategoryInput = document.getElementById('custom-category-input');
+    descInput = document.getElementById('description-input');
+    customDescInput = document.getElementById('custom-description-input');
+    clienteInputSelect = document.getElementById('cliente-input');
+    customClienteInput = document.getElementById('custom-cliente-input');
+    fornitoreInputSelect = document.getElementById('fornitore-input');
+    customFornitoreInput = document.getElementById('custom-fornitore-input');
+    amountInput = document.getElementById('amount-input');
+    submitBtn = document.getElementById('submit-btn');
+    cancelEditBtn = document.getElementById('cancel-edit-btn');
+    tableHeadRow = document.querySelector('#data-table thead tr');
+    clearBtn = document.getElementById('clear-all-btn');
+    loadBackupBtn = document.getElementById('load-backup-btn');
+    importExtraBtn = document.getElementById('import-extra-btn');
+    importExtraFile = document.getElementById('import-extra-file');
+    exportBackupBtn = document.getElementById('export-backup-btn');
+    importBackupBtn = document.getElementById('import-backup-btn');
+    importBackupFile = document.getElementById('import-backup-file');
+    filterContainer = document.getElementById('filter-grid-container');
+    toggleFiltersBtn = document.getElementById('toggle-filters-btn');
+    globalClearFiltersBtn = document.getElementById('global-clear-filters-btn');
+    clearFiltersBtn = document.getElementById('clear-filters-btn'); // Nuovi filtri
+    actionsMenuBtn = document.getElementById('actions-menu-btn'); // Dropdown menu
+    actionsDropdownContent = document.getElementById('actions-dropdown-content');
+
+    // 2.a Filter Elements
+    yearFiltersContainer = document.getElementById('year-filters');
+    monthFiltersContainer = document.getElementById('month-filters');
+    typeFiltersContainer = document.getElementById('type-filters');
+    categoryFiltersContainer = document.getElementById('category-filters');
+    groupBySelect = document.getElementById('group-by-select');
     
-    return { addBlock, container }; // Export hook se necessario altrove
-}
+    // 2.b Settings Modal Elements
+    settingsBtn = document.getElementById('settings-btn');
+    settingsModal = document.getElementById('settings-modal');
+    closeSettingsModal = document.getElementById('close-settings-modal');
+    saveGroupBtn = document.getElementById('save-group-btn');
+    cancelGroupBtn = document.getElementById('cancel-group-btn');
+    newGroupNameInput = document.getElementById('new-group-name');
+    customGroupsContainer = document.getElementById('custom-groups-container');
+    settingsFormTitle = document.getElementById('settings-form-title');
+    settingsFormArea = document.getElementById('settings-form-area');
+    settingsTypesContainer = document.getElementById('settings-types-container');
+    settingsCategoriesContainer = document.getElementById('settings-categories-container');
+    settingsDescriptionsContainer = document.getElementById('settings-descriptions-container');
 
-// Helper per leggere i dati al submit
-function extractDynamicBlocksData(containerId) {
-    const container = document.getElementById(containerId);
-    if(!container) return { array: [], tipoStr: "", dispStr: "", matStr: "", operatoreValutazioneStr: "", esitoStr: "", statoValutazioneStr: "" };
-    
-    let blocks = [];
-    container.querySelectorAll('.dynamic-intervention-block').forEach(b => {
-        let t = b.querySelector('.block-tipo').value.trim();
-        let d = b.querySelector('.block-disp').value.trim();
-        let m = b.querySelector('.block-mat').value.trim();
-        let op = b.querySelector('.block-operatore') ? b.querySelector('.block-operatore').value.trim() : "";
-        let es = b.querySelector('.block-esito') ? b.querySelector('.block-esito').value.trim() : "";
-        let st = b.querySelector('.block-stato-valutazione') ? b.querySelector('.block-stato-valutazione').value.trim() : "";
-        if(t || d || m || op || es || st) blocks.push({ tipo: t, disp: d, mat: m, operatoreValutazione: op, esito: es, statoValutazione: st });
+    // Settings Modal Event Listeners
+    if (settingsBtn && settingsModal) {
+        settingsBtn.addEventListener('click', () => {
+            openSettingsModal();
+        });
+    }
+    if (closeSettingsModal) {
+        closeSettingsModal.addEventListener('click', () => {
+            closeSettingsModalFunc();
+        });
+    }
+    document.addEventListener('click', (e) => {
+        if (settingsModal && !settingsModal.classList.contains('hidden') && e.target === settingsModal) {
+            closeSettingsModalFunc();
+        }
     });
     
-    return {
-        array: blocks,
-        tipoStr: blocks.map(b => b.tipo).filter(x=>x).join(', '),
-        dispStr: blocks.map(b => b.disp).filter(x=>x).join(', '),
-        matStr: blocks.map(b => b.mat).filter(x=>x).join('; '),
-        operatoreValutazioneStr: blocks.map(b => b.operatoreValutazione).filter(x=>x).join(', '),
-        esitoStr: blocks.map(b => b.esito).filter(x=>x).join('; '),
-        statoValutazioneStr: blocks.map(b => b.statoValutazione).filter(x=>x).join(', ')
-    };
-}
-// --- FINE LOGICA BLOCCHI DINAMICI ---
-
-// LOGICA MESSAGGISTICA E NOTIFICHE
-let messagesDataCache = []; // Cache for filtering without refetching
-
-const btnMsgTabResolved = document.getElementById('btnMsgTabResolved');
-
-function updateMsgTabsUI() {
-    if(btnMsgTabAll) btnMsgTabAll.className = (currentMsgTab === 'all') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
-    if(btnMsgTabReceived) btnMsgTabReceived.className = (currentMsgTab === 'received') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
-    if(btnMsgTabSent) btnMsgTabSent.className = (currentMsgTab === 'sent') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
-    if(btnMsgTabUnread) btnMsgTabUnread.className = (currentMsgTab === 'unread') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
-    if(btnMsgTabDeleted) btnMsgTabDeleted.className = (currentMsgTab === 'deleted') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
-    if(btnMsgTabResolved) btnMsgTabResolved.className = (currentMsgTab === 'resolved') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
-    if(btnMsgTabInCharge) btnMsgTabInCharge.className = (currentMsgTab === 'in_charge') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
-    if(btnMsgTabReplied) btnMsgTabReplied.className = (currentMsgTab === 'replied') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
-}
-
-if(btnMsgTabAll) btnMsgTabAll.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'all'; updateMsgTabsUI(); renderMessagesUI(); });
-if(btnMsgTabReceived) btnMsgTabReceived.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'received'; updateMsgTabsUI(); renderMessagesUI(); });
-if(btnMsgTabSent) btnMsgTabSent.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'sent'; updateMsgTabsUI(); renderMessagesUI(); });
-if(btnMsgTabUnread) btnMsgTabUnread.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'unread'; updateMsgTabsUI(); renderMessagesUI(); });
-if(btnMsgTabDeleted) btnMsgTabDeleted.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'deleted'; updateMsgTabsUI(); renderMessagesUI(); });
-if(btnMsgTabResolved) btnMsgTabResolved.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'resolved'; updateMsgTabsUI(); renderMessagesUI(); });
-if(btnMsgTabInCharge) btnMsgTabInCharge.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'in_charge'; updateMsgTabsUI(); renderMessagesUI(); });
-if(btnMsgTabReplied) btnMsgTabReplied.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'replied'; updateMsgTabsUI(); renderMessagesUI(); });
-
-if(btnEmptyTrash) btnEmptyTrash.addEventListener('click', async (e) => {
-    e.preventDefault();
-    if(!confirm("Sei sicuro di voler SVUOTARE IL CESTINO? Tutti i messaggi eliminati verranno distrutti per sempre!")) return;
-    try {
-        const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        const toDelete = messagesDataCache.filter(item => item.data.eliminato === true);
-        for(let msg of toDelete) {
-            await deleteDoc(doc(db, "messaggi", msg.id));
-        }
-    } catch(err) { console.error("Errore svuota cestino", err); }
-});
-
-if(msgSearchText) msgSearchText.addEventListener('input', () => renderMessagesUI());
-if(msgSearchUser) msgSearchUser.addEventListener('change', () => renderMessagesUI());
-if(msgSearchDate) msgSearchDate.addEventListener('change', () => renderMessagesUI());
-
-async function loadMessages() {
-    if (!isFirebaseConfigured) {
-        if(messagesList) messagesList.innerHTML = '<div style="color:red; font-size:0.85rem; text-align:center;">Sincronizzazione Cloud non configurata per i messaggi.</div>';
-        return;
+    // Load Custom Groupings initially
+    await loadCustomGroupings();
+    
+    // Context Menu Elements
+    contextMenu = document.getElementById('row-context-menu');
+    ctxEditBtn = document.getElementById('ctx-edit');
+    ctxDeleteBtn = document.getElementById('ctx-delete');
+    
+    // Search Element
+    const globalSearchInput = document.getElementById('global-search-input');
+    if (globalSearchInput) {
+        globalSearchInput.addEventListener('input', (e) => {
+            filterState.searchQuery = e.target.value;
+            renderTable();
+        });
     }
-    try {
-        const { query, collection, onSnapshot, orderBy } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        const q = query(collection(db, "messaggi"), orderBy("timestamp", "desc"));
-        
-        onSnapshot(q, (snapshot) => {
-            messagesDataCache = [];
-            let uniqueUsers = new Set();
-            snapshot.forEach((docSnap) => {
-                const d = docSnap.data();
-                messagesDataCache.push({ id: docSnap.id, data: d });
-                if(d.sender && d.sender !== "Sconosciuto") uniqueUsers.add(d.sender);
-                if(d.recipients && d.recipients !== "Bacheca (Tutti)") {
-                    if (typeof d.recipients === 'string') {
-                        d.recipients.split(',').forEach(r => uniqueUsers.add(r.trim()));
-                    } else if (Array.isArray(d.recipients)) {
-                        d.recipients.forEach(r => uniqueUsers.add(r));
-                    }
+
+    // iPhone view toggle
+    const iphoneBtn = document.getElementById('iphone-view-btn');
+    const tableContainer = document.querySelector('.table-container');
+    if (iphoneBtn && tableContainer) {
+        iphoneBtn.addEventListener('click', () => {
+            tableContainer.classList.toggle('iphone-mode');
+            if (tableContainer.classList.contains('iphone-mode')) {
+                iphoneBtn.style.backgroundColor = '#2563eb';
+                iphoneBtn.style.color = '#fff';
+            } else {
+                iphoneBtn.style.backgroundColor = 'transparent';
+                iphoneBtn.style.color = '#2563eb';
+            }
+        });
+    }
+
+    // Clear Filters Logic handled at the bottom with dropdown buttons.
+
+    // Actions Dropdown Logic
+    if (actionsMenuBtn && actionsDropdownContent) {
+        actionsMenuBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent immediate closing
+            actionsDropdownContent.classList.toggle('show');
+        });
+
+        // Close dropdown when clicking outside
+        window.addEventListener('click', (e) => {
+            if (!actionsMenuBtn.contains(e.target) && !actionsDropdownContent.contains(e.target)) {
+                if (actionsDropdownContent.classList.contains('show')) {
+                    actionsDropdownContent.classList.remove('show');
                 }
+            }
+        });
+    }
+    
+    // Summary Cards Elements
+    sumRevenueEubiosEl = document.getElementById('sum-revenue-eubios');
+    sumRevenueTechEl = document.getElementById('sum-revenue-tech');
+    sumCogsEl = document.getElementById('sum-cogs');
+    sumOpexEl = document.getElementById('sum-opex');
+    sumProfitEl = document.getElementById('sum-profit');
+
+    // Load Backup Helper
+    async function executePreload() {
+        if (typeof preloadData !== 'undefined' && Array.isArray(preloadData) && preloadData.length > 0) {
+            console.log("Forzatura caricamento dei dati pre-elaborati da data.js...");
+            
+            // Clean out old data to avoid duplicates upon multiple re-loads
+            appData = [];
+            
+            // Map the legacy schema to the new simplified schema
+            let isEubiotechSection = false;
+            let seenExRv24_0 = false;
+            
+            // Track which months of Eubios Revenue we've already imported 
+            // because data.js contains duplicate/secondary revenue sequences that inflate the total
+            const seenEubiosRevenues = new Set();
+            
+            const newMappedData = preloadData.map((item, index) => {
+                let mappedType;
+                let mappedCategory = item.category || 'Generico';
+                let mappedDescription = item.description || '';
+                
+                const catUpper = mappedCategory.toUpperCase().trim();
+                if (catUpper === 'TOTALE' || catUpper.includes('TOTALE') || 
+                    catUpper === 'FONDO ACCANTONAMENTO' || 
+                    catUpper === 'NOLEGGIO AUTO' || catUpper.includes('NOLEGGIO AUTO') ||
+                    catUpper.includes('COSTI DIVERSI GESTIONE EUBIOTECH')) {
+                    return null;
+                }
+
+                if (item.type === "Ricavo" || item.type === "REVENUE") {
+                     // The old logic skipped duplicate revenue sequences (because Fatturato was a single line).
+                     // Now we have Ausili, Comunicatori, Nutrizione that share the same date.
+                     // We don't want to skip them if they are distinct categories.
+                     const dateObj = new Date(item.date);
+                     const yyyyMm = `${dateObj.getFullYear()}-${dateObj.getMonth()}`;
+                     const dedupeKey = `${yyyyMm}-${catUpper}`;
+                     
+                     if (seenEubiosRevenues.has(dedupeKey)) {
+                         return null; // Skip duplicate revenue sequence ONLY if it's the exact same category and month
+                     }
+                     seenEubiosRevenues.add(dedupeKey);
+                     mappedType = "REVENUE_EUBIOS"; 
+                } else if (item.type === "Costo del Venduto" || item.type === "COSTO PERSONALE" || item.type === "COSTO PERSONALE (EUBIOTECH)") {
+                     mappedType = "COGS_TECH";
+                     mappedCategory = "SALARI E STIPENDI";
+                     if (!mappedDescription && item.category) {
+                         mappedDescription = item.category; 
+                     }
+                } else {
+                     // item.type === "Altro Costo"
+                     mappedType = "OPEX_TECH"; // Used to be COSTS_EUBIOS, but all these elements belong to Eubiotech
+                }
+
+                // Macro-Category mapping logic
+                if (["INTERESSI PASSIVI", "ALTRI ONERI O PROVENTI FINANZIARI", "ONERI FINANZIARI", "PROVENTI FINANZIARI"].includes(catUpper) || catUpper.includes("ONERI FINANZIARI")) {
+                    mappedDescription = item.category + (mappedDescription ? " - " + mappedDescription : "");
+                    mappedCategory = "GESTIONE FINANZIARIA";
+                    mappedType = "OPEX_TECH";
+                } else if (["IRES", "IRAP", "POSTALI E BOLLI", "DIRITTI CAMERALI", "SANZIONI"].includes(catUpper)) {
+                    mappedDescription = item.category + (mappedDescription ? " - " + mappedDescription : "");
+                    mappedCategory = "GESTIONE FISCALE";
+                    mappedType = "OPEX_TECH";
+                } else if (["ONERI CONTRIBUTIVI", "INPS", "INAIL", "F24", "TFR"].includes(catUpper) || catUpper.includes("INPS") || catUpper.includes("INAIL") || catUpper.includes("F24") || catUpper.includes("TFR") || catUpper.includes("CONTRIBUTI")) {
+                    mappedDescription = item.category + (mappedDescription ? " - " + mappedDescription : "");
+                    mappedCategory = "SALARI E STIPENDI";
+                    mappedType = "COGS_TECH"; 
+                }
+
+                return {
+                    id: (item.id ? item.id.replace(/\//g, '-') : 'raw-' + Date.now() + Math.random()),
+                    date: item.date,
+                    type: mappedType,
+                    category: mappedCategory,
+                    description: mappedDescription,
+                    amount: parseFloat(item.amount) || 0,
+                    createdAt: new Date().toISOString()
+                };
+            });
+            
+            // INJECT missing Eubiotech Revenue (Compenso) from the user's explicit Excel file image
+            const eubiotechRevenues = [
+                {date: "2024-01-01", amount: 22000}, {date: "2024-02-01", amount: 22000}, {date: "2024-03-01", amount: 28670},
+                {date: "2024-04-01", amount: 27780}, {date: "2024-05-01", amount: 27990}, {date: "2024-06-01", amount: 27810},
+                {date: "2024-07-01", amount: 29540}, {date: "2024-08-01", amount: 26290}, {date: "2024-09-01", amount: 27900},
+                {date: "2024-10-01", amount: 37660}, {date: "2024-11-01", amount: 30020}, {date: "2024-12-01", amount: 27880},
+                
+                {date: "2025-01-01", amount: 22000}, {date: "2025-02-01", amount: 22000}, {date: "2025-03-01", amount: 40295},
+                {date: "2025-04-01", amount: 22000}, {date: "2025-05-01", amount: 22000}, {date: "2025-06-01", amount: 41380},
+                {date: "2025-07-01", amount: 22000}, {date: "2025-08-01", amount: 22000}, {date: "2025-09-01", amount: 39375},
+                {date: "2025-10-01", amount: 22000}, {date: "2025-11-01", amount: 22000}, {date: "2025-12-01", amount: 41885}
+            ];
+            
+            eubiotechRevenues.forEach((rev, i) => {
+                const months = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+                const d = new Date(rev.date);
+                newMappedData.push({
+                    id: 'eubio-rev-calc-' + d.getFullYear() + '-' + d.getMonth(),
+                    date: rev.date,
+                    type: "REVENUE_EUBIOTECH",
+                    category: "Compenso Eubiotech",
+                    description: `Fatturato / Compenso ${months[d.getMonth()]} ${d.getFullYear()}`,
+                    amount: rev.amount,
+                    createdAt: new Date().toISOString()
+                });
             });
 
-            if(msgSearchUser) {
-                const currentVal = msgSearchUser.value;
-                msgSearchUser.innerHTML = '<option value="">Utente (Tutti)</option>';
-                Array.from(uniqueUsers).sort().forEach(u => {
-                    if(u) {
-                        let opt = document.createElement('option');
-                        opt.value = u;
-                        opt.textContent = u;
-                        msgSearchUser.appendChild(opt);
+            // INJECT Ad-Hoc Corporate/Tax expenses for 2024 and 2025
+            const corpData = [
+                // 2024 - Dec 24
+                // { id: 'corp-inject-2024-altricompensi', date: '2024-12-01', type: 'OPEX_TECH', category: 'Altri compensi', description: 'Inserimento corporate', amount: 23000.00, createdAt: new Date().toISOString() },
+                { id: 'corp-inject-2024-oneri', date: '2024-12-01', type: 'OPEX_TECH', category: 'Oneri contributivi (INPS, INAIL, F24)', description: 'Inserimento corporate', amount: 58164.82, createdAt: new Date().toISOString() },
+                { id: 'corp-inject-2024-tfr', date: '2024-12-01', type: 'OPEX_TECH', category: 'TFR', description: 'Inserimento corporate', amount: 2302.35, createdAt: new Date().toISOString() },
+                { id: 'corp-inject-2024-oneri-fin', date: '2024-12-01', type: 'OPEX_TECH', category: 'Altri oneri o proventi finanziari', description: 'Inserimento corporate', amount: 8372.86, createdAt: new Date().toISOString() },
+                // { id: 'corp-inject-2024-gestione', date: '2024-12-01', type: 'OPEX_TECH', category: 'GESTIONE FISCALE', description: 'Inserimento corporate', amount: 20136.46, createdAt: new Date().toISOString() },
+                { id: 'corp-inject-2024-ires', date: '2024-12-01', type: 'OPEX_TECH', category: 'IRES', description: 'Inserimento corporate', amount: 7782.00, createdAt: new Date().toISOString() },
+                { id: 'corp-inject-2024-irap', date: '2024-12-01', type: 'OPEX_TECH', category: 'IRAP', description: 'Inserimento corporate', amount: 11845.00, createdAt: new Date().toISOString() },
+                { id: 'corp-inject-2024-postali', date: '2024-12-01', type: 'OPEX_TECH', category: 'Postali e bolli', description: 'Inserimento corporate', amount: 90.87, createdAt: new Date().toISOString() },
+                { id: 'corp-inject-2024-camerali', date: '2024-12-01', type: 'OPEX_TECH', category: 'Diritti camerali', description: 'Inserimento corporate', amount: 120.00, createdAt: new Date().toISOString() },
+                { id: 'corp-inject-2024-sanzioni', date: '2024-12-01', type: 'OPEX_TECH', category: 'Sanzioni', description: 'Inserimento corporate', amount: 298.59, createdAt: new Date().toISOString() },
+
+                // 2025 - Nov 25
+                // { id: 'corp-inject-2025-altricompensi', date: '2025-11-01', type: 'OPEX_TECH', category: 'Altri compensi', description: 'Inserimento corporate', amount: 21000.00, createdAt: new Date().toISOString() },
+                { id: 'corp-inject-2025-oneri', date: '2025-11-01', type: 'OPEX_TECH', category: 'Oneri contributivi (INPS, INAIL, F24)', description: 'Inserimento corporate', amount: 92346.62, createdAt: new Date().toISOString() },
+                { id: 'corp-inject-2025-tfr', date: '2025-11-01', type: 'OPEX_TECH', category: 'TFR', description: 'Inserimento corporate', amount: 3104.62, createdAt: new Date().toISOString() },
+                { id: 'corp-inject-2025-oneri-fin', date: '2025-11-01', type: 'OPEX_TECH', category: 'Altri oneri o proventi finanziari', description: 'Inserimento corporate', amount: 3293.33, createdAt: new Date().toISOString() },
+                // { id: 'corp-inject-2025-gestione', date: '2025-11-01', type: 'OPEX_TECH', category: 'GESTIONE FISCALE', description: 'Inserimento corporate', amount: 13065.77, createdAt: new Date().toISOString() },
+                { id: 'corp-inject-2025-ires', date: '2025-11-01', type: 'OPEX_TECH', category: 'IRES', description: 'Inserimento corporate', amount: 2905.43, createdAt: new Date().toISOString() },
+                { id: 'corp-inject-2025-irap', date: '2025-11-01', type: 'OPEX_TECH', category: 'IRAP', description: 'Inserimento corporate', amount: 10160.35, createdAt: new Date().toISOString() }
+            ];
+            newMappedData.push(...corpData);
+
+            appData = newMappedData.filter(item => item !== null);
+            saveData(true); // Param true to bypass individual save and do a bulk logic or let render handle it
+            
+            // Batch write to Firestore for preload in chunks
+            try {
+                let count = 0;
+                const batches = [db.batch()];
+                let batchIndex = 0;
+                
+                appData.forEach(item => {
+                    const docRef = dataCollection.doc(item.id);
+                    batches[batchIndex].set(docRef, item);
+                    count++;
+                    if (count >= 490) {
+                        batches.push(db.batch());
+                        batchIndex++;
+                        count = 0;
                     }
                 });
-                msgSearchUser.value = currentVal;
+                
+                for (let b of batches) {
+                    await b.commit();
+                }
+                console.log("Preload batch completato su Firebase");
+            } catch(e) {
+                console.error("Errore batch preload Firestore:", e);
+                alert("Si è verificato un errore durante il salvataggio dei dati su Firebase.");
             }
-
-            renderMessagesUI();
-        }, (error) => {
-            console.error("Errore snapshot messaggi", error);
-            if(messagesList) messagesList.innerHTML = '<div style="color:red; font-size:0.85rem; text-align:center;">Errore caricamento messaggi.</div>';
-        });
-    } catch(e) { console.error(e); }
-}
-
-function renderMessagesUI() {
-    if(!messagesList) return;
-    messagesList.innerHTML = '';
-    let count = 0;
-    let activeNotes = [];
-
-    const currentUser = localStorage.getItem('antimo_user_name') || "Sconosciuto";
-    const filterTecnico = document.getElementById('filterTecnicoOggi') ? document.getElementById('filterTecnicoOggi').value : "MIO";
-    const filterName = filterTecnico === "MIO" ? currentUser : filterTecnico;
-
-    const searchText = (msgSearchText && msgSearchText.value) ? msgSearchText.value.toLowerCase() : "";
-    const searchUser = (msgSearchUser && msgSearchUser.value) ? msgSearchUser.value : "";
-    const searchDate = (msgSearchDate && msgSearchDate.value) ? msgSearchDate.value : "";
-    
-    // Calculate counts for categories
-    let countAll = 0, countUnread = 0, countReceived = 0, countSent = 0, countDeleted = 0, countResolved = 0, countInCharge = 0, countReplied = 0;
-    
-    messagesDataCache.forEach(item => {
-        const d = item.data;
-        let sN = d.sender || "Sconosciuto";
-        let rN = d.recipients || "Bacheca (Tutti)";
-        if (Array.isArray(rN)) rN = rN.join(', ');
-
-        if (filterTecnico !== "TUTTI") {
-            const isRelevantForFilter = (sN === filterName) || (rN.includes(filterName)) || (rN === "Bacheca (Tutti)");
-            if (!isRelevantForFilter) return; // skip
-        }
-
-        // Apply shared filters (Search Text, Search User, Search Date)
-        if (searchUser && sN !== searchUser && !rN.includes(searchUser)) return;
-        if (searchText) {
-            const msgT = (d.text || "").toLowerCase();
-            const senderT = sN.toLowerCase();
-            if (!msgT.includes(searchText) && !senderT.includes(searchText)) return;
-        }
-        if (searchDate && d.timestamp) {
-            const dt = new Date(d.timestamp.toMillis());
-            const dtStr = dt.getFullYear() + "-" + String(dt.getMonth()+1).padStart(2,'0') + "-" + String(dt.getDate()).padStart(2,'0');
-            if (dtStr !== searchDate) return;
-        }
-
-        // Tally categories mutually exclusive funnel
-        if (d.eliminato === true) {
-            countDeleted++;
-        } else if (d.isResolved === true) {
-            countResolved++;
-        } else if (d.haRisposto === true) {
-            countReplied++;
-            countAll++;
-        } else if (d.presoInCarico === true) {
-            countInCharge++;
-            countAll++;
+            
+            // Force re-generating filter logic since data changed completely
+            filtersGeneratedOnce = false;
+            renderTable();
+            alert(`Caricati ${appData.length} record dal file base Excel (inclusi i compensi Eubiotech calcolati).`);
         } else {
-            countAll++;
-            if (d.letto !== true) countUnread++;
-            if ((rN === "Bacheca (Tutti)" || rN.includes(currentUser))) countReceived++;
-            if (sN === currentUser) countSent++;
+            alert("Nessun dato di base trovato nel file data.js.");
         }
-    });
+    }
 
-    const applyCountStyle = (btn, count, exclude) => {
-        if(!btn) return;
-        if(exclude) {
-            btn.style.backgroundColor = "";
-            btn.style.color = "";
+    if(loadBackupBtn) {
+        loadBackupBtn.addEventListener('click', async () => {
+            if (confirm("Vuoi caricare i dati base estratti dall'Excel? Questo CANCELLERÀ e SOSTITUIRÀ tutti i dati attualmente salvati.")) {
+                try {
+                    // Wipe the database completely first to avoid orphaned duplicates
+                    console.log("Svuotamento database prima del ripristino dei dati base...");
+                    const snapshot = await dataCollection.get();
+                    let count = 0;
+                    const batches = [db.batch()];
+                    let batchIndex = 0;
+                    
+                    snapshot.docs.forEach((doc) => {
+                        batches[batchIndex].delete(doc.ref);
+                        count++;
+                        if (count >= 490) {
+                            batches.push(db.batch());
+                            batchIndex++;
+                            count = 0;
+                        }
+                    });
+                    
+                    for (let b of batches) {
+                        await b.commit();
+                    }
+                    console.log("Database svuotato. Avvio generazione nuovi dati...");
+                } catch(e) {
+                    console.error("Errore durante lo svuotamento del database:", e);
+                }
+                
+                await executePreload();
+            }
+        });
+    }
+
+    if(clearBtn) {
+        clearBtn.addEventListener('click', async () => {
+            if (confirm("ATTENZIONE! Vuoi davvero CANCELLARE TUTTI I DATI dal database? Questa operazione è irreversibile e dovrai ricaricarli dal Base Excel o da un Backup.")) {
+                try {
+                    const snapshot = await dataCollection.get();
+                    let count = 0;
+                    const batches = [db.batch()];
+                    let batchIndex = 0;
+                    
+                    snapshot.docs.forEach((doc) => {
+                        batches[batchIndex].delete(doc.ref);
+                        count++;
+                        if (count >= 490) {
+                            batches.push(db.batch());
+                            batchIndex++;
+                            count = 0;
+                        }
+                    });
+                    
+                    for (let b of batches) {
+                        await b.commit();
+                    }
+                    appData = [];
+                    updateActiveFiltersDisplay();
+                    renderTable();
+                    alert("Database svuotato con successo.");
+                } catch(e) {
+                    console.error("Errore durante lo svuotamento del database:", e);
+                    alert("Errore durante l'operazione di pulizia del database cloud.");
+                }
+            }
+        });
+    }
+
+    // --- IMPORT COSTI EXTRA DA EXCEL ---
+    if (importExtraBtn && importExtraFile) {
+        importExtraBtn.addEventListener('click', () => {
+             if (typeof XLSX === 'undefined') {
+                 alert("La libreria per leggere i file Excel (SheetJS) non è ancora caricata. Riprova tra qualche istante o ricarica la pagina.");
+                 return;
+             }
+             importExtraFile.click();
+        });
+
+        importExtraFile.addEventListener('change', (e) => {
+             const file = e.target.files[0];
+             if(!file) return;
+
+             const reader = new FileReader();
+             reader.onload = function(evt) {
+                 try {
+                     const data = new Uint8Array(evt.target.result);
+                     const workbook = XLSX.read(data, {type: 'array'});
+                     let newEntries = [];
+                     let parsedCount = 0;
+
+                     workbook.SheetNames.forEach(sheetName => {
+                         console.log("Analizzando foglio:", sheetName); // Debug log
+                         
+                         // More permissive sheet name matching
+                         const sheetNameLower = sheetName.toLowerCase();
+                         const isRiepilogo = sheetNameLower.includes("riepilogo") && sheetNameLower.includes("costi");
+                         
+                         if (isRiepilogo) {
+                             console.log(" Trovato foglio valido:", sheetName);
+                             const sheet = workbook.Sheets[sheetName];
+                             const json = XLSX.utils.sheet_to_json(sheet, {header: 1});
+                             if (!json || json.length === 0) return;
+
+                             let descRowIdx = -1;
+                             for(let i=0; i<Math.min(15, json.length); i++) { // Increased search depth to 15
+                                 if(json[i] && typeof json[i][0] === 'string') {
+                                     const cellValue = json[i][0].trim().toLowerCase();
+                                     // Relaxed check: just needs to contain 'descriz'
+                                     if(cellValue.includes('descriz')) {
+                                         descRowIdx = i;
+                                         console.log("  Trovata riga intestazione a indice:", i);
+                                         break;
+                                     }
+                                 }
+                             }
+
+                             if(descRowIdx !== -1 && json[descRowIdx-1]) {
+                                 const monthsRow = json[descRowIdx-1];
+                                 const monthCols = [];
+                                 
+                                 for(let c=1; c<monthsRow.length; c++) {
+                                     const cellValue = monthsRow[c];
+                                     if(cellValue !== null && cellValue !== undefined && cellValue !== "" && cellValue !== "Totale") {
+                                         let y, m;
+                                         if (typeof cellValue === 'number' && cellValue > 10000) {
+                                             // Excel serial date (e.g. 45658)
+                                             const jsDate = new Date((cellValue - 25569) * 86400 * 1000);
+                                             y = jsDate.getFullYear();
+                                             m = jsDate.getMonth() + 1;
+                                         } else if (typeof cellValue === 'string' && cellValue.includes('-')) {
+                                             // Fallback for strings like 'gen-25'
+                                             const parts = cellValue.split('-');
+                                             const monthNames = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
+                                             const mIdx = monthNames.indexOf(parts[0].toLowerCase().trim());
+                                             y = parseInt(parts[1], 10);
+                                             if (y < 2000) y += 2000;
+                                             m = mIdx !== -1 ? mIdx + 1 : null;
+                                         }
+                                         
+                                         if (y && m && !isNaN(y)) {
+                                             monthCols.push({ colIdx: c, year: y, month: m });
+                                         }
+                                     }
+                                 }
+                                 
+                                 console.log(`  Identificati ${monthCols.length} mesi in questo foglio.`);
+
+                                 for(let r=descRowIdx+1; r<json.length; r++) {
+                                     const row = json[r];
+                                     if(!row || !row[0]) continue;
+                                     
+                                     const rawCat = row[0].toString();
+                                     const cat = rawCat.trim();
+                                     const catUpper = cat.toUpperCase();
+                                     
+                                     // Escludi Noleggio auto, Totale, Fondo accantonamento in tutte le variazioni possibili
+                                     if(catUpper === 'TOTALE' || 
+                                        catUpper === 'FONDO ACCANTONAMENTO' || 
+                                        catUpper === 'NOLEGGIO AUTO' || 
+                                        catUpper.includes('NOLEGGIO AUTO') ||
+                                        catUpper.includes('TOTALE')) continue; 
+                                     
+                                     monthCols.forEach(mc => {
+                                         let val = row[mc.colIdx]; 
+                                         if (typeof val === 'string') {
+                                             val = parseFloat(val.replace(/€/g, '').replace(/\./g, '').replace(/,/g, '.').trim());
+                                         }
+                                         if(!isNaN(val) && val !== 0 && val !== undefined && val !== null) {
+                                             const dateStr = `${mc.year}-${mc.month.toString().padStart(2, '0')}-01`;
+                                             
+                                             // Check if we already have this specific opex imported to avoid exact duplicates
+                                             const existingIdx = appData.findIndex(item => 
+                                                 item.date === dateStr && 
+                                                 item.category.toLowerCase() === cat.toLowerCase() && 
+                                                 item.type === "OPEX_TECH" && 
+                                                 Math.abs(item.amount - val) < 0.01 // Soft match amount
+                                             );
+
+                                             if (existingIdx === -1) {
+                                                 newEntries.push({
+                                                     id: 'ex-op-' + Date.now() + Math.random().toString(36).substr(2, 5),
+                                                     date: dateStr,
+                                                     type: "OPEX_TECH",
+                                                     description: "Costo Extra Excel: " + cat,
+                                                     category: cat,
+                                                     amount: val,
+                                                     provider: "Importazione Extra",
+                                                     createdAt: new Date().toISOString()
+                                                 });
+                                                 parsedCount++;
+                                             } else {
+                                                 // Log duplicates for debugging
+                                                 console.log(`  Scartato duplicato: ${dateStr} - ${cat} - ${val}€`);
+                                             }
+                                         }
+                                     });
+                                 }
+                             } else {
+                                 console.log("  ATTENZIONE: Non ho trovato la riga 'Descrizione' nel foglio", sheetName);
+                             }
+                         }
+                     });
+                     
+                     if (parsedCount > 0) {
+                         appData = [...appData, ...newEntries];
+                         localStorage.setItem(DATA_KEY, JSON.stringify(appData));
+                         
+                         // Batch write new entries to Firestore
+                         try {
+                              const batch = db.batch();
+                              newEntries.forEach(item => {
+                                  const docRef = dataCollection.doc(item.id);
+                                  batch.set(docRef, item);
+                              });
+                              batch.commit().then(() => console.log("Importazione extra salvata su Firebase"));
+                         } catch(e) {
+                              console.error("Errore salvataggio import extra su Firestore:", e);
+                         }
+                         
+                         // Re-initialize completely
+                         updateUI();
+                         populateCategoryDropdown(); // Update dropdowns with new categories
+                         alert(`Importazione completata con successo! Inseriti ${parsedCount} nuovi record in "Costi altri Eubiotech".`);
+                     } else {
+                         alert("L'analisi del file è andata a buon fine, ma non ci sono nuovi dati da inserire in tabella. I dati presenti nel file (ad es. per i noleggi, spese legali, ecc.) sono tutti GIÀ PRESENTI all'interno dell'applicazione!");
+                     }
+                 } catch (err) {
+                     console.error("Errore durante l'importazione Excel:", err);
+                     alert("Si è verificato un errore durante la lettura del file Excel.");
+                 }
+                 // Reset input so the same file could be selected again if needed
+                 importExtraFile.value = '';
+             };
+             reader.readAsArrayBuffer(file);
+        });
+    }
+
+    // --- PRELOAD DATA INJECTION (AUTO) ---
+    if (appData.length === 0) {
+        executePreload();
+    }
+
+    function isItemInCustomGroup(item, groupName) {
+        if (!typeof customGroupings !== 'undefined' && customGroupings) {
+            const group = customGroupings.find(g => g.name.toLowerCase() === groupName.toLowerCase());
+            if (group) {
+                const matchType = group.filters.types && group.filters.types.includes(item.type);
+                const matchCat = group.filters.categories && group.filters.categories.includes(item.category);
+                const matchDesc = group.filters.descriptions && item.description && group.filters.descriptions.includes(item.description);
+                return matchType || matchCat || matchDesc;
+            }
+        }
+        return false;
+    }
+
+    // --- SUMMARY CALCULATIONS ---
+    function updateSummaryCards(dataToSummarize) {
+        let revEubios = 0, costsEubios = 0, revTech = 0, costiRisorseUmane = 0, costiAltri = 0, costsTechTotal = 0;
+        dataToSummarize.forEach(item => {
+            // Support legacy 'REVENUE' in case any exists
+            if(item.type === 'REVENUE_EUBIOS' || item.type === 'REVENUE') revEubios += item.amount;
+            else if(item.type === 'COSTS_EUBIOS') costsEubios += item.amount;
+            else if(item.type === 'REVENUE_EUBIOTECH') {
+                revTech += item.amount;
+                costsEubios += item.amount; // Aggiunge i Ricavi Eubiotech ai Costi Eubios
+            }
+            else if(isItemInCustomGroup(item, 'Costi risorse umane') || isItemInCustomGroup(item, 'Risorse umane') || item.type === 'Costi risorse umane' || item.type === 'COGS_TECH' || item.type === 'COGS') {
+                costiRisorseUmane += item.amount;
+                costsTechTotal += item.amount;
+            }
+            else if(isItemInCustomGroup(item, 'Costi altri') || isItemInCustomGroup(item, 'Altri costi') || item.type === 'Costi altri' || item.type === 'OPEX_TECH' || item.type === 'OPEX' || item.type === 'ALTRI COSTI EUBIOTECH') {
+                costiAltri += item.amount;
+                costsTechTotal += item.amount;
+            }
+        });
+        
+        // Eubios Profit = Eubios Revenue - Eubios Costs (which now includes Eubiotech Revenue)
+        const profitEubios = revEubios - costsEubios;
+        
+        // Eubiotech Profit = Eubiotech Revenue - All other operating costs and compensations
+        const profitTech = revTech - costsTechTotal;
+
+        // Formulate period label
+        let availableYearsCount = document.querySelectorAll('.flt-year').length;
+        let yearsArr = Array.from(filterState.years).sort();
+        let yearStr = yearsArr.length > 0 ? yearsArr.join(", ") : "Nessun anno";
+        if (availableYearsCount > 0 && yearsArr.length === availableYearsCount) yearStr = "Tutti gli anni";
+
+        let monthsArr = Array.from(filterState.months).sort((a,b)=>a-b);
+        let monthStr = "";
+        if (monthsArr.length === 12) {
+            monthStr = "";
+        } else if (monthsArr.length === 0) {
+            monthStr = " - Nessun mese";
+        } else {
+            const mNames = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
+            // Simplify quarters if full quarter is selected exactly
+            if (monthsArr.length === 3 && monthsArr[0] === 1 && monthsArr[1] === 2 && monthsArr[2] === 3) monthStr = " - Q1";
+            else if (monthsArr.length === 3 && monthsArr[0] === 4 && monthsArr[1] === 5 && monthsArr[2] === 6) monthStr = " - Q2";
+            else if (monthsArr.length === 3 && monthsArr[0] === 7 && monthsArr[1] === 8 && monthsArr[2] === 9) monthStr = " - Q3";
+            else if (monthsArr.length === 3 && monthsArr[0] === 10 && monthsArr[1] === 11 && monthsArr[2] === 12) monthStr = " - Q4";
+            else monthStr = " - " + monthsArr.map(m => mNames[m-1]).join(", ");
+        }
+        
+        let periodLabel = `<span style="font-size:0.85em; font-weight:normal; display:block; margin-top:0.3rem; color: #94a3b8;">${yearStr}${monthStr}</span>`;
+
+        const updateTitle = (id, baseText) => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = `${baseText}${periodLabel}`;
+        };
+
+        updateTitle('title-revenue-eubios', 'Ricavi Eubios');
+        updateTitle('title-costs-eubios', 'Costi Eubios');
+        updateTitle('title-revenue-tech', 'Ricavi Eubiotech');
+        // Removed Costi Eubiotech card update
+        updateTitle('title-cogs', 'Costi risorse umane');
+        updateTitle('title-opex', 'Costi altri');
+        updateTitle('title-profit-eubios', 'Utile Eubios');
+        updateTitle('title-profit-tech', 'Utile Eubiotech');
+
+        const formatCurrency = (val) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(val);
+        const formatPct = (val, base) => {
+            if (!base || base === 0 || val === base) return "";
+            return `(${((val / base) * 100).toFixed(1)}%)`;
+        };
+        const setValAndPct = (id, val, base) => {
+            const el = document.getElementById(id);
+            if(el) {
+                const pctStr = formatPct(val, base);
+                if (pctStr) {
+                    el.innerHTML = `${formatCurrency(val)} <span style="font-size: 0.55em; opacity: 0.7; margin-left: 5px; font-weight: normal;">${pctStr}</span>`;
+                } else {
+                    el.innerHTML = formatCurrency(val);
+                }
+            }
+        };
+        
+        setValAndPct('sum-revenue-eubios', revEubios, revEubios);
+        setValAndPct('sum-costs-eubios', costsEubios, revEubios);
+        setValAndPct('sum-profit-eubios', profitEubios, revEubios);
+
+        setValAndPct('sum-revenue-tech', revTech, revTech);
+        // Removed Costi Eubiotech total from cards
+        setValAndPct('sum-cogs', costiRisorseUmane, revTech);
+        setValAndPct('sum-opex', costiAltri, revTech);
+        setValAndPct('sum-profit-tech', profitTech, revTech);
+    }
+
+    // --- RENDER LOGIC ---
+    function renderTable() {
+        tableBody.innerHTML = '';
+        const tableHeadRow = document.querySelector('#data-table thead tr');
+
+        if (appData.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="7" class="empty-state">Nessun dato presente. Inizia aggiungendo un record.</td></tr>';
+            updateSummaryCards([]);
+            updateFilterUI(); // Ensure filters exist even if empty
             return;
         }
-        if(count > 0) {
-            btn.style.backgroundColor = "var(--blue-primary, #0d6efd)";
-            btn.style.color = "white";
-            btn.style.border = "none";
-        } else {
-            btn.style.backgroundColor = "";
-            btn.style.color = "";
-            btn.style.border = "";
-        }
-    };
 
-    if(btnMsgTabAll) { btnMsgTabAll.innerHTML = `Tutti (${countAll})`; applyCountStyle(btnMsgTabAll, countAll, false); }
-    if(btnMsgTabUnread) { btnMsgTabUnread.innerHTML = `Non Letti (${countUnread})`; applyCountStyle(btnMsgTabUnread, countUnread, false); }
-    if(btnMsgTabReceived) { btnMsgTabReceived.innerHTML = `Ricevuti (${countReceived})`; applyCountStyle(btnMsgTabReceived, countReceived, false); }
-    if(btnMsgTabSent) { btnMsgTabSent.innerHTML = `Inviati (${countSent})`; applyCountStyle(btnMsgTabSent, countSent, false); }
-    if(btnMsgTabInCharge) { btnMsgTabInCharge.innerHTML = `👷 Presi in Carico (${countInCharge})`; applyCountStyle(btnMsgTabInCharge, countInCharge, false); }
-    if(btnMsgTabReplied) { btnMsgTabReplied.innerHTML = `↩️ Risposti (${countReplied})`; applyCountStyle(btnMsgTabReplied, countReplied, false); }
-    if(btnMsgTabDeleted) { btnMsgTabDeleted.innerHTML = `Cestino (${countDeleted})`; applyCountStyle(btnMsgTabDeleted, countDeleted, true); }
-    if(btnMsgTabResolved) { btnMsgTabResolved.innerHTML = `✅ Risolti (${countResolved})`; applyCountStyle(btnMsgTabResolved, countResolved, true); }
+        updateFilterUI(); // Refresh available years
 
-    if(btnEmptyTrash) {
-        if (currentMsgTab === 'deleted' && countDeleted > 0) {
-            btnEmptyTrash.classList.remove('hidden');
-        } else {
-            btnEmptyTrash.classList.add('hidden');
-        }
-    }
+        // 1. FILTERING
+        let baseFilteredData = appData.filter(item => {
+            let itemYear = -1;
+            let itemMonth = -1; // 1-12
+            try {
+                const dateObj = new Date(item.date);
+                if(!isNaN(dateObj)) {
+                    itemYear = dateObj.getFullYear();
+                    itemMonth = dateObj.getMonth() + 1;
+                }
+            } catch(e){}
 
-    let filtered = messagesDataCache.filter(item => {
-        const d = item.data;
-        let sN = d.sender || "Sconosciuto";
-        let rN = d.recipients || "Bacheca (Tutti)";
-        if (Array.isArray(rN)) rN = rN.join(', ');
-
-        if (currentMsgTab === 'deleted') {
-            if (d.eliminato !== true) return false;
-        } else if (currentMsgTab === 'resolved') {
-            if (d.isResolved !== true || d.eliminato) return false;
-        } else if (currentMsgTab === 'replied') {
-            if (d.haRisposto !== true || d.isResolved || d.eliminato) return false;
-        } else if (currentMsgTab === 'in_charge') {
-            if (d.presoInCarico !== true || d.haRisposto || d.isResolved || d.eliminato) return false;
-        } else if (currentMsgTab === 'all') {
-            if (d.eliminato || d.isResolved) return false;
-        } else {
-            // received, sent, unread
-            if (d.eliminato || d.isResolved || d.haRisposto || d.presoInCarico) return false;
-            if (currentMsgTab === 'received') {
-                if (rN !== "Bacheca (Tutti)" && !rN.includes(currentUser)) return false;
-            } else if (currentMsgTab === 'sent') {
-                if (sN !== currentUser) return false;
-            } else if (currentMsgTab === 'unread') {
-                if (d.letto === true) return false;
-            }
-        }
-
-        if (searchUser) {
-            if (sN !== searchUser && !rN.includes(searchUser)) return false;
-        }
-
-        if (searchText) {
-            const msgT = (d.text || "").toLowerCase();
-            const senderT = sN.toLowerCase();
-            if (!msgT.includes(searchText) && !senderT.includes(searchText)) return false;
-        }
-
-        if (searchDate && d.timestamp) {
-            const dt = new Date(d.timestamp.toMillis());
-            const dtStr = dt.getFullYear() + "-" + String(dt.getMonth()+1).padStart(2,'0') + "-" + String(dt.getDate()).padStart(2,'0');
-            if (dtStr !== searchDate) return false;
-        }
-
-        return true;
-    });
-
-    if (filtered.length === 0) {
-        messagesList.innerHTML = '<div style="text-align: center; font-size: 0.9rem; color: #666; padding: 10px;">Nessun messaggio trovato per questa selezione.</div>';
-    } else {
-        filtered.forEach((item) => {
-            count++;
-            const data = item.data;
-            const docSnapId = item.id;
+            // Check if year is selected
+            if(filterState.years.size > 0 && !filterState.years.has(itemYear)) return false;
             
-            // Notification badge condition: only brand new untouched messages
-            if(data.isNotification && !data.eliminato && !data.letto && !data.presoInCarico) {
-                activeNotes.push(data.text);
-            }
+            // Check if month is selected
+            if(filterState.months.size > 0 && !filterState.months.has(itemMonth)) return false;
             
-            const div = document.createElement('div');
-            div.setAttribute('data-id', docSnapId);
-            div.style.padding = "10px";
-            div.style.borderRadius = "8px";
-            div.style.backgroundColor = data.isNotification ? "#fffbeb" : (data.letto ? "#f8fafc" : "#f1f5f9");
-            if (data.eliminato) div.style.backgroundColor = "#fee2e2";
-            div.style.borderLeft = data.isNotification ? "4px solid #f59e0b" : "4px solid #cbd5e1";
-            if (data.eliminato) div.style.borderLeft = "4px solid #ef4444";
-            div.style.fontSize = "0.9rem";
-            div.style.display = "flex";
-            div.style.flexDirection = "column";
-            div.style.gap = "5px";
-            div.style.transition = "background-color 1s ease";
-            if(data.letto && !data.isNotification && !data.eliminato) div.style.opacity = "0.6";
-            if(data.eliminato) div.style.opacity = "0.8";
-
-            let timeStr = "--/--/---- --:--";
-            if(data.timestamp) {
-                const d = new Date(data.timestamp.toMillis());
-                timeStr = `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-            }
-
-            let sN = data.sender || "Sconosciuto";
-            let rN = data.recipients || "Bacheca (Tutti)";
+            // Check if type is selected
+            if(filterState.types.size > 0 && !filterState.types.has(item.type)) return false;
             
-            let attHtml = '';
-            if(data.fileUrls && data.fileUrls.length > 0) {
-                attHtml = '<div style="margin-top: 10px; display: flex; gap: 5px; flex-wrap: wrap;">';
-                data.fileUrls.forEach(f => {
-                    attHtml += `<a href="${f.url}" target="_blank" style="display:inline-flex; align-items:center; gap:5px; padding:4px 8px; background:rgba(59,130,246,0.1); color:var(--blue-primary); border-radius:4px; text-decoration:none; font-size:0.8rem; border:1px solid #bfdbfe;">📎 ${f.name || 'Allegato'}</a>`;
-                });
-                attHtml += '</div>';
+            // Check if category is selected
+            if(filterState.categories.size > 0 && !filterState.categories.has(item.category)) return false;
+
+            // Check Global Search Query (Supports AND / OR)
+            if (filterState.searchQuery.trim() !== '') {
+                const searchStr = `${item.date} ${item.type} ${item.category} ${item.description} ${item.amount}`.toLowerCase();
+                const rawQuery = filterState.searchQuery.toLowerCase().trim();
+                
+                // Parse OR operators first (lowest precedence)
+                const orGroups = rawQuery.split(/\s+or\s+/);
+                
+                let passedOr = false;
+                for (const group of orGroups) {
+                    // Parse AND operators within each OR group
+                    const andTerms = group.split(/\s+and\s+|\s+/); // Match explicit 'and' or just spaces
+                    
+                    let passedAnd = true;
+                    for (const term of andTerms) {
+                        if (term && !searchStr.includes(term)) {
+                            passedAnd = false;
+                            break;
+                        }
+                    }
+                    
+                    if (passedAnd) {
+                        passedOr = true;
+                        break;
+                    }
+                }
+                
+                if (!passedOr) return false;
             }
 
-            div.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <span style="font-size: 0.75rem; color: #666; font-weight: 600;">⏰ ${timeStr} </span>
-                    <div>
-                        ${data.eliminato ? '<span style="font-size:0.75rem; background:#ef4444; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">🗑️ CESTINO</span>' : ''}
-                        ${data.isResolved && !data.eliminato ? '<span style="font-size:0.75rem; background:#10b981; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">✅ RISOLTO</span>' : ''}
-                        ${data.haRisposto && !data.eliminato && !data.isResolved ? `<span style="font-size:0.75rem; background:#6366f1; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">↩️ RISPOSTO</span>` : ''}
-                        ${data.presoInCarico && !data.eliminato && !data.isResolved && !data.haRisposto ? `<span style="font-size:0.75rem; background:#3b82f6; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">👷 Preso in Carico da ${data.presoInCaricoDa || 'Te'}</span>` : ''}
-                        ${data.isNotification && !data.eliminato && !data.isResolved ? '<span style="font-size:0.75rem; background:#f59e0b; color:white; padding:2px 6px; border-radius:12px; font-weight:bold;">📌 NOTIFICA</span>' : ''}
+            // Check Multi-Select popover filters (usually for Grouped View, but can apply globally)
+            if (filterState.categories.size > 0 && !filterState.categories.has(item.category || 'Generico')) return false;
+            if (filterState.types.size > 0 && !filterState.types.has(item.type)) return false;
+            if (filterState.descriptions.size > 0 && !filterState.descriptions.has(item.description)) return false;
+
+            return true;
+        });
+
+        // Split column filter logic to allow dynamic dropdown options
+        let filteredData = baseFilteredData.filter(item => {
+            if (filterState.columnFilters.type && item.type !== filterState.columnFilters.type) return false;
+            if (filterState.columnFilters.category && item.category !== filterState.columnFilters.category) return false;
+            if (filterState.columnFilters.description && item.description !== filterState.columnFilters.description) return false;
+            return true;
+        });
+
+        // Update top cards with filtered totals
+        updateSummaryCards(filteredData);
+        updateActiveFiltersDisplay();
+        
+        const formatCurrency = (val) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(val);
+
+        // 2. GROUPING & RENDERING
+        const groupBy = filterState.groupBy;
+
+        if (groupBy === 'none') {
+            // Sort state helpers
+            const getSortIcon = (col) => {
+                const sortItemIdx = filterState.sortCols.findIndex(s => s.col === col);
+                if (sortItemIdx === -1) return '<span style="color:#cbd5e1;">↕</span>'; // Not sorted
+                
+                // Show arrow and priority number if there are multiple sorts
+                const dirStr = filterState.sortCols[sortItemIdx].dir === 'asc' ? '↑' : '↓';
+                const priorityStr = filterState.sortCols.length > 1 ? `<sup style="color:#8b5cf6;font-size:0.7em;">${sortItemIdx + 1}</sup>` : '';
+                return `<span style="color:#0f172a; font-weight:bold;">${dirStr}${priorityStr}</span>`;
+            };
+
+            // Generate distinct values for column dropsdowns based on CURRENT filtered data
+            // (but excluding the column's own filter to allow switching to other options within the same context)
+            const typeOptionsData = baseFilteredData.filter(item => {
+                if (filterState.columnFilters.category && item.category !== filterState.columnFilters.category) return false;
+                if (filterState.columnFilters.description && item.description !== filterState.columnFilters.description) return false;
+                return true;
+            });
+            const categoryOptionsData = baseFilteredData.filter(item => {
+                if (filterState.columnFilters.type && item.type !== filterState.columnFilters.type) return false;
+                if (filterState.columnFilters.description && item.description !== filterState.columnFilters.description) return false;
+                return true;
+            });
+            const descOptionsData = baseFilteredData.filter(item => {
+                if (filterState.columnFilters.type && item.type !== filterState.columnFilters.type) return false;
+                if (filterState.columnFilters.category && item.category !== filterState.columnFilters.category) return false;
+                return true;
+            });
+
+            const uniqueTypes = [...new Set(typeOptionsData.map(d => d.type))].filter(Boolean).sort();
+            const uniqueCategoriesLocal = [...new Set(categoryOptionsData.map(d => d.category))].filter(Boolean).sort();
+            const uniqueDescLocal = [...new Set(descOptionsData.map(d => d.description))].filter(Boolean).sort();
+            
+            const typeLabels = {
+                'REVENUE_EUBIOS': 'RICAVI EUBIOS',
+                'COSTS_EUBIOS': 'COSTI EUBIOS',
+                'REVENUE_EUBIOTECH': 'RICAVI EUBIOTECH',
+                'Costi risorse umane': 'COSTI RISORSE UMANE (EUBIOTECH)', 'COGS_TECH': 'COSTI PERSONALE EUBIOTECH (Legacy)',
+                'Costi altri': 'COSTI ALTRI (EUBIOTECH)', 'OPEX_TECH': 'ALTRI COSTI EUBIOTECH (Legacy)',
+                'REVENUE': 'RICAVI EUBIOS (Legacy)',
+                'COGS': 'COSTI EUBIOS (Legacy)',
+                'OPEX': 'ALTRI COSTI (Legacy)'
+            };
+
+            const typeOptions = `<option value="">Tutti</option>` + uniqueTypes.map(t => `<option value="${t}" ${filterState.columnFilters.type === t ? 'selected' : ''}>${typeLabels[t] || t}</option>`).join('');
+            const categoryOptions = `<option value="">Tutte</option>` + uniqueCategoriesLocal.map(c => `<option value="${c}" ${filterState.columnFilters.category === c ? 'selected' : ''}>${c}</option>`).join('');
+            const descOptions = `<option value="">Tutte</option>` + uniqueDescLocal.map(d => `<option value="${d}" ${filterState.columnFilters.description === d ? 'selected' : ''}>${d}</option>`).join('');
+
+            tableHeadRow.innerHTML = `
+                <th>
+                    <div style="display:flex; flex-direction:column;">
+                        <span class="sortable" data-sort="date">Data <span class="sort-icon">${getSortIcon('date')}</span></span>
+                        <select class="col-filter-date-group" style="margin-top:4px; font-size:0.8em; padding:2px; max-width: 150px;">
+                            <option value="none" disabled selected>Raggruppa per...</option>
+                            <option value="year">Anno</option>
+                            <option value="quarter">Trimestre</option>
+                            <option value="month">Mese</option>
+                            <option value="week">Settimana</option>
+                            <option value="day">Giorno</option>
+                        </select>
                     </div>
-                </div>
-                <div style="margin-top:5px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; font-size: 0.8rem; color: var(--blue-dark);">
-                    <strong>Da:</strong> ${sN} &nbsp;|&nbsp; <strong>A:</strong> ${rN}
-                </div>
-                <div style="color: #333; line-height: 1.4; white-space: pre-wrap; margin-top:5px; ${(data.letto || data.eliminato) ? 'text-decoration: line-through; color: #777;' : ''}">${data.text}</div>
-                ${attHtml}
+                </th>
+                <th>
+                    <div style="display:flex; flex-direction:column;">
+                        <span class="sortable" data-sort="type">Tipo <span class="sort-icon">${getSortIcon('type')}</span></span>
+                        <select class="col-filter" data-col="type" style="margin-top:4px; font-size:0.8em; padding:2px; max-width: 150px;">
+                            ${typeOptions}
+                        </select>
+                    </div>
+                </th>
+                <th>
+                    <div style="display:flex; flex-direction:column;">
+                        <span class="sortable" data-sort="category">Categoria <span class="sort-icon">${getSortIcon('category')}</span></span>
+                        <select class="col-filter" data-col="category" style="margin-top:4px; font-size:0.8em; padding:2px; max-width: 150px;">
+                            ${categoryOptions}
+                        </select>
+                    </div>
+                </th>
+                <th>
+                    <div style="display:flex; flex-direction:column;">
+                        <span class="sortable" data-sort="description">Descrizione <span class="sort-icon">${getSortIcon('description')}</span></span>
+                        <select class="col-filter" data-col="description" style="margin-top:4px; font-size:0.8em; padding:2px; max-width: 150px;">
+                            ${descOptions}
+                        </select>
+                    </div>
+                </th>
+                <th class="sortable" data-sort="dettaglio">Dettaglio <span class="sort-icon">${getSortIcon('dettaglio')}</span></th>
+                <th class="sortable" data-sort="amount">Importo (€) <span class="sort-icon">${getSortIcon('amount')}</span></th>
+                <th>Cliente</th>
+                <th>Fornitore</th>
+                <th>Allegato</th>
+                <th>Azioni</th>
             `;
             
-            const actionDiv = document.createElement('div');
-            actionDiv.style.display = "flex";
-            actionDiv.style.gap = "8px";
-            actionDiv.style.marginTop = "8px";
-            actionDiv.style.flexWrap = "wrap";
+            // Bind column filters
+            document.querySelectorAll('.col-filter').forEach(select => {
+                select.addEventListener('change', (e) => {
+                    const col = e.target.getAttribute('data-col');
+                    filterState.columnFilters[col] = e.target.value;
+                    renderTable();
+                });
+            });
 
-            if (data.eliminato) {
-                const restoreBtn = document.createElement('button');
-                restoreBtn.innerHTML = "♻️ Ripristina";
-                restoreBtn.style.cssText = "background: none; border: 1px solid #10b981; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #047857; background-color: rgba(16,185,129,0.1);";
-                restoreBtn.onclick = async () => {
-                    try {
-                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await updateDoc(doc(db, "messaggi", docSnapId), { eliminato: false });
-                    } catch(err) { console.error("Errore ripristino", err); }
-                };
-                actionDiv.appendChild(restoreBtn);
-
-                const hardDeleteBtn = document.createElement('button');
-                hardDeleteBtn.innerHTML = "🔥 Elimina Definitivamente";
-                hardDeleteBtn.style.cssText = "background: none; border: 1px solid #dc2626; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #b91c1c; background-color: rgba(220,38,38,0.1); font-weight: bold;";
-                hardDeleteBtn.onclick = async () => {
-                    if(!confirm("Sei sicuro di voler distruggere per sempre questo messaggio? Non potrà essere recuperato!")) return;
-                    try {
-                        const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await deleteDoc(doc(db, "messaggi", docSnapId));
-                    } catch(err) { console.error("Errore hard delete", err); }
-                };
-                actionDiv.appendChild(hardDeleteBtn);
-            } else if (data.isResolved) {
-                const riprendiBtn = document.createElement('button');
-                riprendiBtn.innerHTML = "♻️ Riprendi in Carico";
-                riprendiBtn.style.cssText = "background: none; border: 1px solid #f59e0b; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #b45309; background-color: rgba(245,158,11,0.1);";
-                riprendiBtn.onclick = async () => {
-                    try {
-                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await updateDoc(doc(db, "messaggi", docSnapId), { isResolved: false });
-                    } catch(err) { console.error("Errore riprendi risolto", err); }
-                };
-                actionDiv.appendChild(riprendiBtn);
-
-                const hardDeleteBtn = document.createElement('button');
-                hardDeleteBtn.innerHTML = "🔥 Elimina Definitivamente";
-                hardDeleteBtn.style.cssText = "background: none; border: 1px solid #dc2626; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #b91c1c; background-color: rgba(220,38,38,0.1); font-weight: bold;";
-                hardDeleteBtn.onclick = async () => {
-                    if(!confirm("Sei sicuro di voler distruggere per sempre questo messaggio? Non potrà essere recuperato!")) return;
-                    try {
-                        const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await deleteDoc(doc(db, "messaggi", docSnapId));
-                    } catch(err) { console.error("Errore hard delete", err); }
-                };
-                actionDiv.appendChild(hardDeleteBtn);
-            } else {
-                const toggleBtn = document.createElement('button');
-                toggleBtn.innerHTML = data.isNotification ? "🔕 Annulla Notifica" : "🔔 Setta Promemoria";
-                toggleBtn.style.cssText = "background: none; border: 1px solid #b8b8b8; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #555; background-color: rgba(255,255,255,0.5);";
-                toggleBtn.onclick = async () => {
-                    try {
-                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await updateDoc(doc(db, "messaggi", docSnapId), { isNotification: !data.isNotification });
-                    } catch(err) { console.error("Errore toggle", err); }
-                };
-                actionDiv.appendChild(toggleBtn);
-
-                const replyBtn = document.createElement('button');
-                replyBtn.innerHTML = "↩️ Rispondi";
-                replyBtn.style.cssText = "background: none; border: 1px solid #10b981; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #047857; background-color: rgba(16,185,129,0.1); font-weight: bold;";
-                replyBtn.onclick = () => {
-                    window.pendingReplyRecipients = [sN];
-                    window.replyingToMsgId = docSnapId;
-                    if(msgText) {
-                        msgText.placeholder = `Rispondi a ${sN}...`;
-                        msgText.focus();
-                        msgText.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Bind date group fast switch
+            const dateGroupSelect = document.querySelector('.col-filter-date-group');
+            if(dateGroupSelect) {
+                dateGroupSelect.addEventListener('change', (e) => {
+                    const val = e.target.value;
+                    if(val !== 'none') {
+                        filterState.groupBy = val;
+                        const topSelect = document.getElementById('group-by-select');
+                        if (topSelect) topSelect.value = val;
+                        renderTable();
                     }
-                };
-                actionDiv.appendChild(replyBtn);
+                });
+            }
 
-                const replyAllBtn = document.createElement('button');
-                replyAllBtn.innerHTML = "↩️👥 Rispondi a tutti";
-                replyAllBtn.style.cssText = "background: none; border: 1px solid #059669; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #065f46; background-color: rgba(5,150,105,0.1); font-weight: bold;";
-                replyAllBtn.onclick = () => {
-                    let allRecs = [sN];
-                    if (data.recipients && data.recipients !== "Bacheca (Tutti)") {
-                        if (typeof data.recipients === 'string') {
-                            data.recipients.split(',').forEach(r => allRecs.push(r.trim()));
-                        } else if (Array.isArray(data.recipients)) {
-                            data.recipients.forEach(r => allRecs.push(r));
-                        }
-                    }
-                    const currentUser = localStorage.getItem('antimo_user_name') || "Sconosciuto";
-                    allRecs = [...new Set(allRecs)].filter(r => r !== currentUser);
-                    window.pendingReplyRecipients = allRecs;
-                    window.replyingToMsgId = docSnapId;
+            // Bind sorting headers
+            document.querySelectorAll('#data-table th .sortable, #data-table th.sortable').forEach(th => {
+                th.style.cursor = 'pointer';
+                th.addEventListener('click', (e) => {
+                    // Prevent triggering sort when clicking the dropdown
+                    if(e.target.tagName.toLowerCase() === 'select' || e.target.tagName.toLowerCase() === 'option') return;
                     
-                    if (msgText) {
-                        msgText.placeholder = `Rispondi a tutti (${allRecs.join(', ')})...`;
-                        msgText.focus();
-                        msgText.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-                };
-                actionDiv.appendChild(replyAllBtn);
-
-                const toggleReadBtn = document.createElement('button');
-                toggleReadBtn.innerHTML = data.letto ? "📖 Da Leggere" : "✔️ Letto";
-                toggleReadBtn.style.cssText = "background: none; border: 1px solid #b8b8b8; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #555; background-color: rgba(255,255,255,0.5);";
-                toggleReadBtn.onclick = async () => {
-                    try {
-                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await updateDoc(doc(db, "messaggi", docSnapId), { letto: !data.letto });
-                    } catch(err) { console.error("Errore letto", err); }
-                };
-                actionDiv.appendChild(toggleReadBtn);
-                
-                const myUserName = localStorage.getItem('antimo_user_name') || 'Sconosciuto';
-                const toggleCaricoBtn = document.createElement('button');
-                toggleCaricoBtn.innerHTML = data.presoInCarico ? `❌ Annulla Incarico (${data.presoInCaricoDa || 'Te'})` : "👷 Prendi in Carico";
-                toggleCaricoBtn.style.cssText = "background: none; border: 1px solid #3b82f6; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #1d4ed8; background-color: rgba(59,130,246,0.1);";
-                toggleCaricoBtn.onclick = async () => {
-                    try {
-                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        if (data.presoInCarico) {
-                            await updateDoc(doc(db, "messaggi", docSnapId), { presoInCarico: false, presoInCaricoDa: null });
+                    const col = th.getAttribute('data-sort');
+                    const isShift = e.shiftKey;
+                    
+                    const existingIdx = filterState.sortCols.findIndex(s => s.col === col);
+                    
+                    if (isShift) {
+                        // Multi-sort behavior: toggle dir if exists, else append
+                        if (existingIdx !== -1) {
+                            filterState.sortCols[existingIdx].dir = filterState.sortCols[existingIdx].dir === 'asc' ? 'desc' : 'asc';
                         } else {
-                            await updateDoc(doc(db, "messaggi", docSnapId), { presoInCarico: true, presoInCaricoDa: myUserName });
+                            filterState.sortCols.push({ col: col, dir: col === 'date' || col === 'amount' ? 'desc' : 'asc' });
                         }
-                    } catch(err) { console.error("Errore carico", err); }
-                };
-                actionDiv.appendChild(toggleCaricoBtn);
-
-                if (data.presoInCarico && data.presoInCaricoDa === myUserName) {
-                    const resolveBtn = document.createElement('button');
-                    resolveBtn.innerHTML = "✅ Segna come Risolto";
-                    resolveBtn.style.cssText = "background: none; border: 1px solid #10b981; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #047857; background-color: rgba(16,185,129,0.1); font-weight: bold;";
-                    resolveBtn.onclick = async () => {
-                        try {
-                            const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                            await updateDoc(doc(db, "messaggi", docSnapId), { isResolved: true, isNotification: false, letto: true });
-                        } catch(err) { console.error("Errore risolvi", err); }
-                    };
-                    actionDiv.appendChild(resolveBtn);
-                }
-
-                const deleteBtn = document.createElement('button');
-                deleteBtn.innerHTML = "🗑️ Elimina";
-                deleteBtn.style.cssText = "background: none; border: 1px solid #ffcccc; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; cursor: pointer; color: #d32f2f; background-color: rgba(255,255,255,0.5);";
-                deleteBtn.onclick = async () => {
-                    try {
-                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await updateDoc(doc(db, "messaggi", docSnapId), { eliminato: true });
-                    } catch(err) { console.error("Errore soft delete", err); }
-                };
-                actionDiv.appendChild(deleteBtn);
-            }
-
-            div.appendChild(actionDiv);
-            messagesList.appendChild(div);
-        });
-    }
-    
-    // Aggiorna Pulsante Globale Notifiche e Testo "Mostra/Nascondi"
-    if(activeNotes.length > 0 && btnTopNotification) {
-        btnTopNotification.classList.remove('hidden');
-        if(topNotificationText) topNotificationText.textContent = `${activeNotes.length > 1 ? `(${activeNotes.length}) ` : ''}${activeNotes[0]}`;
-    } else if(btnTopNotification) {
-        btnTopNotification.classList.add('hidden');
-    }
-    
-    if(btnToggleMessages) {
-        const isHidden = messagesContainer.classList.contains('hidden');
-        let noteBadge = activeNotes.length > 0 ? ` <span style="background:#ef4444;color:white;padding:3px 8px;border-radius:12px;font-size:1rem;font-weight:bold;margin-left:5px;box-shadow:0 2px 4px rgba(239,68,68,0.3);">${activeNotes.length}</span>` : '';
-        btnToggleMessages.innerHTML = (isHidden ? 'MOSTRA' : 'NASCONDI') + noteBadge;
-    }
-    
-    // In caso di link WhatsApp con msgId
-    const urlParams = new URLSearchParams(window.location.search);
-    const msgId = urlParams.get('msgId');
-    if(msgId && currentMsgTab === 'all') {
-        const targetMsg = messagesList.querySelector(`div[data-id="${msgId}"]`);
-        if(targetMsg) {
-            messagesContainer.classList.remove('hidden');
-            if(btnToggleMessages) btnToggleMessages.textContent = 'Nascondi';
-            setTimeout(() => {
-                targetMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                const originalBg = targetMsg.style.backgroundColor;
-                targetMsg.style.backgroundColor = '#dbeafe';
-                setTimeout(() => { targetMsg.style.backgroundColor = originalBg; }, 3000);
-            }, 500);
-            window.history.replaceState({}, document.title, window.location.pathname);
-        }
-    }
-}
-
-let pendingMessageText = "";
-let pendingMessageIsNotification = false;
-let pendingMessageFiles = [];
-
-const msgAttachmentsInput = document.getElementById('msgAttachments');
-const msgPreviewContainer = document.getElementById('msgPreviewContainer');
-
-if (msgAttachmentsInput) {
-    msgAttachmentsInput.addEventListener('change', (e) => {
-        const files = e.target.files;
-        pendingMessageFiles = [];
-        msgPreviewContainer.innerHTML = '';
-        if (files.length > 0) {
-            msgPreviewContainer.classList.remove('hidden');
-            Array.from(files).forEach(file => {
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    const dataUrl = ev.target.result;
-                    pendingMessageFiles.push({ name: file.name, type: file.type, data: dataUrl });
-                    
-                    const div = document.createElement('div');
-                    div.style.cssText = 'position: relative; width: 60px; height: 60px; border: 1px solid #ccc; border-radius: 4px; overflow: hidden;';
-                    if (file.type.startsWith('image/')) {
-                        div.innerHTML = `<img src="${dataUrl}" style="width:100%; height:100%; object-fit:cover;">`;
-                    } else if (file.type.startsWith('video/')) {
-                        div.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#eee; font-size:1.5rem;">🎥</div>`;
                     } else {
-                        div.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#eee; font-size:1.5rem;">📄</div>`;
+                        // Single-sort behavior (reset array, or just toggle if it's already the primary)
+                        if (existingIdx === 0 && filterState.sortCols.length === 1) {
+                            // It was already the only sort, just toggle it
+                            filterState.sortCols[0].dir = filterState.sortCols[0].dir === 'asc' ? 'desc' : 'asc';
+                        } else {
+                            // Reset and make this the ONLY primary sort
+                            filterState.sortCols = [{ col: col, dir: col === 'date' || col === 'amount' ? 'desc' : 'asc' }];
+                        }
                     }
-                    msgPreviewContainer.appendChild(div);
-                };
-                reader.readAsDataURL(file);
-            });
-        } else {
-            msgPreviewContainer.classList.add('hidden');
-        }
-    });
-}
-
-const btnWhatsappNuovoIntervento = document.getElementById('btnWhatsappNuovoIntervento');
-if (btnWhatsappNuovoIntervento) {
-    btnWhatsappNuovoIntervento.addEventListener('click', () => {
-        let paz = document.getElementById('paziente') ? document.getElementById('paziente').value : "";
-        let loc = document.getElementById('localita') ? document.getElementById('localita').value : "";
-        let ind = document.getElementById('indirizzo') ? document.getElementById('indirizzo').value : "";
-        
-        let extraInfo = "";
-        if (paz || loc || ind) {
-            extraInfo = `\nPaziente: ${paz}\nLuogo: ${loc} - ${ind}`;
-        }
-        
-        pendingMessageText = "NUOVO INTERVENTO" + extraInfo;
-        pendingMessageIsNotification = false;
-        if(waSelectModal) waSelectModal.classList.remove('hidden');
-    });
-}
-
-// GLOBAL PASTE LISTENER PRO (Bacheca & Allegati Intervento)
-document.addEventListener('paste', (e) => {
-    const target = e.target;
-    // Identifichiamo dove l'utente sta incollando
-    const isBacheca = target.id === 'msgText';
-    // Qualunque casella di testo durante l'inserimento/modifica intervento vale per gli allegati
-    const isInterventionNote = target.closest('#interventionSection') && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT');
-
-    if (!isBacheca && !isInterventionNote) return;
-
-    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-    for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.kind === 'file' && item.type.startsWith('image/')) {
-            const file = item.getAsFile();
-            if (!file) continue;
-
-            const fileName = `PastedImage_${Date.now()}.png`;
-            const reader = new FileReader();
-
-            reader.onload = (ev) => {
-                const dataUrl = ev.target.result;
-
-                if (isBacheca) {
-                    if (msgPreviewContainer) msgPreviewContainer.classList.remove('hidden');
-                    pendingMessageFiles.push({ name: fileName, type: file.type, data: dataUrl });
-
-                    if (msgPreviewContainer) {
-                        const div = document.createElement('div');
-                        div.style.cssText = 'position: relative; width: 60px; height: 60px; border: 1px solid #ccc; border-radius: 4px; overflow: hidden; margin-top: 5px; margin-right: 5px; display: inline-block;';
-                        div.innerHTML = `<img src="${dataUrl}" style="width:100%; height:100%; object-fit:cover;">`;
-                        msgPreviewContainer.appendChild(div);
-                    }
-                } else if (isInterventionNote) {
-                    // Lo inseriamo negli allegati dell'Intervento (Eseguito / Programmato)
-                    const filePreviewCont = document.getElementById('filePreviewContainer');
-                    if (filePreviewCont) filePreviewCont.classList.remove('hidden');
                     
-                    currentAttachments.push({
-                        data: dataUrl,
-                        type: file.type,
-                        name: fileName
-                    });
-                    
-                    if (typeof renderAttachmentsPreview === 'function') {
-                        renderAttachmentsPreview();
-                    }
-                }
-            };
-            reader.readAsDataURL(file);
-        }
-    }
-});
-
-const waSelectModal = document.getElementById('waSelectModal');
-const waContactsList = document.getElementById('waContactsList');
-const waSelectAll = document.getElementById('waSelectAll');
-const btnWaSkip = document.getElementById('btnWaSkip');
-const btnWaSend = document.getElementById('btnWaSend');
-const btnCloseWaSelect = document.getElementById('btnCloseWaSelect');
-
-if(btnCloseWaSelect) {
-    btnCloseWaSelect.addEventListener('click', () => {
-        waSelectModal.classList.add('hidden');
-        window.pendingReplyRecipients = null;
-        window.replyingToMsgId = null;
-        if (msgAttachmentsInput) msgAttachmentsInput.value = '';
-        if (msgPreviewContainer) { msgPreviewContainer.innerHTML = ''; msgPreviewContainer.classList.add('hidden'); }
-        pendingMessageFiles = [];
-        if(document.getElementById('msgText')) {
-            document.getElementById('msgText').placeholder = "Scrivi un nuovo messaggio o comunicazione...";
-        }
-    });
-}
-
-const waQueueModal = document.getElementById('waQueueModal');
-const waQueueList = document.getElementById('waQueueList');
-const btnCloseWaQueue = document.getElementById('btnCloseWaQueue');
-
-async function processMessageSave(text, isNotif, recipients = "Bacheca (Tutti)") {
-    if(!isFirebaseConfigured) return null;
-    try {
-        const senderName = localStorage.getItem('antimo_user_name') || "Sconosciuto";
-        const { collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        const { ref: storageRefCall, uploadString, getDownloadURL } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js");
-        
-        let fileUrls = [];
-        if (pendingMessageFiles && pendingMessageFiles.length > 0 && typeof storage !== 'undefined') {
-            const upPromises = pendingMessageFiles.map(async (att, idx) => {
-                const fName = `messaggi_attachments/msg_${Date.now()}_${idx}_${att.name.replace(/[^a-zA-Z0-9.\-]/g, "_")}`;
-                const storageRef = storageRefCall(storage, fName);
-                await uploadString(storageRef, att.data, 'data_url');
-                const url = await getDownloadURL(storageRef);
-                return { url: url, name: att.name, type: att.type };
-            });
-            fileUrls = await Promise.all(upPromises);
-        }
-
-        const docD = {
-            text: text,
-            isNotification: isNotif,
-            sender: senderName,
-            recipients: recipients,
-            timestamp: serverTimestamp(),
-            fileUrls: fileUrls
-        };
-        const docRef = await addDoc(collection(db, "messaggi"), docD);
-
-        // Se è una risposta a un messaggio specifico, aggiorna l'originale
-        if (window.replyingToMsgId) {
-            try {
-                const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                await updateDoc(doc(db, "messaggi", window.replyingToMsgId), { haRisposto: true, rispostoDa: senderName });
-            } catch(e) { console.error("Errore update haRisposto", e); }
-            window.replyingToMsgId = null;
-        }
-
-        return docRef.id;
-    } catch(err) {
-        console.error("Errore invio msg", err);
-        alert("Errore invio messaggio.");
-        return null;
-    }
-}
-
-if(newMessageForm) {
-    newMessageForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const testoS = document.getElementById('msgText').value.trim();
-        const isNotif = document.getElementById('msgIsNotification') ? document.getElementById('msgIsNotification').checked : true;
-        
-        if(!testoS || !isFirebaseConfigured) return;
-        
-        pendingMessageText = testoS;
-        pendingMessageIsNotification = isNotif;
-        
-        // Load employees from Firebase
-        waContactsList.innerHTML = '<div style="text-align: center; color: #666; font-size: 0.9rem;">Caricamento dipendenti...</div>';
-        waSelectAll.checked = false;
-        waSelectModal.classList.remove('hidden');
-
-        try {
-            const { collection, getDocs, query, where } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-            const q = query(collection(db, "anagrafiche"), where("localita", "==", "App (Dipendente)"));
-            const snap = await getDocs(q);
-            
-            waContactsList.innerHTML = '';
-            let dipendenti = [];
-            snap.forEach(doc => dipendenti.push(doc.data()));
-            
-            if (dipendenti.length > 0) {
-                dipendenti.forEach((c, i) => {
-                    const cbValue = c.telefono1 || c.telefono || "";
-                    const cbName = `${c.nome} ${c.cognome || ''}`.trim();
-                    const isChecked = window.pendingReplyRecipients && window.pendingReplyRecipients.includes(cbName) ? 'checked' : '';
-                    const div = document.createElement('label');
-                    div.style.cssText = "display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: #f9f9f9; border-radius: 6px; border: 1px solid #eee;";
-                    div.innerHTML = `<input type="checkbox" class="wa-contact-cb" value="${i}" data-name="${cbName}" data-phone="${cbValue}" style="transform: scale(1.2);" ${isChecked}> <span style="font-weight:bold; color:var(--blue-dark);">${cbName}</span> <span style="color:#666; font-size:0.85rem;">(${cbValue || 'Nessun num'})</span>`;
-                    waContactsList.appendChild(div);
+                    renderTable();
                 });
-            } else {
-                waContactsList.innerHTML = '<div style="text-align: center; color: #666; font-size: 0.9rem;">Nessun dipendente trovato.</div>';
-            }
-        } catch(err) {
-            console.error("Errore fetch dipendenti per WA:", err);
-            waContactsList.innerHTML = '<div style="text-align: center; color: red; font-size: 0.9rem;">Errore caricamento.</div>';
-        }
-    });
-}
-
-if(waSelectAll) {
-    waSelectAll.addEventListener('change', (e) => {
-        document.querySelectorAll('.wa-contact-cb').forEach(cb => cb.checked = e.target.checked);
-    });
-}
-
-if(btnWaSkip) {
-    btnWaSkip.addEventListener('click', async () => {
-        const checkedBoxes = Array.from(document.querySelectorAll('.wa-contact-cb:checked'));
-        let recNames = checkedBoxes.map(cb => cb.getAttribute('data-name')).join(', ');
-        if(!recNames) recNames = "Bacheca (Tutti)";
-
-        btnWaSkip.disabled = true; btnWaSkip.innerHTML = '...';
-        await processMessageSave(pendingMessageText, pendingMessageIsNotification, recNames);
-        if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = true;
-        
-        if (msgAttachmentsInput) msgAttachmentsInput.value = '';
-        if (msgPreviewContainer) { msgPreviewContainer.innerHTML = ''; msgPreviewContainer.classList.add('hidden'); }
-        pendingMessageFiles = [];
-        window.pendingReplyRecipients = null;
-        if(document.getElementById('msgText')) {
-            document.getElementById('msgText').value = '';
-            document.getElementById('msgText').placeholder = "Scrivi un nuovo messaggio o comunicazione...";
-        }
-        
-        waSelectModal.classList.add('hidden');
-        btnWaSkip.disabled = false; btnWaSkip.innerHTML = 'Solo Bacheca';
-    });
-}
-
-if(btnWaSend) {
-    btnWaSend.addEventListener('click', async () => {
-        const checkedBoxes = Array.from(document.querySelectorAll('.wa-contact-cb:checked'));
-        const selectedIndexes = checkedBoxes.map(cb => parseInt(cb.value));
-        
-        let recNames = checkedBoxes.map(cb => cb.getAttribute('data-name')).join(', ');
-        if(!recNames) recNames = "Bacheca (Tutti)";
-        
-        btnWaSend.disabled = true; btnWaSend.innerHTML = '...';
-        const msgId = await processMessageSave(pendingMessageText, pendingMessageIsNotification, recNames);
-        if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = true;
-        
-        if (msgAttachmentsInput) msgAttachmentsInput.value = '';
-        if (msgPreviewContainer) { msgPreviewContainer.innerHTML = ''; msgPreviewContainer.classList.add('hidden'); }
-        pendingMessageFiles = [];
-        window.pendingReplyRecipients = null;
-        if(document.getElementById('msgText')) {
-            document.getElementById('msgText').value = '';
-            document.getElementById('msgText').placeholder = "Scrivi un nuovo messaggio o comunicazione...";
-        }
-        
-        waSelectModal.classList.add('hidden');
-        btnWaSend.disabled = false; btnWaSend.innerHTML = 'Procedi su WA';
-        
-        if(checkedBoxes.length > 0 && msgId) {
-            waQueueList.innerHTML = '';
-            checkedBoxes.forEach(cb => {
-                const cNome = cb.getAttribute('data-name');
-                const cNumero = cb.getAttribute('data-phone');
-                if(!cNumero) return; // Salta se non ha il numero
-
-                const btn = document.createElement('a');
-                btn.className = "btn btn-primary";
-                btn.style.cssText = "background: #25D366; border: none; padding: 12px; text-decoration: none; color: white; display: flex; justify-content: center; align-items: center; gap: 8px; font-weight: bold; border-radius: 8px;";
-                btn.target = "_blank";
-                
-                let cleanNum = cNumero.replace(/\s+/g, '');
-                if(!cleanNum.startsWith('+') && cleanNum.length <= 10) cleanNum = "39" + cleanNum;
-                else cleanNum = cleanNum.replace('+', '');
-                
-                let appLink = window.location.origin + window.location.pathname + '?msgId=' + msgId;
-                let textWithLink = "📩 Nuova comunicazione in Bacheca.\n\n👉 Apri nell'App per leggere e visualizzare eventuali allegati: " + appLink;
-                
-                btn.href = `https://wa.me/${cleanNum}?text=${encodeURIComponent(textWithLink)}`;
-                btn.innerHTML = `<span style="font-size:1.2rem;">💬</span> WhatsApp per ${cNome}`;
-                btn.onclick = () => { 
-                    btn.style.opacity = '0.5'; 
-                    btn.innerHTML = `<span style="font-size:1.2rem;">✅</span> Inviato a ${cNome}`;
-                };
-                waQueueList.appendChild(btn);
             });
-            if (waQueueList.innerHTML !== '') {
-                waQueueModal.classList.remove('hidden');
+
+            if(filteredData.length === 0) {
+                 tableBody.innerHTML = '<tr><td colspan="7" class="empty-state">Nessun dato corrisponde ai filtri selezionati.</td></tr>';
+                 return;
             }
-        }
-    });
-}
 
-if(btnCloseWaQueue) {
-    btnCloseWaQueue.addEventListener('click', () => {
-        waQueueModal.classList.add('hidden');
-    });
-}
-
-// Form Inputs
-const iTipo = document.getElementById('tipoAttivita');
-const iPaziente = document.getElementById('paziente');
-const iLocalita = document.getElementById('localita');
-const iIndirizzo = document.getElementById('indirizzo');
-const iTelefono = document.getElementById('telefono');
-
-const iNuovoDispositivo = document.getElementById('nuovoDispositivo');
-const iNote = document.getElementById('note');
-const inputKmPercorsi = document.getElementById('kmPercorsi');
-const inputMatricola = document.getElementById('matricola');
-const inputAllegato = document.getElementById('allegatoFile');
-const filePreviewContainer = document.getElementById('filePreviewContainer');
-const inputDataProgrammata = document.getElementById('dataProgrammata');
-
-// Setting e Nuovi
-const btnSettings = document.getElementById('btnSettings');
-const settingsModal = document.getElementById('settingsModal');
-const btnCloseSettings = document.getElementById('btnCloseSettings');
-const toggleRequireKm = document.getElementById('toggleRequireKm');
-const kmContainer = document.getElementById('kmContainer');
-const activeExtraAttachmentsContainer = document.getElementById('activeExtraAttachmentsContainer');
-const activeExtraAttachmentsList = document.getElementById('activeExtraAttachmentsList');
-const inputAllegatoProgrammazione = document.getElementById('allegatoProgrammazione');
-const progPreviewContainer = document.getElementById('progPreviewContainer');
-
-// Backup & Versioni
-const btnOpenBackup = document.getElementById('btnOpenBackup');
-const backupModal = document.getElementById('backupModal');
-const btnCloseBackup = document.getElementById('btnCloseBackup');
-const versionDescModal = document.getElementById('versionDescModal');
-const btnCloseVersionDesc = document.getElementById('btnCloseVersionDesc');
-const btnAiSearch = document.getElementById('btnAiSearch');
-const aiSearchInput = document.getElementById('aiSearchInput');
-const aiSearchResult = document.getElementById('aiSearchResult');
-const verTitleDesc = document.getElementById('verTitleDesc');
-const versionDescContent = document.getElementById('versionDescContent');
-
-// Backup Dates
-const backupManualeDate = document.getElementById('backupManualeDate');
-const backupOggiDate = document.getElementById('backupOggiDate');
-const backup2giorniDate = document.getElementById('backup2giorniDate');
-const backup7giorniDate = document.getElementById('backup7giorniDate');
-
-const btnSaveManualBackup = document.getElementById('btnSaveManualBackup');
-const btnAllVersions = document.getElementById('btnAllVersions');
-
-const justifyModal = document.getElementById('justifyModal');
-const justifyReason = document.getElementById('justifyReason');
-const btnCancelJustify = document.getElementById('btnCancelJustify');
-const btnConfirmJustify = document.getElementById('btnConfirmJustify');
-
-let interventionToJustify = null; // Memorizza l'ID in fase di giustificazione
-
-let customDevices = JSON.parse(localStorage.getItem('antimo_customDevices')) || [];
-
-const editInterventionModal = document.getElementById('editInterventionModal');
-const btnCancelEdit = document.getElementById('btnCancelEdit');
-const btnSaveEdit = document.getElementById('btnSaveEdit');
-
-async function deleteProgrammatoAppJs(index) {
-    const p = plannedInterventions[index];
-    if(!p) return;
-    if(!confirm(`Sicuro di voler eliminare l'intervento programmato per ${p.paziente}?`)) return;
-    
-    plannedInterventions.splice(index, 1);
-    saveState();
-    
-    if (isFirebaseConfigured && (p.idFb || p.id)) {
-        try {
-            const { doc, deleteDoc, collection, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-            if (p.idFb) {
-                await deleteDoc(doc(db, "programmati", p.idFb));
-            } else {
-                const q = query(collection(db, "programmati"), where("id", "==", p.id));
-                const snaps = await getDocs(q);
-                snaps.forEach(async d => await deleteDoc(doc(db, "programmati", d.id)));
-            }
-        } catch(e) { console.error("Errore rimozione cloud", e); }
-    }
-    updateUI();
-    updateInterventiCount();
-}
-
-let currentEditProgIndex = null;
-function editProgrammatoAppJs(index) {
-    const p = plannedInterventions[index];
-    if(!p) return;
-    currentEditProgIndex = index;
-    
-    document.getElementById('editItemIndex').value = index;
-    document.getElementById('editPaziente').value = p.paziente || "";
-    if (document.getElementById('editTecnicoAssegnato')) document.getElementById('editTecnicoAssegnato').value = p.tecnicoAssegnato || "";
-    document.getElementById('editLocalita').value = p.localita || p.destinazione || "";
-    document.getElementById('editIndirizzo').value = p.indirizzo || "";
-    document.getElementById('editTelefono').value = p.telefono || "";
-    document.getElementById('editTipo').value = p.tipo || "";
-    document.getElementById('editDispositivi').value = p.dispositivi || "";
-    document.getElementById('editMatricola').value = p.matricola || "";
-    document.getElementById('editDataPrevista').value = p.dataPrevista || "";
-    document.getElementById('editOraPrevista').value = p.oraPrevista || "";
-    document.getElementById('editNote').value = p.note || "";
-    
-    editInterventionModal.classList.remove('hidden');
-}
-
-if(btnCancelEdit) btnCancelEdit.addEventListener('click', () => editInterventionModal.classList.add('hidden'));
-
-if(btnSaveEdit) {
-    btnSaveEdit.addEventListener('click', async () => {
-        if(currentEditProgIndex === null) return;
-        const p = plannedInterventions[currentEditProgIndex];
-        
-        btnSaveEdit.textContent = "Salvataggio...";
-        btnSaveEdit.disabled = true;
-        
-        p.paziente = document.getElementById('editPaziente').value;
-        if (document.getElementById('editTecnicoAssegnato')) p.tecnicoAssegnato = document.getElementById('editTecnicoAssegnato').value;
-        p.localita = document.getElementById('editLocalita').value;
-        p.indirizzo = document.getElementById('editIndirizzo').value;
-        p.telefono = document.getElementById('editTelefono').value;
-        p.tipo = document.getElementById('editTipo').value;
-        p.dispositivi = document.getElementById('editDispositivi').value;
-        p.matricola = document.getElementById('editMatricola').value;
-        p.dataPrevista = document.getElementById('editDataPrevista').value;
-        p.oraPrevista = document.getElementById('editOraPrevista').value;
-        p.note = document.getElementById('editNote').value;
-        p.status = p.dataPrevista ? 'planned' : 'in_attesa';
-        
-        saveState();
-        
-        if (isFirebaseConfigured && (p.idFb || p.id)) {
-            try {
-                const { doc, updateDoc, collection, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                const payload = { ...p };
-                delete payload.idFb; // non salviamo la chiave fb se presente
-                
-                if (p.idFb) {
-                    await updateDoc(doc(db, "programmati", p.idFb), payload);
-                } else {
-                    const q = query(collection(db, "programmati"), where("id", "==", p.id));
-                    const snaps = await getDocs(q);
-                    snaps.forEach(async d => await updateDoc(doc(db, "programmati", d.id), payload));
-                }
-            } catch(e) { console.error("Errore aggiornamento cloud", e); }
-        }
-        
-        editInterventionModal.classList.add('hidden');
-        btnSaveEdit.textContent = "SALVA MODIFICHE";
-        btnSaveEdit.disabled = false;
-        
-        updateUI();
-        updateInterventiCount();
-    });
-}
-
-function initApp() {
-
-    updateUI();
-    updateInterventiCount();
-    
-    // Inizializza Listeners Real-time e sync
-    loadMessages();
-    syncAssistitiDatabase();
-    
-    // Proviamo a sincronizzare i dati locali vecchi/offline non ancora sul cloud
-    setTimeout(syncLocalDataToCloud, 2000);
-    setTimeout(syncPlannedInterventions, 1000); // Pesca i programmati dal cloud
-}
-
-// Nuova funzione per scaricare gli interventi PROGRAMMATI dal Cloud a tutti i dispositivi
-async function syncPlannedInterventions() {
-    if (!isFirebaseConfigured) return;
-    try {
-        const { collection, getDocs, query, where } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        
-        // Vogliamo solo quelli che sono esplicitamente 'planned' (o senza status, legacy)
-        // Non possiamo usare un 'in' facile se non creiamo indice composto, quindi filtriamo dopo averli presi tutti se sono pochi, 
-        // oppure facciamo una query se il db lo permette. Per sicurezza prendiamo tutto e filtriamo per evitare indici mancanti.
-        const snap = await getDocs(collection(db, "programmati"));
-        let cloudPlanned = [];
-        snap.forEach(doc => {
-            const data = doc.data();
-            if (!data.status || data.status === 'planned' || data.status === 'in_attesa') {
-                cloudPlanned.push({ id: doc.id, ...data });
-            }
-        });
-        
-        // Ordiniamo per data teorica o per come arrivano
-        plannedInterventions = cloudPlanned;
-        saveState();
-        updateInterventiCount();
-        updateUI();
-        console.log("Interventi programmati sincronizzati dal Cloud (filtrati 'da fare').");
-    } catch(e) {
-        console.error("Errore fetch programmati da Firebase:", e);
-    }
-}
-
-// Nuova funzione per ascoltare e sincronizzare il DB degli Assistiti
-async function syncAssistitiDatabase() {
-    if (!isFirebaseConfigured) return;
-    try {
-        const { doc, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        const docRef = doc(db, "shared_data", "assistiti");
-        onSnapshot(docRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                if (data.list) {
-                    localStorage.setItem('antimo_assistiti', JSON.stringify(data.list));
-                    if(typeof window.renderAssistitiDatalist === 'function') {
-                        window.renderAssistitiDatalist();
+            // Apply selected multi-level sort
+            const sortedData = [...filteredData].sort((a, b) => {
+                for (let i = 0; i < filterState.sortCols.length; i++) {
+                    const sortInfo = filterState.sortCols[i];
+                    const col = sortInfo.col;
+                    const dir = sortInfo.dir === 'asc' ? 1 : -1;
+                    
+                    let cmp = 0;
+                    if (col === 'date') {
+                        cmp = new Date(a.date) - new Date(b.date);
+                    } else if (col === 'amount') {
+                        cmp = parseFloat(a.amount || 0) - parseFloat(b.amount || 0);
+                    } else {
+                        // Strings
+                        const valA = (a[col] || '').toString().toLowerCase();
+                        const valB = (b[col] || '').toString().toLowerCase();
+                        if (valA < valB) cmp = -1;
+                        else if (valA > valB) cmp = 1;
+                    }
+                    
+                    if (cmp !== 0) {
+                        return cmp * dir;
                     }
                 }
-            }
-        });
-    } catch(e) {
-        console.error("Errore attivazione listener Assistiti", e);
-    }
-}
+                return 0; // All priorities equal
+            });
 
-// Funzione per sincronizzare i vecchi interventi salvati solo in localStorage verso Firebase
-async function syncLocalDataToCloud() {
-    if (!isFirebaseConfigured) return;
-    
-    // Invece di fidarci del flag locale "cloudSynced" (che potrebbe essersi buggato
-    // con il vecchio DB errato), guardiamo TUTTO quello che abbiamo in locale.
-    let tuttiIFilePath = completedInterventions;
-    if (tuttiIFilePath.length === 0) {
-        if (typeof console !== 'undefined') console.log("Nessun intervento in locale.");
-        return 0; 
-    }
-    
-    // 1. Peschiamo tutti gli ID già presenti sul CLOUD VERO (antimo-6a86b)
-    let cloudIds = [];
-    try {
-        const snap = await getDocs(collection(db, "interventi"));
-        snap.forEach(doc => {
-            const data = doc.data();
-            if(data.id) cloudIds.push(data.id);
-        });
-    } catch(e) {
-        console.error("Impossibile leggere il cloud per il check", e);
-        throw new Error("Impossibile leggere dal Cloud per verificare i doppioni. Controlla i permessi o la connessione.");
-    }
-    
-    // Filtriamo gli interventi che in locale risultano "sincronizzati" ma che sul server non ci sono più:
-    // Significa che sono stati eliminati definitivamente dalla dashboard admin.
-    let daRimuovere = tuttiIFilePath.filter(inv => inv.cloudSynced && !cloudIds.includes(inv.id));
-    if (daRimuovere.length > 0) {
-        console.log(`Rilevati ${daRimuovere.length} interventi eliminati dal server admin. Pulisco cache locale.`);
-        completedInterventions = completedInterventions.filter(inv => cloudIds.includes(inv.id) || !inv.cloudSynced);
-        saveState();
-        if(typeof updateUI === 'function') updateUI();
-        if(typeof updateInterventiCount === 'function') updateInterventiCount();
-        tuttiIFilePath = completedInterventions;
-    }
-
-    // 2. Filtriamo solo quelli locali offline NUOVI che MANGANo dal cloud e che NON sono mai stati sul cloud
-    let daSincronizzare = tuttiIFilePath.filter(inv => !inv.cloudSynced && !cloudIds.includes(inv.id));
-    
-    // DEBUG MANUALE POTENTE PER L'UTENTE
-    if (typeof window !== 'undefined' && window._antimo_forcing_sync) {
-        alert(`DEBUG:\nMemoria Telefono: ${tuttiIFilePath.length} interventi\nTrovati sul Cloud VERO: ${cloudIds.length}\nQuelli che mancano sul Cloud: ${daSincronizzare.length}`);
-    }
-    
-    if (daSincronizzare.length === 0) {
-        // Se tutti quelli locali sono già sul cloud VERO:
-        // Assicuriamoci che tutti abbiano la spunta cloudSynced per il futuro
-        let dbUpdatedFilter = false;
-        tuttiIFilePath.forEach(i => {
-            if(!i.cloudSynced) { i.cloudSynced = true; dbUpdatedFilter = true; }
-        });
-        if(dbUpdatedFilter) saveState();
-        
-        return 0; // Niente di bloccato
-    }
-    
-    console.log(`Trovati ${daSincronizzare.length} interventi locali MANGANTI dal cloud. Li carico forzatamente...`);
-    
-    let dbUpdated = false;
-    
-    for (let inv of daSincronizzare) {
-        try {
-            // Inviamo l'intervento su Firestore in modo sicuro
-            let fileCloudUrl = inv.fileUrl || null;
-            
-            // Se c'è un file base64 non ancora caricato
-            if (inv.fileData && !fileCloudUrl) {
-                let ext = "jpg";
-                if (inv.fileName) {
-                    ext = inv.fileName.split('.').pop();
-                } else if (inv.fileType === "application/pdf") {
-                    ext = "pdf";
-                } else if (inv.fileType && inv.fileType.startsWith("video/")) {
-                    ext = "mp4";
-                }
-                
+            sortedData.forEach(item => {
+                const tr = document.createElement('tr');
+                let displayDate = item.date;
                 try {
-                    const storageRef = ref(storage, `allegati/${inv.id}_sync.${ext}`);
-                    await uploadString(storageRef, inv.fileData, 'data_url');
-                    fileCloudUrl = await getDownloadURL(storageRef);
-                } catch(uploadErr) {
-                    console.error("Errore upload allegato in auto-sync", uploadErr);
-                    // Continuiamo comunque
+                    const parts = item.date.split('-');
+                    if(parts.length === 3) displayDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                } catch(e){}
+
+                let attachmentLink = '-';
+                if (item.attachmentUrl) {
+                    attachmentLink = `<a href="${item.attachmentUrl}" target="_blank" title="${item.attachmentName || 'Visualizza'}">📎</a>`;
                 }
-            }
-            const payloadToSave = {
-                timestamp: serverTimestamp(),
-                id: inv.id || Date.now().toString(),
-                tipo: inv.tipo || "Non specificato",
-                paziente: inv.paziente || "Sconosciuto",
-                localita: inv.localita || inv.destinazione || "",
-                indirizzo: inv.indirizzo || "",
-                telefono: inv.telefono || "",
-                dispositivi: inv.dispositivi || "",
-                matricola: inv.matricola || "",
-                note: inv.note || "",
-                operatore: inv.operatore || localStorage.getItem('antimo_user_name') || "Sconosciuto",
-                startTime: inv.startTime || Date.now(),
-                endTime: inv.endTime || Date.now(),
-                kmPercorsi: inv.kmPercorsi || "0",
-                fileUrl: fileCloudUrl || null,
-                haAllegato: !!(inv.fileData || fileCloudUrl),
-                fileType: inv.fileType || null
-            };
+                
+                const typeLabels = {
+                    'REVENUE_EUBIOS': 'RICAVI EUBIOS',
+                    'COSTS_EUBIOS': 'COSTI EUBIOS',
+                    'REVENUE_EUBIOTECH': 'RICAVI EUBIOTECH',
+                    'Costi risorse umane': 'COSTI RISORSE UMANE (EUBIOTECH)', 'COGS_TECH': 'COSTI PERSONALE EUBIOTECH (Legacy)',
+                    'Costi altri': 'COSTI ALTRI (EUBIOTECH)', 'OPEX_TECH': 'ALTRI COSTI EUBIOTECH (Legacy)',
+                    'REVENUE': 'RICAVI EUBIOS (Legacy)',
+                    'COGS': 'COSTI EUBIOS (Legacy)',
+                    'OPEX': 'ALTRI COSTI (Legacy)'
+                };
+                const displayType = typeLabels[item.type] || item.type;
 
-            await addDoc(collection(db, "interventi"), payloadToSave);
-            
-            console.log("Intervento offline sincronizzato con successo:", inv.paziente);
-            inv.fileUrl = fileCloudUrl;
-            
-            // In ogni caso marchiamolo come sincronizzato
-            inv.cloudSynced = true;
-            // Svuotiamo il peso locale per non saturare i 5MB
-            delete inv.fileData; // Rimuovo enormi base64 se presenti (evitano QuotaExceededError su CloudUpload)
-            dbUpdated = true;
-            
-        } catch (err) {
-            console.error("Errore auto-sync in background per " + inv.paziente, err);
-            alert(`Impossibile sincronizzare l'intervento di ${inv.paziente}. Errore: ${err.message}`);
-        }
-    }
-    
-    if (dbUpdated) {
-        saveState();
-        updateInterventiCount();
-    }
-    
-    return daSincronizzare.length;
-}
+                tr.className = 'raw-data-row';
+                tr.setAttribute('data-id', item.id);
+                tr.innerHTML = `
+                    <td>${displayDate}</td>
+                    <td><strong>${displayType}</strong></td>
+                    <td>${item.category}</td>
+                    <td>${item.description || '-'}</td>
+                    <td>${item.dettaglio || '-'}</td>
+                    <td style="font-family: monospace; font-size: 1.1em;">${formatCurrency(item.amount)}</td>
+                    <td>${item.cliente || '-'}</td>
+                    <td>${item.fornitore || '-'}</td>
+                    <td style="text-align: center;">${attachmentLink}</td>
+                    <td>
+                        <button class="edit-btn btn-small" data-id="${item.id}" style="margin-right: 5px;">Modifica</button>
+                        <button class="delete-btn btn-small btn-danger" data-id="${item.id}">Elimina</button>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
 
-function saveState() {
-    localStorage.setItem('antimo_interventions', JSON.stringify(completedInterventions));
-    localStorage.setItem('antimo_plannedInterventions', JSON.stringify(plannedInterventions));
-    localStorage.setItem('antimo_customDevices', JSON.stringify(customDevices));
-}
+            // Attach edit event listeners
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idToEdit = e.target.getAttribute('data-id');
+                    editEntry(idToEdit);
+                });
+            });
 
-function updateUI() {
-    // Gestione KM visibilità dal Setting
-    if (requireKm) {
-        kmContainer.classList.remove('hidden');
-    } else {
-        kmContainer.classList.add('hidden');
-    }
+            // Attach delete event listeners
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idToDelete = e.target.getAttribute('data-id');
+                    deleteEntry(idToDelete);
+                });
+            });
 
-    // Le attività programmate
-    const visibiliProg = plannedInterventions.filter(p => !p.status || p.status === 'planned');
-    updateHeaderFiltersUI();
-    
-    if (selectedCalendarDate) {
-        oggiInterventionsSection.classList.add('hidden');
-        domaniInterventionsSection.classList.add('hidden');
-        npInterventionsSection.classList.add('hidden');
-        
-        if (isPlannedVisible) {
-            plannedInterventionsSection.classList.remove('hidden');
-            const titolo = plannedInterventionsSection.querySelector('h2');
-            if(titolo) titolo.innerHTML = `<span class="btn-icon">📅</span> Interventi del ${selectedCalendarDate.split('-').reverse().join('/')}`;
-            const filteredByDate = visibiliProg.filter(p => p.dataPrevista === selectedCalendarDate);
-            renderPlannedInterventions(filteredByDate, [], []);
         } else {
-            plannedInterventionsSection.classList.add('hidden');
-        }
-        return;
-    }
-    
-    const titoloProg = plannedInterventionsSection.querySelector('h2');
-    if(titoloProg) titoloProg.innerHTML = `<span class="btn-icon">📅</span> Tutti i Programmati`;
-    
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
-
-    if(visibiliProg.length > 0 && isPlannedVisible) plannedInterventionsSection.classList.remove('hidden');
-    else plannedInterventionsSection.classList.add('hidden');
-
-    const oggiProg = visibiliProg.filter(p => p.dataPrevista === todayStr);
-    if(oggiProg.length > 0 && isOggiVisible) oggiInterventionsSection.classList.remove('hidden');
-    else oggiInterventionsSection.classList.add('hidden');
-
-    const domaniProg = visibiliProg.filter(p => p.dataPrevista === tomorrowStr);
-    if(domaniProg.length > 0 && isDomaniVisible) domaniInterventionsSection.classList.remove('hidden');
-    else domaniInterventionsSection.classList.add('hidden');
-
-    renderPlannedInterventions(visibiliProg, oggiProg, domaniProg);
-
-    // NP (SE isNpVisible è true)
-    const visibiliNP = plannedInterventions.filter(p => p.status === 'in_attesa');
-    if(visibiliNP.length > 0 && isNpVisible) {
-        npInterventionsSection.classList.remove('hidden');
-    } else {
-        npInterventionsSection.classList.add('hidden');
-    }
-    renderNpInterventions();
-}
-
-function padZ(num) { return num.toString().padStart(2, '0'); }
-function formatDateDMY(date) { return `${padZ(date.getDate())}-${padZ(date.getMonth() + 1)}-${date.getFullYear()}`; }
-function formatTime(ms) {
-    let ts = Math.floor(ms / 1000);
-    return `${padZ(Math.floor(ts / 3600))}:${padZ(Math.floor((ts % 3600) / 60))}:${padZ(ts % 60)}`;
-}
-
-async function updateInterventiCount() { 
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
-
-    // Aggiorna contatori
-    const soloPlanned = plannedInterventions.filter(p => !p.status || p.status === 'planned');
-    let cOggi = 0, cDomani = 0, cNeseg = 0;
-    soloPlanned.forEach(p => {
-        if(p.dataPrevista === todayStr) cOggi++;
-        else if(p.dataPrevista === tomorrowStr) cDomani++;
-        
-        if(p.dataPrevista && p.dataPrevista <= todayStr) cNeseg++;
-    });
-
-    const soloNP = plannedInterventions.filter(p => p.status === 'in_attesa').length;
-
-    if (programmatiCount) programmatiCount.textContent = soloPlanned.length;
-    if (oggiCount) oggiCount.textContent = cOggi;
-    if (domaniCount) domaniCount.textContent = cDomani;
-    if (npCount) npCount.textContent = soloNP;
-    if (nesegCount) nesegCount.textContent = cNeseg;
-    
-    // Calculate start and end of today
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = startOfToday.getTime() + 24 * 60 * 60 * 1000 - 1;
-
-    // Filter completedInterventions for today only
-    const doneToday = completedInterventions.filter(inv => inv.startTime >= startOfToday.getTime() && inv.startTime <= endOfToday);
-    
-    // Gestione Multi-Tenant (Tutti vs MIO)
-    const targetFilter = filterTecnicoOggi ? filterTecnicoOggi.value : "MIO";
-    const myName = localStorage.getItem('antimo_user_name') || "";
-    
-    if (targetFilter === "MIO" || targetFilter === "" || !isFirebaseConfigured) {
-        interventiCount.textContent = doneToday.length;
-    } else {
-        // Fetch dal DB chiunque oppure un utente specifico
-        try {
-            const q = query(collection(db, "interventi"), where("startTime", ">=", startOfToday.getTime()));
-            const snap = await getDocs(q);
-            window.firebaseEseguitiOggi = [];
-            snap.forEach(d => window.firebaseEseguitiOggi.push(d.data()));
+            // GROUPED VIEW
             
-            if (targetFilter === "TUTTI") {
-                interventiCount.textContent = window.firebaseEseguitiOggi.length;
-            } else {
-                interventiCount.textContent = window.firebaseEseguitiOggi.filter(x => x.operatore === targetFilter).length;
-            }
-        } catch(e) {
-            console.error(e);
-            interventiCount.textContent = doneToday.length; // fallback
-        }
-    }
-}
-
-if(filterTecnicoOggi) {
-    // 1. Aggiungiamo i nomi di tutti i dipendenti al dropdown
-    if (window.anagrafiche && window.anagrafiche.length > 0) {
-        const dipendenti = window.anagrafiche.filter(d => d.qualifica === "Dipendente").map(d => d.ragioneSociale || (d.nome + " " + (d.cognome || ""))).sort();
-        /* Popoliamo filterTecnicoOggi */
-        dipendenti.forEach(nome => {
-            const opt = document.createElement('option');
-            opt.value = nome;
-            opt.style.color = "black";
-            opt.textContent = `👤 Solo: ${nome}`;
-            filterTecnicoOggi.appendChild(opt);
-        });
-
-        /* Popoliamo tecnicoAssegnato */
-        const dropdownsAss = [document.getElementById('tecnicoAssegnato'), document.getElementById('editTecnicoAssegnato')];
-        dropdownsAss.forEach(dd => {
-            if(dd && dd.options.length <= 1) { // EVITA DOPPIONI AL RELOAD
-                dipendenti.forEach(nome => {
-                    const opt = document.createElement('option');
-                    opt.value = nome;
-                    opt.textContent = nome;
-                    dd.appendChild(opt);
+            // SMART PIVOT: Se l'utente ha isolato una specifica tipologia (Tipo, Categoria, o Descrizione)
+            // e raggruppa per 'Anno', la vista P&L standard è inutile. Creiamo una Pivot Nome/Anno.
+            const hasPivotFilter = filterState.columnFilters.category || filterState.columnFilters.type || filterState.columnFilters.description;
+            if (hasPivotFilter && groupBy === 'year') {
+                
+                let pivotSubtitle = [];
+                if (filterState.columnFilters.type) pivotSubtitle.push(`Tipo: ${filterState.columnFilters.type}`);
+                if (filterState.columnFilters.category) pivotSubtitle.push(`Cat: ${filterState.columnFilters.category}`);
+                if (filterState.columnFilters.description) pivotSubtitle.push(`Desc: ${filterState.columnFilters.description}`);
+                
+                const yearsSet = new Set();
+                filteredData.forEach(item => {
+                    const d = new Date(item.date);
+                    if(!isNaN(d)) yearsSet.add(d.getFullYear());
                 });
                 
-                if(localStorage.getItem('antimo_user_name')) {
-                    const myName = localStorage.getItem('antimo_user_name');
-                    if(Array.from(dd.options).some(o => o.value === myName)) {
-                        dd.value = myName; // DEFAULT a me
+                const years = Array.from(yearsSet).sort((a,b) => b - a); // 2025, 2024
+                
+                tableHeadRow.innerHTML = `
+                    <th style="background:#f8fafc;">Nominativo / Descrizione<br><span style="font-size:0.8em; font-weight:normal;">(${pivotSubtitle.join(' | ')})</span></th>
+                    ${years.map(y => `<th style="text-align: right; background:#f8fafc;">Anno ${y}</th>`).join('')}
+                    <th style="text-align: right; background:#f1f5f9;">Totale Complessivo</th>
+                `;
+                
+                if(filteredData.length === 0) {
+                     tableBody.innerHTML = `<tr><td colspan="${years.length + 2}" class="empty-state">Nessun dato.</td></tr>`;
+                     return;
+                }
+                
+                const pivotData = {};
+                filteredData.forEach(item => {
+                    let desc = (item.description || item.category || 'Generico').toUpperCase().trim();
+                    if (desc === 'PERSONALE EUBIOTECH' || desc === 'COSTI PERSONALE EUBIOTECH') desc = 'GENERICO';
+                    
+                    const dateObj = new Date(item.date);
+                    const y = isNaN(dateObj) ? 'N/A' : dateObj.getFullYear();
+                    
+                    if (!pivotData[desc]) pivotData[desc] = { total: 0 };
+                    if (!pivotData[desc][y]) pivotData[desc][y] = 0;
+                    
+                    pivotData[desc][y] += item.amount;
+                    pivotData[desc].total += item.amount;
+                });
+                
+                const sortedDescs = Object.keys(pivotData).sort((a,b) => pivotData[b].total - pivotData[a].total);
+                
+                sortedDescs.forEach(desc => {
+                    const d = pivotData[desc];
+                    const tr = document.createElement('tr');
+                    let html = `<td data-label="Descrizione"><a href="javascript:void(0)" class="drilldown-link" data-group-type="smart_pivot" data-group-key="${desc.replace(/"/g, '&quot;')}" style="color: #3b82f6; text-decoration: none;"><strong>${desc}</strong></a></td>`;
+                    years.forEach(y => {
+                        const val = d[y] || 0;
+                        html += `<td data-label="Anno ${y}" style="font-family:monospace; text-align: right; color:#059669;">${val !== 0 ? formatCurrency(val) : '-'}</td>`;
+                    });
+                    html += `<td data-label="Totale Complessivo" style="font-family:monospace; font-weight:bold; text-align: right; color:#0f172a; background:#f8fafc;">${formatCurrency(d.total)}</td>`;
+                    tr.innerHTML = html;
+                    tableBody.appendChild(tr);
+                });
+                
+                return; // Early return per evitare di disegnare il P&L normale
+            }
+
+            if (groupBy === 'custom_group') {
+                const yearsSet = new Set();
+                filteredData.forEach(item => {
+                    const d = new Date(item.date);
+                    if(!isNaN(d)) yearsSet.add(d.getFullYear());
+                });
+                const years = Array.from(yearsSet).sort((a,b) => b - a);
+
+                tableHeadRow.innerHTML = `
+                    <th style="background:#f8fafc; border-bottom: 2px solid #0f172a;">Voce Conto Economico</th>
+                    ${years.map(y => `<th style="text-align: right; background:#f8fafc; border-bottom: 2px solid #0f172a;">Anno ${y}</th>`).join('')}
+                    <th style="text-align: right; background:#f1f5f9; border-bottom: 2px solid #0f172a;">Totale Complessivo</th>
+                `;
+                
+                if(filteredData.length === 0) {
+                     tableBody.innerHTML = `<tr><td colspan="${years.length + 2}" class="empty-state">Nessun dato.</td></tr>`;
+                     return;
+                }
+
+                const groupTotals = {};
+                customGroupings.forEach(g => {
+                    groupTotals[g.name] = { total: 0, subCats: {} };
+                    years.forEach(y => groupTotals[g.name][y] = 0);
+                });
+                groupTotals['Altro / Non Assegnato'] = { total: 0, subCats: {} };
+                years.forEach(y => groupTotals['Altro / Non Assegnato'][y] = 0);
+
+                filteredData.forEach(item => {
+                    const dateObj = new Date(item.date);
+                    const y = isNaN(dateObj) ? 'N/A' : dateObj.getFullYear();
+                    if (y === 'N/A') return;
+
+                    const matchedGroup = customGroupings.find(g => {
+                        const matchType = g.filters.types && g.filters.types.includes(item.type);
+                        const matchCat = g.filters.categories && g.filters.categories.includes(item.category);
+                        const matchDesc = g.filters.descriptions && item.description && g.filters.descriptions.includes(item.description);
+                        return matchType || matchCat || matchDesc;
+                    });
+                    const key = matchedGroup ? matchedGroup.name : 'Altro / Non Assegnato';
+
+                    if (!groupTotals[key]) {
+                        groupTotals[key] = { total: 0, subCats: {} };
+                        years.forEach(y => groupTotals[key][y] = 0);
+                    }
+
+                    if (groupTotals[key][y] === undefined) groupTotals[key][y] = 0;
+                    groupTotals[key][y] += item.amount;
+                    groupTotals[key].total += item.amount;
+                    
+                    const catName = item.category || 'Nessuna Categoria';
+                    if (!groupTotals[key].subCats[catName]) {
+                        groupTotals[key].subCats[catName] = { total: 0, itemsByDesc: {} };
+                        years.forEach(y => groupTotals[key].subCats[catName][y] = 0);
+                    }
+                    groupTotals[key].subCats[catName][y] += item.amount;
+                    groupTotals[key].subCats[catName].total += item.amount;
+
+                    const descName = item.description || 'Senza Descrizione';
+                    if (!groupTotals[key].subCats[catName].itemsByDesc[descName]) {
+                        groupTotals[key].subCats[catName].itemsByDesc[descName] = { total: 0 };
+                        years.forEach(y => groupTotals[key].subCats[catName].itemsByDesc[descName][y] = 0);
+                    }
+                    groupTotals[key].subCats[catName].itemsByDesc[descName][y] += item.amount;
+                    groupTotals[key].subCats[catName].itemsByDesc[descName].total += item.amount;
+                });
+
+                const ceSchema = [
+                    { name: 'CE FATTURATO', type: 'group', sign: 1 },
+                    { name: 'CE COSTI VARIABILI', type: 'group', sign: -1 },
+                    { name: 'VALORE AGGIUNTO (A-B)', type: 'calc', fields: ['CE FATTURATO', 'CE COSTI VARIABILI'] },
+                    { name: 'CE SALARI E STIPENDI', type: 'group', sign: -1 },
+                    { name: 'EBITDA', type: 'calc', fields: ['VALORE AGGIUNTO (A-B)', 'CE SALARI E STIPENDI'] },
+                    { name: 'CE AMMORTAMENTI E ACCANTONAMENTI', type: 'group', sign: -1 },
+                    { name: 'EBIT', type: 'calc', fields: ['EBITDA', 'CE AMMORTAMENTI E ACCANTONAMENTI'] },
+                    { name: 'CE GESTIONE FINANZIARIA', type: 'group', sign: -1 },
+                    { name: 'EBIT - RISULTATO ANTE IMPOSTE', type: 'calc', fields: ['EBIT', 'CE GESTIONE FINANZIARIA'] },
+                    { name: 'CE GESTIONE FISCALE', type: 'group', sign: -1 },
+                    { name: 'UTILE E PERDITA DI ESERCIZIO', type: 'calc', fields: ['EBIT - RISULTATO ANTE IMPOSTE', 'CE GESTIONE FISCALE'] }
+                ];
+
+                ceSchema.filter(s => s.type === 'calc').forEach(calcDef => {
+                    groupTotals[calcDef.name] = { total: 0, subCats: {} };
+                    years.forEach(y => groupTotals[calcDef.name][y] = 0);
+                    
+                    years.forEach(y => {
+                        const baseTerm = calcDef.fields[0];
+                        const modTerm = calcDef.fields[1];
+                        
+                        const getValWithSign = (term) => {
+                            const schemaNameClean = term.replace(/^CE\s+/i, '').trim();
+                            const schemaDef = ceSchema.find(s => s.name.replace(/^CE\s+/i, '').trim() === schemaNameClean);
+                            
+                            // Try to find the term exactly, or with/without CE
+                            let rawVal = 0;
+                            if (groupTotals[term] && groupTotals[term][y] !== undefined) {
+                                rawVal = groupTotals[term][y];
+                            } else {
+                                // Fallback: look for the term without 'CE ' or with 'CE ' 
+                                const fallbackKey = Object.keys(groupTotals).find(k => k.replace(/^CE\s+/i, '').trim() === schemaNameClean);
+                                if (fallbackKey && groupTotals[fallbackKey] && groupTotals[fallbackKey][y] !== undefined) {
+                                    rawVal = groupTotals[fallbackKey][y];
+                                }
+                            }
+
+                            if (schemaDef && schemaDef.type === 'group' && schemaDef.sign === -1) {
+                                return -rawVal;
+                            }
+                            return rawVal; 
+                        };
+                        
+                        const val = (groupTotals[baseTerm] ? groupTotals[baseTerm][y] || 0 : 0) + getValWithSign(modTerm);
+                        groupTotals[calcDef.name][y] = val;
+                        groupTotals[calcDef.name].total += val;
+                    });
+                });
+
+                const renderedGroups = new Set();
+                
+                ceSchema.forEach(rowDef => {
+                    const isCalc = rowDef.type === 'calc';
+                    
+                    // Allow matching with or without the 'CE' prefix
+                    const schemaNameClean = rowDef.name.replace(/^CE\s+/i, '').trim();
+                    let actualGroupName = rowDef.name;
+
+                    if (!groupTotals[rowDef.name]) {
+                        const fallbackKey = Object.keys(groupTotals).find(k => k.replace(/^CE\s+/i, '').trim() === schemaNameClean);
+                        if (fallbackKey && groupTotals[fallbackKey]) {
+                            actualGroupName = fallbackKey;
+                        }
+                    }
+
+                    const d = groupTotals[actualGroupName] || { total: 0, subCats: {} };
+                    renderedGroups.add(actualGroupName);
+
+                    const tr = document.createElement('tr');
+                    
+                    let bgStyle = isCalc ? 'background-color:#fef08a;' : 'background-color:#ffffff;';
+                    if (rowDef.name === 'CE COSTI VARIABILI') bgStyle = 'background-color:#e0e7ff; font-weight:bold;';
+                    else if (isCalc) bgStyle = 'background-color:#fef08a; font-weight:bold; border-top: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1;';
+                    
+                    let toggleBtnHtml = '';
+                    if (!isCalc) {
+                        toggleBtnHtml = `<button class="ce-expand-btn" data-group="${actualGroupName}" style="background:none; border:none; color:#3b82f6; cursor:pointer; margin-right:5px; font-weight:bold;" title="Espandi Dettagli">⊞</button>`;
+                    }
+                    
+                    let html = `<td data-label="Voce Conto Economico" style="${bgStyle} border: 1px solid #e2e8f0; vertical-align:middle;">${toggleBtnHtml} ${rowDef.name}</td>`;
+                    
+                    years.forEach(y => {
+                        const val = d[y] || 0;
+                        let colorStr = isCalc ? '#000000' : '#0f172a';
+                        if (val < 0) colorStr = '#dc2626'; // Red for negative logic in Utile
+                        if (!isCalc && rowDef.sign === -1 && val > 0) colorStr = '#b91c1c'; // Red for costs
+                        
+                        html += `<td data-label="Anno ${y}" style="font-family:monospace; text-align: right; ${bgStyle} color:${colorStr}; border: 1px solid #e2e8f0;">${val !== 0 ? formatCurrency(val) : '-'}</td>`;
+                    });
+                    html += `<td data-label="Totale Complessivo" style="font-family:monospace; font-weight:bold; text-align: right; ${bgStyle} border: 1px solid #e2e8f0;">${formatCurrency(d.total)}</td>`;
+                    tr.innerHTML = html;
+                    tableBody.appendChild(tr);
+                    
+                    // Pre-generate sub-rows, initially hidden
+                    if (!isCalc && d && d.subCats) {
+                        const subCatsSorted = Object.keys(d.subCats).sort((a,b) => d.subCats[b].total - d.subCats[a].total);
+                        subCatsSorted.forEach(catName => {
+                            const subTr = document.createElement('tr');
+                            const safeGroupName = actualGroupName.replace(/[^a-zA-Z0-9-]/g, '');
+                            const safeCatName = catName.replace(/[^a-zA-Z0-9-]/g, '');
+                            subTr.className = `ce-subrow for-${safeGroupName}`;
+                            subTr.style.display = 'none';
+                            
+                            const hasDescriptions = d.subCats[catName].itemsByDesc && Object.keys(d.subCats[catName].itemsByDesc).length > 0;
+                            let subToggleBtnHtml = hasDescriptions 
+                                ? `<button class="ce-desc-expand-btn" data-group="${safeGroupName}" data-cat="${safeCatName}" style="background:none; border:none; color:#3b82f6; cursor:pointer; margin-right:5px; font-weight:bold;" title="Espandi Dettagli">⊞</button>` 
+                                : '';
+
+                            let subHtml = `<td style="padding-left: 30px; border: 1px solid #e2e8f0; font-size: 0.9em; color:#475569;">${subToggleBtnHtml} ↳ ${catName}</td>`;
+                            years.forEach(y => {
+                                const sval = d.subCats[catName][y] || 0;
+                                let scolorStr = '#475569';
+                                if (rowDef.sign === -1 && sval > 0) scolorStr = '#b91c1c';
+                                subHtml += `<td style="font-family:monospace; font-size: 0.9em; text-align: right; color:${scolorStr}; border: 1px solid #e2e8f0;">${sval !== 0 ? formatCurrency(sval) : '-'}</td>`;
+                            });
+                            subHtml += `<td style="font-family:monospace; font-weight:bold; font-size: 0.9em; text-align: right; color:#475569; border: 1px solid #e2e8f0; background:#f8fafc;">${formatCurrency(d.subCats[catName].total)}</td>`;
+                            subTr.innerHTML = subHtml;
+                            tableBody.appendChild(subTr);
+                            
+                            // Generate 3rd level description rows
+                            if (hasDescriptions) {
+                                const descSorted = Object.keys(d.subCats[catName].itemsByDesc).sort((a,b) => d.subCats[catName].itemsByDesc[b].total - d.subCats[catName].itemsByDesc[a].total);
+                                descSorted.forEach(descName => {
+                                    const descTr = document.createElement('tr');
+                                    descTr.className = `ce-descrow for-desc-${safeGroupName}-${safeCatName} under-${safeGroupName}`;
+                                    descTr.style.display = 'none';
+                                    
+                                    let descHtml = `<td style="padding-left: 55px; border: 1px solid #e2e8f0; font-size: 0.85em; color:#64748b; font-style:italic;">• ${descName}</td>`;
+                                    years.forEach(y => {
+                                        const dval = d.subCats[catName].itemsByDesc[descName][y] || 0;
+                                        let dcolorStr = '#64748b';
+                                        if (rowDef.sign === -1 && dval > 0) dcolorStr = '#b91c1c';
+                                        descHtml += `<td style="font-family:monospace; font-size: 0.85em; text-align: right; color:${dcolorStr}; border: 1px solid #e2e8f0;">${dval !== 0 ? formatCurrency(dval) : '-'}</td>`;
+                                    });
+                                    descHtml += `<td style="font-family:monospace; font-weight:bold; font-size: 0.85em; text-align: right; color:#64748b; border: 1px solid #e2e8f0; background:#f8fafc;">${formatCurrency(d.subCats[catName].itemsByDesc[descName].total)}</td>`;
+                                    descTr.innerHTML = descHtml;
+                                    tableBody.appendChild(descTr);
+                                });
+                            }
+                        });
+                    }
+                });
+
+                const remainingGroups = Object.keys(groupTotals).filter(k => !renderedGroups.has(k) && groupTotals[k].total !== 0 && k !== 'Altro / Non Assegnato');
+                if (remainingGroups.length > 0) {
+                    const trEmpty = document.createElement('tr');
+                    trEmpty.innerHTML = `<td colspan="${years.length + 2}" style="background:#f1f5f9; font-weight:bold; text-align:center; padding-top: 20px; border-bottom: 2px solid #cbd5e1;">Altre Causali (Non incluse nello schema base)</td>`;
+                    tableBody.appendChild(trEmpty);
+                    
+                    remainingGroups.forEach(k => {
+                        const d = groupTotals[k];
+                        const tr = document.createElement('tr');
+                        let toggleBtnHtml = `<button class="ce-expand-btn" data-group="${k}" style="background:none; border:none; color:#3b82f6; cursor:pointer; margin-right:5px; font-weight:bold;" title="Espandi Dettagli">⊞</button>`;
+                        let html = `<td data-label="Voce Conto Economico" style="border: 1px solid #e2e8f0;">${toggleBtnHtml} ${k}</td>`;
+                        years.forEach(y => {
+                            const val = d[y] || 0;
+                            html += `<td data-label="Anno ${y}" style="font-family:monospace; text-align: right; color:#64748b; border: 1px solid #e2e8f0;">${val !== 0 ? formatCurrency(val) : '-'}</td>`;
+                        });
+                        html += `<td data-label="Totale Complessivo" style="font-family:monospace; font-weight:bold; text-align: right; background:#f8fafc; border: 1px solid #e2e8f0;">${formatCurrency(d.total)}</td>`;
+                        tr.innerHTML = html;
+                        tableBody.appendChild(tr);
+                        
+                        // Subrows for other specific groups
+                        if (d.subCats) {
+                            const subCatsSorted = Object.keys(d.subCats).sort((a,b) => d.subCats[b].total - d.subCats[a].total);
+                            subCatsSorted.forEach(catName => {
+                                const subTr = document.createElement('tr');
+                                const safeGroupName = k.replace(/[^a-zA-Z0-9-]/g, '');
+                                const safeCatName = catName.replace(/[^a-zA-Z0-9-]/g, '');
+                                subTr.className = `ce-subrow for-${safeGroupName}`;
+                                subTr.style.display = 'none';
+                                
+                                const hasDescriptions = d.subCats[catName].itemsByDesc && Object.keys(d.subCats[catName].itemsByDesc).length > 0;
+                                let subToggleBtnHtml = hasDescriptions 
+                                    ? `<button class="ce-desc-expand-btn" data-group="${safeGroupName}" data-cat="${safeCatName}" style="background:none; border:none; color:#3b82f6; cursor:pointer; margin-right:5px; font-weight:bold;" title="Espandi Dettagli">⊞</button>` 
+                                    : '';
+
+                                let subHtml = `<td style="padding-left: 30px; border: 1px solid #e2e8f0; font-size: 0.9em; color:#475569;">${subToggleBtnHtml} ↳ ${catName}</td>`;
+                                years.forEach(y => {
+                                    const sval = d.subCats[catName][y] || 0;
+                                    subHtml += `<td style="font-family:monospace; font-size: 0.9em; text-align: right; color:#475569; border: 1px solid #e2e8f0;">${sval !== 0 ? formatCurrency(sval) : '-'}</td>`;
+                                });
+                                subHtml += `<td style="font-family:monospace; font-weight:bold; font-size: 0.9em; text-align: right; color:#475569; border: 1px solid #e2e8f0; background:#f8fafc;">${formatCurrency(d.subCats[catName].total)}</td>`;
+                                subTr.innerHTML = subHtml;
+                                tableBody.appendChild(subTr);
+
+                                if (hasDescriptions) {
+                                    const descSorted = Object.keys(d.subCats[catName].itemsByDesc).sort((a,b) => d.subCats[catName].itemsByDesc[b].total - d.subCats[catName].itemsByDesc[a].total);
+                                    descSorted.forEach(descName => {
+                                        const descTr = document.createElement('tr');
+                                        descTr.className = `ce-descrow for-desc-${safeGroupName}-${safeCatName} under-${safeGroupName}`;
+                                        descTr.style.display = 'none';
+                                        
+                                        let descHtml = `<td style="padding-left: 55px; border: 1px solid #e2e8f0; font-size: 0.85em; color:#64748b; font-style:italic;">• ${descName}</td>`;
+                                        years.forEach(y => {
+                                            const dval = d.subCats[catName].itemsByDesc[descName][y] || 0;
+                                            descHtml += `<td style="font-family:monospace; font-size: 0.85em; text-align: right; color:#64748b; border: 1px solid #e2e8f0;">${dval !== 0 ? formatCurrency(dval) : '-'}</td>`;
+                                        });
+                                        descHtml += `<td style="font-family:monospace; font-weight:bold; font-size: 0.85em; text-align: right; color:#64748b; border: 1px solid #e2e8f0; background:#f8fafc;">${formatCurrency(d.subCats[catName].itemsByDesc[descName].total)}</td>`;
+                                        descTr.innerHTML = descHtml;
+                                        tableBody.appendChild(descTr);
+                                    });
+                                }
+                            });
+                        }
+                    });
+                }
+                
+                // Add interactivity for expand/collapse CE rows
+                document.querySelectorAll('.ce-expand-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const targetGroup = e.target.getAttribute('data-group');
+                        const sanitizedGroup = targetGroup.replace(/[^a-zA-Z0-9-]/g, '');
+                        const subRows = document.querySelectorAll(`.for-${sanitizedGroup}`);
+                        const descRows = document.querySelectorAll(`.under-${sanitizedGroup}`);
+                        const isExpanded = e.target.textContent === '⊟';
+                        
+                        if (isExpanded) {
+                            e.target.textContent = '⊞';
+                            subRows.forEach(row => row.style.display = 'none');
+                            descRows.forEach(row => row.style.display = 'none');
+                            // Reset 3rd level buttons
+                            document.querySelectorAll(`.ce-desc-expand-btn[data-group="${sanitizedGroup}"]`).forEach(b => b.textContent = '⊞');
+                        } else {
+                            e.target.textContent = '⊟';
+                            subRows.forEach(row => row.style.display = 'table-row');
+                        }
+                    });
+                });
+
+                // Add toggle for 3rd level
+                document.querySelectorAll('.ce-desc-expand-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const targetGroup = e.target.getAttribute('data-group');
+                        const targetCat = e.target.getAttribute('data-cat');
+                        const descRows = document.querySelectorAll(`.for-desc-${targetGroup}-${targetCat}`);
+                        const isExpanded = e.target.textContent === '⊟';
+                        
+                        if (isExpanded) {
+                            e.target.textContent = '⊞';
+                            descRows.forEach(row => row.style.display = 'none');
+                        } else {
+                            e.target.textContent = '⊟';
+                            descRows.forEach(row => row.style.display = 'table-row');
+                        }
+                    });
+                });
+
+                return; // Early return for pivot
+            }
+
+            let firstHeaderAttr = '';
+            if (groupBy === 'year') firstHeaderAttr = 'class="interactive-header" data-filter-type="year"';
+            else if (groupBy === 'month') firstHeaderAttr = 'class="interactive-header" data-filter-type="month"';
+            else if (groupBy === 'quarter') firstHeaderAttr = 'class="interactive-header" data-filter-type="quarter"';
+            else if (groupBy === 'category') firstHeaderAttr = 'class="interactive-header" data-filter-type="category"';
+            else if (groupBy === 'type') firstHeaderAttr = 'class="interactive-header" data-filter-type="type"';
+            else if (groupBy === 'description') firstHeaderAttr = 'class="interactive-header" data-filter-type="description"';
+            else if (groupBy === 'custom_group') firstHeaderAttr = 'class="interactive-header"';
+
+            const getGroupByLabel = (gb) => {
+                const labels = {
+                    'year': 'Anno',
+                    'quarter': 'Trimestre',
+                    'month': 'Mese',
+                    'week': 'Settimana',
+                    'day': 'Giorno',
+                    'category': 'Categoria',
+                    'type': 'Tipo',
+                    'description': 'Descrizione',
+                    'custom_group': 'Raggruppamento Personalizzato'
+                };
+                return labels[gb] || 'Gruppo';
+            };
+
+            tableHeadRow.innerHTML = `
+                <th ${firstHeaderAttr}>${getGroupByLabel(groupBy)}</th>
+                <th class="interactive-header" data-filter-type="category" data-type="REVENUE_EUBIOS,REVENUE">Ricavi Eubios</th>
+                <th class="interactive-header" data-filter-type="category" data-type="COSTS_EUBIOS">Costi Eubios</th>
+                <th class="interactive-header" data-filter-type="category" data-type="REVENUE_EUBIOTECH">Ricavi Eubiotech</th>
+                <th class="interactive-header" data-filter-type="category" data-type="Costi risorse umane,COGS_TECH,COGS">Costi risorse umane</th>
+                <th class="interactive-header" data-filter-type="category" data-type="Costi altri,OPEX_TECH,OPEX">Costi altri</th>
+                <th>Utile Eubios</th>
+                <th>Utile Eubiotech</th>
+            `;
+
+            // Bind interactive headers
+            document.querySelectorAll('#data-table th.interactive-header').forEach(th => {
+                th.addEventListener('click', (e) => {
+                    openPopoverForHeader(th);
+                });
+            });
+
+            if(filteredData.length === 0) {
+                 tableBody.innerHTML = '<tr><td colspan="8" class="empty-state">Nessun dato corrisponde ai filtri selezionati.</td></tr>';
+                 return;
+            }
+
+            const groupedData = {};
+
+            filteredData.forEach(item => {
+                let key = 'Sconosciuto';
+                let dateObj = new Date(item.date);
+                let validDate = !isNaN(dateObj);
+
+                if (groupBy === 'year' && validDate) {
+                    key = dateObj.getFullYear();
+                } else if (groupBy === 'month' && validDate) {
+                    const months = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+                    key = `${months[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+                } else if (groupBy === 'quarter' && validDate) {
+                    const q = Math.ceil((dateObj.getMonth() + 1) / 3);
+                    key = `Q${q} ${dateObj.getFullYear()}`;
+                } else if (groupBy === 'week' && validDate) {
+                    const target = new Date(dateObj.valueOf());
+                    const dayNr = (dateObj.getDay() + 6) % 7;
+                    target.setDate(target.getDate() - dayNr + 3);
+                    const firstThursday = target.valueOf();
+                    target.setMonth(0, 1);
+                    if (target.getDay() !== 4) {
+                        target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+                    }
+                    const weekNum = 1 + Math.ceil((firstThursday - target) / 604800000);
+                    key = `Settiman. ${weekNum.toString().padStart(2, '0')} - ${dateObj.getFullYear()}`;
+                } else if (groupBy === 'day' && validDate) {
+                    const d = dateObj.getDate().toString().padStart(2, '0');
+                    const m = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+                    key = `${d}/${m}/${dateObj.getFullYear()}`;
+                } else if (groupBy === 'type') {
+                    const typeLabels = {
+                        'REVENUE_EUBIOS': 'RICAVI EUBIOS',
+                        'COSTS_EUBIOS': 'COSTI EUBIOS',
+                        'REVENUE_EUBIOTECH': 'RICAVI EUBIOTECH',
+                        'Costi risorse umane': 'COSTI RISORSE UMANE (EUBIOTECH)', 'COGS_TECH': 'COSTI PERSONALE EUBIOTECH (Legacy)',
+                        'Costi altri': 'COSTI ALTRI (EUBIOTECH)', 'OPEX_TECH': 'ALTRI COSTI EUBIOTECH (Legacy)',
+                        'REVENUE': 'RICAVI EUBIOS (Legacy)',
+                        'COGS': 'COSTI EUBIOS (Legacy)',
+                        'OPEX': 'ALTRI COSTI (Legacy)'
+                    };
+                    key = typeLabels[item.type] || item.type;
+                } else if (groupBy === 'category') {
+                    key = item.category || 'Generico';
+                } else if (groupBy === 'description') {
+                    key = item.description || 'Nessuna Descrizione';
+                } else if (groupBy === 'custom_group') {
+                    // Find the first custom group that this item matches
+                    const matchedGroup = customGroupings.find(g => {
+                        const matchType = g.filters.types && g.filters.types.includes(item.type);
+                        const matchCat = g.filters.categories && g.filters.categories.includes(item.category);
+                        const matchDesc = g.filters.descriptions && item.description && g.filters.descriptions.includes(item.description);
+                        
+                        // It's a match if ANY of the criteria match the record
+                        return matchType || matchCat || matchDesc;
+                    });
+                    key = matchedGroup ? matchedGroup.name : 'Altro / Non Assegnato';
+                }
+
+                if (!groupedData[key]) {
+                    groupedData[key] = { revEubios: 0, costsEubios: 0, revTech: 0, cogsTech: 0, opexTech: 0, 
+                        sortKey: (groupBy === 'month' || groupBy === 'quarter' || groupBy === 'week' || groupBy === 'day') ? dateObj.getTime() : key 
+                    };
+                }
+
+                if (item.type === 'REVENUE_EUBIOS' || item.type === 'REVENUE') groupedData[key].revEubios += item.amount;
+                else if (item.type === 'COSTS_EUBIOS') groupedData[key].costsEubios += item.amount;
+                else if (item.type === 'REVENUE_EUBIOTECH') {
+                    groupedData[key].revTech += item.amount;
+                    groupedData[key].costsEubios += item.amount; // Aggiunge i Ricavi Eubiotech ai Costi Eubios
+                }
+                else if (isItemInCustomGroup(item, 'Costi risorse umane') || isItemInCustomGroup(item, 'Risorse umane') || item.type === 'Costi risorse umane' || item.type === 'COGS_TECH' || item.type === 'COGS') groupedData[key].cogsTech += item.amount;
+                else if (isItemInCustomGroup(item, 'Costi altri') || isItemInCustomGroup(item, 'Altri costi') || item.type === 'Costi altri' || item.type === 'OPEX_TECH' || item.type === 'OPEX' || item.type === 'ALTRI COSTI EUBIOTECH') groupedData[key].opexTech += item.amount;
+            });
+
+            // Sort grouped keys
+            const sortedKeys = Object.keys(groupedData).sort((a, b) => {
+                const ga = groupedData[a];
+                const gb = groupedData[b];
+                
+                // Compare by sortKey (time) or alphabetically
+                if(typeof ga.sortKey === 'number' && typeof gb.sortKey === 'number') {
+                    // Ascending time (older to newer) for month/quarter
+                    return ga.sortKey - gb.sortKey; 
+                }
+                
+                // For strings, e.g. Year or Category, sort alphabetically
+                if (a < b) return -1;
+                if (a > b) return 1;
+                return 0;
+            });
+
+            sortedKeys.forEach(k => {
+                const data = groupedData[k];
+                const profitEubios = data.revEubios - data.costsEubios;
+                const profitTech = data.revTech - (data.cogsTech + data.opexTech);
+                const tr = document.createElement('tr');
+                
+                const formatPctTable = (val, base) => {
+                    if (!base || base === 0 || val === base) return "";
+                    return `<span style="font-size: 0.75em; opacity: 0.7; margin-left: 4px;">(${((val / base) * 100).toFixed(1)}%)</span>`;
+                };
+
+                let firstCellContent = `<a href="javascript:void(0)" class="drilldown-link" data-group-type="${groupBy}" data-group-key="${k.replace(/"/g, '&quot;')}" style="color: #3b82f6; text-decoration: none;"><strong>${k}</strong></a>`;
+                let revEubiosCellContent = formatCurrency(data.revEubios);
+                let revTechCellContent = formatCurrency(data.revTech);
+                let cogsTechCellContent = formatCurrency(data.cogsTech) + formatPctTable(data.cogsTech, data.revTech);
+                let opexTechCellContent = formatCurrency(data.opexTech) + formatPctTable(data.opexTech, data.revTech);
+                let costsEubiosCellContent = formatCurrency(data.costsEubios) + formatPctTable(data.costsEubios, data.revEubios);
+                let profitEubiosCellContent = formatCurrency(profitEubios) + formatPctTable(profitEubios, data.revEubios);
+                let profitTechCellContent = formatCurrency(profitTech) + formatPctTable(profitTech, data.revTech);
+                
+                // Add expand buttons if grouped by year
+                if (groupBy === 'year') {
+                    firstCellContent = `
+                        <div style="display: flex; align-items: center;">
+                            <button class="row-expand-btn btn-q" data-year="${k}">Q</button>
+                            <button class="row-expand-btn btn-m" data-year="${k}">M</button>
+                            <span style="margin-left: 8px;"><a href="javascript:void(0)" class="drilldown-link" data-group-type="${groupBy}" data-group-key="${k.replace(/"/g, '&quot;')}" style="color: #3b82f6; text-decoration: none;"><strong>${k}</strong></a></span>
+                        </div>
+                    `;
+                    tr.classList.add('year-row');
+                    tr.setAttribute('data-year', k);
+                    
+                    if (data.revEubios > 0 || data.revEubios < 0) {
+                        revEubiosCellContent = `
+                            <div style="display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px;">
+                                <span>${formatCurrency(data.revEubios)}</span>
+                                <button class="row-expand-btn btn-detail" data-year="${k}" data-type="REVENUE_EUBIOS" style="margin-left: 0; margin-right: 0;" title="Dettaglio Nominativi">Dettaglio</button>
+                            </div>
+                        `;
+                    }
+                    if (data.revTech > 0 || data.revTech < 0) {
+                        revTechCellContent = `
+                            <div style="display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px;">
+                                <span>${formatCurrency(data.revTech)}</span>
+                                <button class="row-expand-btn btn-detail" data-year="${k}" data-type="REVENUE_EUBIOTECH" style="margin-left: 0; margin-right: 0;" title="Dettaglio Nominativi">Dettaglio</button>
+                            </div>
+                        `;
+                    }
+                    if (data.costsEubios > 0 || data.costsEubios < 0) {
+                        costsEubiosCellContent = `
+                            <div style="display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px;">
+                                <span>${formatCurrency(data.costsEubios)} ${formatPctTable(data.costsEubios, data.revEubios)}</span>
+                                <button class="row-expand-btn btn-detail" data-year="${k}" data-type="COSTS_EUBIOS" style="margin-left: 0; margin-right: 0;" title="Dettaglio Voci">Dettaglio</button>
+                            </div>
+                        `;
+                    }
+                    if (data.cogsTech > 0 || data.cogsTech < 0) {
+                        cogsTechCellContent = `
+                            <div style="display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px;">
+                                <span>${formatCurrency(data.cogsTech)} ${formatPctTable(data.cogsTech, data.revTech)}</span>
+                                <button class="row-expand-btn btn-detail" data-year="${k}" data-type="Costi risorse umane|COGS_TECH|COGS" style="margin-left: 0; margin-right: 0;" title="Dettaglio Nominativi">Dettaglio</button>
+                            </div>
+                        `;
+                    }
+                    if (data.opexTech > 0 || data.opexTech < 0) {
+                        opexTechCellContent = `
+                            <div style="display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px;">
+                                <span>${formatCurrency(data.opexTech)} ${formatPctTable(data.opexTech, data.revTech)}</span>
+                                <button class="row-expand-btn btn-detail" data-year="${k}" data-type="Costi altri|OPEX_TECH|OPEX" style="margin-left: 0; margin-right: 0;" title="Dettaglio Nominativi">Dettaglio</button>
+                            </div>
+                        `;
                     }
                 }
+
+                tr.innerHTML = `
+                    <td data-label="${getGroupByLabel(groupBy)}">${firstCellContent}</td>
+                    <td data-label="Ricavi Eubios" style="color:#10b981; font-family:monospace;">${revEubiosCellContent}</td>
+                    <td data-label="Costi Eubios" style="color:#f43f5e; font-family:monospace;">${costsEubiosCellContent}</td>
+                    <td data-label="Ricavi Eubiotech" style="color:#059669; font-family:monospace;">${revTechCellContent}</td>
+                    <td data-label="Costi risorse umane" style="color:#f59e0b; font-family:monospace;">${cogsTechCellContent}</td>
+                    <td data-label="Costi altri" style="color:#f43f5e; font-family:monospace;">${opexTechCellContent}</td>
+                    <td data-label="Utile Eubios" style="color:#3b82f6; font-family:monospace; font-weight:bold;">${profitEubiosCellContent}</td>
+                    <td data-label="Utile Eubiotech" style="color:#8b5cf6; font-family:monospace; font-weight:bold;">${profitTechCellContent}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+
+            // Bind expand buttons
+            if (groupBy === 'year') {
+                document.querySelectorAll('.btn-q').forEach(btn => {
+                    btn.addEventListener('click', (e) => toggleSubRows(e.target, 'quarter', filteredData));
+                });
+                document.querySelectorAll('.btn-m').forEach(btn => {
+                    btn.addEventListener('click', (e) => toggleSubRows(e.target, 'month', filteredData));
+                });
+                document.querySelectorAll('.btn-detail').forEach(btn => {
+                    btn.addEventListener('click', (e) => toggleCategoryDetails(e.target, filteredData));
+                });
+            }
+        }
+    }
+
+    function toggleSubRows(btn, expandType, allFilteredData) {
+        const year = parseInt(btn.getAttribute('data-year'));
+        const parentRow = btn.closest('tr');
+        const isActive = btn.classList.contains('active');
+        
+        // Remove ANY existing sub-rows for this year (either quarters or months)
+        document.querySelectorAll(`.sub-row[data-parent-year="${year}"]`).forEach(el => el.remove());
+        
+        // Reset both buttons
+        parentRow.querySelector('.btn-q').classList.remove('active');
+        parentRow.querySelector('.btn-m').classList.remove('active');
+
+        if (isActive) {
+            // It was active, we just collapsed it. Do nothing else.
+            return;
+        }
+
+        // It was not active, expand it
+        btn.classList.add('active');
+
+        // Filter data for this specific year
+        const yearData = allFilteredData.filter(item => {
+            try {
+                const d = new Date(item.date);
+                return !isNaN(d) && d.getFullYear() === year;
+            } catch(e) { return false; }
+        });
+
+        const subGroups = {};
+
+        yearData.forEach(item => {
+            const dateObj = new Date(item.date);
+            let subKey = '';
+            let sortOrder = 0;
+
+            if (expandType === 'quarter') {
+                const q = Math.ceil((dateObj.getMonth() + 1) / 3);
+                subKey = `Q${q}`;
+                sortOrder = q;
+            } else if (expandType === 'month') {
+                const monthsNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+                subKey = monthsNames[dateObj.getMonth()];
+                sortOrder = dateObj.getMonth();
+            }
+
+            if (!subGroups[subKey]) {
+                subGroups[subKey] = { revEubios: 0, costsEubios: 0, revTech: 0, cogsTech: 0, opexTech: 0, sortOrder: sortOrder };
+            }
+
+            if (item.type === 'REVENUE_EUBIOS' || item.type === 'REVENUE') subGroups[subKey].revEubios += item.amount;
+            else if (item.type === 'COSTS_EUBIOS') subGroups[subKey].costsEubios += item.amount;
+            else if (item.type === 'REVENUE_EUBIOTECH') subGroups[subKey].revTech += item.amount;
+            else if (item.type === 'COGS_TECH' || item.type === 'COGS') subGroups[subKey].cogsTech += item.amount;
+            else if (item.type === 'OPEX_TECH' || item.type === 'OPEX') subGroups[subKey].opexTech += item.amount;
+        });
+
+        // Generate missing empty periods so Q1-Q4 or Gen-Dic always show
+        if (expandType === 'quarter') {
+            [1, 2, 3, 4].forEach(q => {
+                const mk = `Q${q}`;
+                if (!subGroups[mk]) subGroups[mk] = { revEubios: 0, costsEubios: 0, revTech: 0, cogsTech: 0, opexTech: 0, sortOrder: q };
+            });
+        } else if (expandType === 'month') {
+            const monthsNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+            // Only generate months that are currently checked in the global filter to prevent confusion
+            // Or generate all 12. Let's filter to only generate if it's within filterState.months
+            monthsNames.forEach((name, i) => {
+                 if (filterState.months.has(i + 1)) {
+                     if (!subGroups[name]) subGroups[name] = { revEubios: 0, costsEubios: 0, revTech: 0, cogsTech: 0, opexTech: 0, sortOrder: i };
+                 } else {
+                     // If we had data for it but it's filtered out globally, yearData wouldn't have it anyway.
+                     // But we shouldn't show the empty row if it's filtered out.
+                     delete subGroups[name];
+                 }
+            });
+        }
+
+        const formatCurrency = (val) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(val);
+
+        const subKeys = Object.keys(subGroups).sort((a,b) => subGroups[a].sortOrder - subGroups[b].sortOrder);
+        
+        // Insert subrows after parentRow in reverse order so they stack correctly below it
+        for (let i = subKeys.length - 1; i >= 0; i--) {
+             const k = subKeys[i];
+             const data = subGroups[k];
+             const profitEubios = data.revEubios - data.costsEubios;
+             const profitTech = data.revTech - (data.cogsTech + data.opexTech);
+             const tr = document.createElement('tr');
+             tr.classList.add('sub-row');
+             tr.setAttribute('data-parent-year', year);
+             
+             const formatPctTable = (val, base) => {
+                 if (!base || base === 0 || val === base) return "";
+                 return `<span style="font-size: 0.75em; opacity: 0.7; margin-left: 4px;">(${((val / base) * 100).toFixed(1)}%)</span>`;
+             };
+             
+             tr.innerHTML = `
+                 <td data-label="Periodo">↳ ${k}</td>
+                 <td data-label="Ricavi Eubios" style="color:#10b981; font-family:monospace;">${formatCurrency(data.revEubios)}</td>
+                 <td data-label="Costi Eubios" style="color:#f43f5e; font-family:monospace;">${formatCurrency(data.costsEubios)} ${formatPctTable(data.costsEubios, data.revEubios)}</td>
+                 <td data-label="Ricavi Eubiotech" style="color:#059669; font-family:monospace;">${formatCurrency(data.revTech)}</td>
+                 <td data-label="Costi personale Eubiotech" style="color:#f59e0b; font-family:monospace;">${formatCurrency(data.cogsTech)} ${formatPctTable(data.cogsTech, data.revTech)}</td>
+                 <td data-label="Costi altri Eubiotech" style="color:#f43f5e; font-family:monospace;">${formatCurrency(data.opexTech)} ${formatPctTable(data.opexTech, data.revTech)}</td>
+                 <td data-label="Utile Eubios" style="color:#3b82f6; font-family:monospace;">${formatCurrency(profitEubios)} ${formatPctTable(profitEubios, data.revEubios)}</td>
+                 <td data-label="Utile Eubiotech" style="color:#8b5cf6; font-family:monospace;">${formatCurrency(profitTech)} ${formatPctTable(profitTech, data.revTech)}</td>
+             `;
+             parentRow.after(tr);
+        }
+    }
+
+    function toggleCategoryDetails(btn, allFilteredData) {
+        const qualificaPersonale = {
+            "CATERINA": "AMMINISTRATORE",
+            "FRANCESCO ECO": "AMMINISTRATIVO",
+            "FRANCESCO": "AMMINISTRATORE", // defined after Francesco Eco so it doesn't substring match incorrectly
+            "ASSUNTA": "COMMERCIALE",
+            "GIANLUCA": "TECNICO ESTERNO",
+            "SABATINO": "TECNICO ESTERNO",
+            "MAURIZIO": "TECNICO ESTERNO",
+            "MANUELA": "COMMERCIALE",
+            "AMMINISTRAZIONE": "AMMINISTRATIVO",
+            "GIOVANNI": "COMMERCIALE",
+            "LUCA": "TECNICO INTERNO",
+            "TONINO": "TECNICO INTERNO"
+        };
+        const year = parseInt(btn.getAttribute('data-year'));
+        const docType = btn.getAttribute('data-type');
+        const parentRow = btn.closest('tr');
+        const isActive = btn.classList.contains('active');
+        
+        // Remove ANY existing sub-rows for this year
+        // We might want to allow multiple details to be open simultaneously,
+        // but it's cleaner to just show one at a time per year to avoid clutter
+        document.querySelectorAll(`.sub-row[data-parent-year="${year}"]`).forEach(el => el.remove());
+        
+        // Reset all buttons in this row
+        parentRow.querySelectorAll('.row-expand-btn').forEach(b => b.classList.remove('active'));
+
+        if (isActive) {
+            return; // Just collapsed
+        }
+
+        btn.classList.add('active');
+
+        // Filter data for this specific year and type
+        const yearData = allFilteredData.filter(item => {
+            try {
+                const d = new Date(item.date);
+                if (isNaN(d) || d.getFullYear() !== year) return false;
+                
+                if (docType.includes('Costi risorse umane') || docType.includes('COGS_TECH') || docType.includes('COGS')) {
+                    return isItemInCustomGroup(item, 'Costi risorse umane') || isItemInCustomGroup(item, 'Risorse umane') || item.type === 'Costi risorse umane' || item.type === 'COGS_TECH' || item.type === 'COGS';
+                }
+                if (docType.includes('Costi altri') || docType.includes('OPEX_TECH') || docType.includes('OPEX')) {
+                    return isItemInCustomGroup(item, 'Costi altri') || isItemInCustomGroup(item, 'Altri costi') || item.type === 'Costi altri' || item.type === 'OPEX_TECH' || item.type === 'OPEX' || item.type === 'ALTRI COSTI EUBIOTECH';
+                }
+                if (docType === 'REVENUE_EUBIOTECH') return item.type === 'REVENUE_EUBIOTECH';
+                if (docType === 'COSTS_EUBIOS') return item.type === 'COSTS_EUBIOS' || item.type === 'REVENUE_EUBIOTECH';
+                if (docType === 'REVENUE_EUBIOS') return item.type === 'REVENUE_EUBIOS' || item.type === 'REVENUE';
+                
+                return false;
+            } catch(e) { return false; }
+        });
+
+        const personGroups = {};
+        const qualGroups = {}; // Used to store qualification totals
+        
+        yearData.forEach(item => {
+            let itemName = 'Generico';
+            
+            if (docType.includes('Costi risorse umane') || docType.includes('COGS')) {
+                 itemName = (item.description || item.category || 'Generico').toUpperCase().trim();
+                 if (itemName === 'PERSONALE EUBIOTECH' || itemName === 'COSTI PERSONALE EUBIOTECH' || itemName === 'SALARI E STIPENDI' || itemName.includes('SALARI E STIPENDI')) itemName = 'GENERICO';
+            } else {
+                 itemName = (item.category || item.description || 'Generico').toUpperCase().trim();
+            }
+            
+            if (!personGroups[itemName]) {
+                personGroups[itemName] = { 
+                    total: 0,
+                    Q1: 0, Q2: 0, Q3: 0, Q4: 0,
+                    ids: []
+                };
+            }
+            
+            let qual = "ALTRO/NON DEFINITO";
+            if (docType.includes('Costi risorse umane') || docType.includes('COGS')) {
+                for (const [key, val] of Object.entries(qualificaPersonale)) {
+                    if (itemName.includes(key)) {
+                        qual = val;
+                        break;
+                    }
+                }
+                if (!qualGroups[qual]) {
+                    qualGroups[qual] = { total: 0, Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
+                }
+            }
+            
+            const dateObj = new Date(item.date);
+            const m = dateObj.getMonth() + 1; // 1-12
+            const q = Math.ceil(m / 3); // 1-4
+            
+            personGroups[itemName].total += item.amount;
+            personGroups[itemName][`Q${q}`] += item.amount;
+            if (item.id) personGroups[itemName].ids.push(item.id);
+            
+            if (docType.includes('Costi risorse umane') || docType.includes('COGS')) {
+                qualGroups[qual].total += item.amount;
+                qualGroups[qual][`Q${q}`] += item.amount;
             }
         });
-    }
 
-    // 2. Imposta il valore
-    const savedFilter = localStorage.getItem('antimo_filterTecnicoOggi');
-    if (savedFilter) {
-        filterTecnicoOggi.value = savedFilter;
-    } else {
-        const defaultName = localStorage.getItem('antimo_user_name') || "";
-        if (defaultName.toLowerCase().includes("giuseppe")) {
-            filterTecnicoOggi.value = "TUTTI";
-        }
-    }
+        const formatCurrency = (val) => val === 0 ? '-' : new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(val);
 
-    // 3. Listener
-    filterTecnicoOggi.addEventListener('change', (e) => {
-        localStorage.setItem('antimo_filterTecnicoOggi', e.target.value);
-        updateInterventiCount();
-        if(!activitiesListContainer.classList.contains('hidden')) {
-            renderActivitiesList();
-        }
-    });
-}
+        const itemNames = Object.keys(personGroups).sort((a,b) => personGroups[b].total - personGroups[a].total);
 
-function renderSpecialPlannedList(container, filteredData) {
-    if(!container) return;
-    container.innerHTML = '';
-    
-    filteredData.forEach(p => {
-        // Cerchiamo l'indice reale nell'array globale
-        const index = plannedInterventions.indexOf(p);
+        const tr = document.createElement('tr');
+        tr.classList.add('sub-row');
+        tr.setAttribute('data-parent-year', year);
         
-        const div = document.createElement('div');
-        div.className = "card-item-container";
+        let headerColor = '#ea580c';
+        let bgLine = '#ffedd5';
+        let borderColor = '#fed7aa';
+        let valColor = '#d97706';
+        let titlePrefix = 'Dettaglio Nominativi Costo Personale';
         
-        let dateStr = p.dataPrevista ? p.dataPrevista.split('-').reverse().join('/') : 'N/D';
-        let attachBadge = (p.fileUrlsProgrammati && p.fileUrlsProgrammati.length > 0) ? `<span style="font-size:0.8rem; background:var(--orange-light); color:white; padding:2px 5px; border-radius:4px; margin-left:5px;">📎</span>` : '';
-
-        let attachHtml = '';
-        if (p.fileUrlsProgrammati && p.fileUrlsProgrammati.length > 0) {
-            attachHtml = `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dotted #ccc;">
-                <strong>📎 Allegati Sede:</strong><br>
-                ${p.fileUrlsProgrammati.map((url, i) => `<a href="${url}" target="_blank" style="color: var(--blue-primary); font-size: 0.85rem; text-decoration: underline;">Allegato ${i+1}</a>`).join('<br>')}
-            </div>`;
+        if (docType.includes('Costi altri') || docType.includes('OPEX')) {
+            headerColor = '#b91c1c';
+            bgLine = '#fee2e2';
+            borderColor = '#fecaca';
+            valColor = '#dc2626';
+            titlePrefix = 'Dettaglio Costi Altri Eubiotech';
+        } else if (docType === 'REVENUE_EUBIOS') {
+            headerColor = '#047857';
+            bgLine = '#d1fae5';
+            borderColor = '#a7f3d0';
+            valColor = '#059669';
+            titlePrefix = 'Dettaglio Ricavi Eubios';
+        } else if (docType === 'REVENUE_EUBIOTECH') {
+            headerColor = '#15803d';
+            bgLine = '#dcfce7';
+            borderColor = '#bbf7d0';
+            valColor = '#16a34a';
+            titlePrefix = 'Dettaglio Ricavi Eubiotech';
+        } else if (docType === 'COSTS_EUBIOS') {
+            headerColor = '#be123c';
+            bgLine = '#ffe4e6';
+            borderColor = '#fecdd3';
+            valColor = '#e11d48';
+            titlePrefix = 'Dettaglio Costi Eubios';
         }
 
-        div.innerHTML = `
-            <div class="card-compact-view">
-                <div style="flex:1;">
-                    <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${p.paziente} ${attachBadge}</div>
-                    <div style="font-size:0.85rem; color:#555;">📍 ${p.localita || p.destinazione} | 🔧 ${p.tipo}</div>
-                    <div style="font-size:0.80rem; color:var(--orange); font-weight:600; margin-top:4px;">🗓 Data Prevista: ${dateStr}</div>
+        let miniTableHTML = `
+            <td class="detail-container-td" colspan="8" style="padding: 1rem 2rem; background: #f8fafc; border-top: 2px dashed ${borderColor};">
+                <h4 class="detail-container-title" style="margin-top: 0; margin-bottom: 0.5rem; color: ${headerColor}; display: flex; justify-content: space-between;">
+                    ${titlePrefix} ${year}
+                </h4>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; background: white; border: 1px solid ${borderColor}; font-size: 0.9em;">
+                        <thead>
+                            <tr style="background: ${bgLine}; border-bottom: 1px solid ${borderColor}; color: ${headerColor};">
+                                <th style="padding: 6px 10px; text-align: left;">Voce / Nominativo</th>
+                                ${docType.includes('Costi risorse umane') || docType.includes('COGS') ? `<th style="padding: 6px 10px; text-align: left;">Qualifica</th>` : ''}
+                                <th style="padding: 6px 10px; text-align: right;">Totale Anno</th>
+                                <th style="padding: 6px 10px; text-align: right; border-left: 1px solid ${borderColor};">Q1</th>
+                                <th style="padding: 6px 10px; text-align: right;">Q2</th>
+                                <th style="padding: 6px 10px; text-align: right;">Q3</th>
+                                <th style="padding: 6px 10px; text-align: right;">Q4</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+
+        if (itemNames.length === 0) {
+            miniTableHTML += `<tr><td colspan="${docType.includes('Costi risorse umane') || docType.includes('COGS') ? '7' : '6'}" style="padding: 10px; text-align: center; color: #9ca3af;">Nessun dettaglio trovato.</td></tr>`;
+        } else {
+            itemNames.forEach(name => {
+                const d = personGroups[name];
+                let rowBgColor = (docType === 'REVENUE_EUBIOTECH' || docType === 'REVENUE_EUBIOS') ? '#f0fdf4' : (docType.includes('Costi altri') || docType.includes('OPEX') ? '#fef2f2' : (docType === 'COSTS_EUBIOS' ? '#fff1f2' : '#fffbeb'));
+                let rowBorderColor = (docType === 'REVENUE_EUBIOTECH' || docType === 'REVENUE_EUBIOS') ? '#bbf7d0' : (docType.includes('Costi altri') || docType.includes('OPEX') ? '#fecaca' : (docType === 'COSTS_EUBIOS' ? '#fecdd3' : '#fef3c7'));
+                
+                let qualifica = "-";
+                if (docType.includes('Costi risorse umane') || docType.includes('COGS')) {
+                    for (const [key, val] of Object.entries(qualificaPersonale)) {
+                        if (name.includes(key)) {
+                            qualifica = val;
+                            break;
+                        }
+                    }
+                }
+                
+                // If there's only one underlying record, attach it. If multiple, comma string.
+                const idsString = d.ids.join(',');
+                
+                miniTableHTML += `
+                    <tr class="inner-summary-row" data-ids="${idsString}" style="border-bottom: 1px solid ${rowBorderColor}; background: ${rowBgColor}; cursor: context-menu;">
+                        <td data-label="Voce / Nominativo" style="padding: 6px 10px;"><strong>${name}</strong></td>
+                        ${docType.includes('Costi risorse umane') || docType.includes('COGS') ? `<td data-label="Qualifica" style="padding: 6px 10px; color: #64748b; font-size: 0.85em;">${qualifica}</td>` : ''}
+                        <td data-label="Totale Anno" style="padding: 6px 10px; text-align: right; color: ${valColor}; font-family: monospace; font-weight: bold;">${formatCurrency(d.total)}</td>
+                        <td data-label="Q1" style="padding: 6px 10px; text-align: right; font-family: monospace; border-left: 1px solid ${rowBorderColor};">${formatCurrency(d.Q1)}</td>
+                        <td data-label="Q2" style="padding: 6px 10px; text-align: right; font-family: monospace;">${formatCurrency(d.Q2)}</td>
+                        <td data-label="Q3" style="padding: 6px 10px; text-align: right; font-family: monospace;">${formatCurrency(d.Q3)}</td>
+                        <td data-label="Q4" style="padding: 6px 10px; text-align: right; font-family: monospace;">${formatCurrency(d.Q4)}</td>
+                    </tr>
+                `;
+            });
+
+            // Add Qualification summary row at the bottom
+            if (docType.includes('Costi risorse umane') || docType.includes('COGS')) {
+                miniTableHTML += `
+                    <tr style="background: white;">
+                        <td colspan="7" style="padding: 15px 10px 5px 10px;">
+                            <h5 style="margin: 0; color: ${headerColor}; font-size: 0.95em;">Riepilogo Costi per Qualifica</h5>
+                        </td>
+                    </tr>
+                `;
+                
+                const qualNames = Object.keys(qualGroups).sort((a,b) => qualGroups[b].total - qualGroups[a].total);
+                qualNames.forEach(q => {
+                    const qd = qualGroups[q];
+                    miniTableHTML += `
+                        <tr style="border-bottom: 1px solid #e5e7eb; background: #f8fafc;">
+                            <td data-label="Voce / Nominativo" colspan="${docType.includes('Costi risorse umane') || docType.includes('COGS') ? '2' : '1'}" style="padding: 6px 10px; color: #475569; font-weight: bold; font-size: 0.85em; text-transform: uppercase;">▶ ${q}</td>
+                            <td data-label="Totale Anno" style="padding: 6px 10px; text-align: right; color: ${valColor}; font-family: monospace; font-weight: bold;">${formatCurrency(qd.total)}</td>
+                            <td data-label="Q1" style="padding: 6px 10px; text-align: right; font-family: monospace; border-left: 1px solid #e5e7eb;">${formatCurrency(qd.Q1)}</td>
+                            <td data-label="Q2" style="padding: 6px 10px; text-align: right; font-family: monospace;">${formatCurrency(qd.Q2)}</td>
+                            <td data-label="Q3" style="padding: 6px 10px; text-align: right; font-family: monospace;">${formatCurrency(qd.Q3)}</td>
+                            <td data-label="Q4" style="padding: 6px 10px; text-align: right; font-family: monospace;">${formatCurrency(qd.Q4)}</td>
+                        </tr>
+                    `;
+                });
+            }
+        }
+
+        miniTableHTML += `
+                        </tbody>
+                    </table>
                 </div>
-                <div style="display: flex; gap: 8px; align-items: center; padding-left: 10px;">
-                    <button class="btn btn-primary btn-orange btn-sm" style="padding:6px 10px; font-size:0.8rem; line-height:1; min-width:auto;" data-action="avvia" data-index="${index}">▶ AVVIA</button>
-                    <span class="expand-icon" style="font-size:1.2rem; color:var(--blue-light); padding:10px;">▼</span>
-                </div>
-            </div>
-            
-            <div class="card-expanded-view hidden">
-                <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${p.indirizzo || ''}</div>
-                <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${p.telefono || '-'}</div>
-                <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${p.dispositivi || 'Nessuno'}</div>
-                <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${p.note || 'Nessuna'}</div>
-                ${attachHtml}
-                <div style="display:flex; gap:10px; margin-top: 15px;">
-                    <button class="btn btn-primary btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="edit" data-index="${index}">✏ Modifica</button>
-                    <button class="btn btn-danger btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="delete" data-index="${index}">🗑 Elimina</button>
-                    <button class="btn btn-danger btn-sm" style="flex:1; padding:8px; font-size:0.85rem; background:#b45309;" data-action="justify" data-index="${index}">✖ Non Eseg</button>
-                </div>
-            </div>
+            </td>
         `;
         
-        setupAccordionCard(div);
-        
-        div.querySelector('button[data-action="edit"]')?.addEventListener('click', (e) => editProgrammatoAppJs(e.target.getAttribute('data-index')));
-        div.querySelector('button[data-action="delete"]')?.addEventListener('click', (e) => deleteProgrammatoAppJs(e.target.getAttribute('data-index')));
-        
-        div.querySelector('button[data-action="avvia"]').addEventListener('click', (e) => {
-            const idx = e.target.getAttribute('data-index');
-            const dataToLoad = plannedInterventions[idx];
-            
-            // Popoliamo il form coi blocchi dinamici
-            const container = document.getElementById('dynamicInterventionsContainer');
-            if (container) {
-                const hooks = initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
-                container.innerHTML = '';
-                if (dataToLoad.interventiList && dataToLoad.interventiList.length > 0) {
-                    dataToLoad.interventiList.forEach(item => hooks.addBlock(item));
-                } else {
-                    hooks.addBlock({ tipo: dataToLoad.tipo, disp: dataToLoad.dispositivi, mat: dataToLoad.matricola||"" });
-                }
-            }
-            
-            iPaziente.value = dataToLoad.paziente || "";
-            if(iLocalita) iLocalita.value = dataToLoad.localita || dataToLoad.destinazione || "";
-            if(iIndirizzo) iIndirizzo.value = dataToLoad.indirizzo || "";
-            if(iTelefono) iTelefono.value = dataToLoad.telefono || "";
-            
-            iNote.value = dataToLoad.note || "";
-            pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
-
-            plannedInterventions.splice(idx, 1);
-            saveState();
-            
-            // Eliminiamo anche dal cloud (se si avvia, sparisce da programmati e diventerà intervento vero)
-            if (isFirebaseConfigured && dataToLoad.id) {
-                import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js").then(async ({ doc, deleteDoc }) => {
-                    try {
-                        // Supponendo che il doc id coincida oppure possiamo fare query, 
-                        // Ma per sicurezza lo lasciamo pendente, 
-                        // Oppure facciamo delete tramite query!
-                        const { collection, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        const q = query(collection(db, "programmati"), where("id", "==", dataToLoad.id));
-                        const snaps = await getDocs(q);
-                        snaps.forEach(async d => await deleteDoc(doc(db, "programmati", d.id)));
-                    } catch(err) { console.error("Errore rimozione cloud programmato", err); }
-                });
-            }
-
-            updateUI();
-            interventionSection.classList.remove('hidden');
-            interventionSection.scrollIntoView({ behavior: 'smooth' });
-        });
-        
-        div.querySelector('button[data-action="justify"]').addEventListener('click', (e) => {
-            const idx = e.target.getAttribute('data-index');
-            interventionToJustify = plannedInterventions[idx];
-            justifyReason.value = "";
-            justifyModal.classList.remove('hidden');
-        });
-
-        container.appendChild(div);
-    });
-}
-
-function renderPlannedInterventions(tuttiProg = [], oggiProg = [], domaniProg = []) {
-    if(plannedList) renderSpecialPlannedList(plannedList, tuttiProg);
-    if(oggiList) renderSpecialPlannedList(oggiList, oggiProg);
-    if(domaniList) renderSpecialPlannedList(domaniList, domaniProg);
-}
-
-function renderNpInterventions() {
-    if(!npList) return;
-    npList.innerHTML = '';
-    
-    // Filtra solo quelli in attesa
-    const visibili = plannedInterventions.filter(p => p.status === 'in_attesa');
-    
-    visibili.forEach((p, indexOriginalArray) => {
-        // Cerchiamo l'indice reale nell'array globale
-        const index = plannedInterventions.indexOf(p);
-        
-        const div = document.createElement('div');
-        div.className = "card-item-container";
-        div.style.borderLeft = "4px solid #ef4444";
-        
-        let noteStr = p.note || p.dispositivi || 'Nessuna nota';
-        let attachBadge = (p.fileUrlsProgrammati && p.fileUrlsProgrammati.length > 0) ? `<span style="font-size:0.8rem; background:var(--orange-light); color:white; padding:2px 5px; border-radius:4px; margin-left:5px;">📎</span>` : '';
-
-        let attachHtml = '';
-        if (p.fileUrlsProgrammati && p.fileUrlsProgrammati.length > 0) {
-            attachHtml = `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dotted #ccc;">
-                <strong>📎 Allegati Sede:</strong><br>
-                ${p.fileUrlsProgrammati.map((url, i) => `<a href="${url}" target="_blank" style="color: var(--blue-primary); font-size: 0.85rem; text-decoration: underline;">Allegato ${i+1}</a>`).join('<br>')}
-            </div>`;
-        }
-
-        div.innerHTML = `
-            <div class="card-compact-view">
-                <div style="flex:1;">
-                    <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${p.paziente} ${attachBadge}</div>
-                    <div style="font-size:0.85rem; color:#555;">📍 ${p.localita || p.destinazione} | 🔧 ${p.tipo}</div>
-                    <div style="font-size:0.80rem; color:#ef4444; font-weight:600; margin-top:4px;">⏳ Da Programmare</div>
-                </div>
-                <div style="display: flex; gap: 8px; align-items: center; padding-left: 10px;">
-                    <button class="btn btn-primary btn-orange btn-sm" style="padding:6px 10px; font-size:0.8rem; line-height:1; min-width:auto;" data-action="avvia" data-index="${index}">▶ AVVIA</button>
-                    <span class="expand-icon" style="font-size:1.2rem; color:var(--blue-light); padding:10px;">▼</span>
-                </div>
-            </div>
-            
-            <div class="card-expanded-view hidden">
-                <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${p.indirizzo || ''}</div>
-                <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${p.telefono || '-'}</div>
-                <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${p.dispositivi || 'Nessuno'}</div>
-                <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${noteStr}</div>
-                <div style="display:flex; gap:10px; margin-top: 15px;">
-                    <button class="btn btn-primary btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="edit" data-index="${index}">✏ Modifica</button>
-                    <button class="btn btn-danger btn-sm" style="flex:1; padding:8px; font-size:0.85rem; background:#b45309;" data-action="delete" data-index="${index}">🗑 Elimina</button>
-                </div>
-            </div>
-        `;
-        
-        setupAccordionCard(div);
-        
-        div.querySelector('button[data-action="edit"]')?.addEventListener('click', (e) => editProgrammatoAppJs(e.target.getAttribute('data-index')));
-        div.querySelector('button[data-action="delete"]')?.addEventListener('click', (e) => deleteProgrammatoAppJs(e.target.getAttribute('data-index')));
-        
-        div.querySelector('button[data-action="avvia"]').addEventListener('click', (e) => {
-            const idx = e.target.getAttribute('data-index');
-            const dataToLoad = plannedInterventions[idx];
-            
-            // Popoliamo il form coi blocchi dinamici
-            const container = document.getElementById('dynamicInterventionsContainer');
-            if (container) {
-                const hooks = initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
-                container.innerHTML = '';
-                if (dataToLoad.interventiList && dataToLoad.interventiList.length > 0) {
-                    dataToLoad.interventiList.forEach(item => hooks.addBlock(item));
-                } else {
-                    hooks.addBlock({ tipo: dataToLoad.tipo, disp: dataToLoad.dispositivi, mat: dataToLoad.matricola||"" });
-                }
-            }
-
-            iPaziente.value = dataToLoad.paziente || "";
-            if(iLocalita) iLocalita.value = dataToLoad.localita || dataToLoad.destinazione || "";
-            if(iIndirizzo) iIndirizzo.value = dataToLoad.indirizzo || "";
-            if(iTelefono) iTelefono.value = dataToLoad.telefono || "";
-            
-            iNote.value = dataToLoad.note || "";
-            pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
-
-            plannedInterventions.splice(idx, 1);
-            saveState();
-            
-            // Eliminiamo anche dal cloud (se si avvia, sparisce da programmati e diventerà intervento vero)
-            if (isFirebaseConfigured && dataToLoad.id) {
-                import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js").then(async ({ doc, deleteDoc }) => {
-                    try {
-                        const { collection, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        const q = query(collection(db, "programmati"), where("id", "==", dataToLoad.id));
-                        const snaps = await getDocs(q);
-                        snaps.forEach(async d => await deleteDoc(doc(db, "programmati", d.id)));
-                    } catch(err) { console.error("Errore rimozione cloud np", err); }
-                });
-            }
-
-            updateUI();
-            updateInterventiCount();
-            interventionSection.classList.remove('hidden');
-            interventionSection.scrollIntoView({ behavior: 'smooth' });
-        });
-
-        npList.appendChild(div);
-    });
-}
-
-// LOGICA MODALE GIUSTIFICAZIONE
-btnCancelJustify.addEventListener('click', () => {
-    justifyModal.classList.add('hidden');
-    interventionToJustify = null;
-});
-
-btnConfirmJustify.addEventListener('click', async () => {
-    const reason = justifyReason.value.trim();
-    if(!reason) return alert("Devi inserire una motivazione!");
-    
-    if(interventionToJustify) {
-        interventionToJustify.status = 'justified_not_executed';
-        interventionToJustify.motivazione = reason;
-        
-        if (isFirebaseConfigured && interventionToJustify.id) {
-            try {
-                const { doc, updateDoc, collection, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                const q = query(collection(db, "programmati"), where("id", "==", interventionToJustify.id));
-                const snaps = await getDocs(q);
-                
-                let updated = false;
-                snaps.forEach(async (d) => {
-                    await updateDoc(doc(db, "programmati", d.id), {
-                        status: 'justified_not_executed',
-                        motivazione: reason
-                    });
-                    updated = true;
-                });
-                
-                if(!updated && interventionToJustify.id.startsWith('plan_')) {
-                     // Fallback se per caso non era ancora salito
-                     const { addDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                     await addDoc(collection(db, "programmati"), interventionToJustify);
-                }
-            } catch(e) {
-                console.error("Errore giustificazione", e);
-            }
-        }
-        
-        // Rimuoviamolo dalla vista locale
-        plannedInterventions = plannedInterventions.filter(p => p.id !== interventionToJustify.id);
-        saveState();
+        tr.innerHTML = miniTableHTML;
+        parentRow.after(tr);
     }
-    
-    justifyModal.classList.add('hidden');
-    interventionToJustify = null;
-    
-    if(isFirebaseConfigured) {
-        syncPlannedInterventions(); // resetta Ui e conteggi
-    } else {
-        updateUI();
-        updateInterventiCount();
+
+    function getGroupByLabel(groupBy) {
+        if(groupBy === 'year') return 'Anno';
+        if(groupBy === 'month') return 'Mese';
+        if(groupBy === 'quarter') return 'Trimestre';
+        if(groupBy === 'week') return 'Settimana';
+        if(groupBy === 'day') return 'Giorno';
+        if(groupBy === 'type') return 'Tipo';
+        if(groupBy === 'category') return 'Categoria';
+        return 'Raggruppamento';
     }
-});
 
-// IMPOSTAZIONI EVENT LISTENERS
-if(btnSettings) {
-    btnSettings.addEventListener('click', () => {
-        toggleRequireKm.checked = requireKm;
-        settingsModal.classList.remove('hidden');
-    });
-}
-if(btnCloseSettings) {
-    btnCloseSettings.addEventListener('click', () => {
-        settingsModal.classList.add('hidden');
-    });
-}
-if(toggleRequireKm) {
-    toggleRequireKm.addEventListener('change', (e) => {
-        requireKm = e.target.checked;
-        localStorage.setItem('antimo_requireKm', JSON.stringify(requireKm));
-        updateUI();
-    });
-}
+    // --- FILTER UI GENERATION ---
+    function updateActiveFiltersDisplay() {
+        const container = document.getElementById('active-filters-list');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        let hasFilters = false;
 
-// BACKUP E VERISONI EVENT LISTENERS
-if(btnOpenBackup) {
-    btnOpenBackup.addEventListener('click', () => {
-        settingsModal.classList.add('hidden'); // Chiude impostazioni
-        
-        // Version Update Dinamico
-        const currentVersionEl = document.getElementById('appVersionStamp');
-        let currentVersion = "v24.3"; 
-        if(currentVersionEl) {
-            let fullText = currentVersionEl.innerText || currentVersionEl.textContent;
-            currentVersion = fullText.split(' - ')[0].trim();
-        }
-        
-        const backupManualeVersionTxt = document.getElementById('backupManualeVersionTxt');
-        if(backupManualeVersionTxt) backupManualeVersionTxt.innerText = currentVersion + " (Custom)";
-        
-        const backupOggiVersionTxt = document.getElementById('backupOggiVersionTxt');
-        if(backupOggiVersionTxt) backupOggiVersionTxt.innerText = currentVersion + " (Attuale)";
-        
-        document.querySelectorAll('.btn-desc-version[data-version="v24.3"]').forEach(b => b.setAttribute('data-version', currentVersion));
-        document.querySelectorAll('.btn-reinstall-version[data-version="v24.3"]').forEach(b => b.setAttribute('data-version', currentVersion));
-        document.querySelectorAll('.btn-desc-version[data-version="v24.3-manual"]').forEach(b => b.setAttribute('data-version', currentVersion + "-manual"));
-        document.querySelectorAll('.btn-reinstall-version[data-version="v24.3-manual"]').forEach(b => b.setAttribute('data-version', currentVersion + "-manual"));
-
-        // Calcola le date da mostrare
-        const today = new Date();
-        
-        if(backupManualeDate) {
-            let savedTime = localStorage.getItem('antimo_manualBackupTime');
-            backupManualeDate.innerHTML = `Oggi (Manuale) - ${savedTime ? savedTime : '--:--'}`;
-        }
-
-        if(backupOggiDate) backupOggiDate.innerText = formatDateDMY(today) + " (Automatica)";
-        const d2 = new Date(); d2.setDate(today.getDate() - 2);
-        if(backup2giorniDate) backup2giorniDate.innerText = formatDateDMY(d2);
-        const d7 = new Date(); d7.setDate(today.getDate() - 7);
-        if(backup7giorniDate) backup7giorniDate.innerText = formatDateDMY(d7);
-        
-        backupModal.classList.remove('hidden');
-    });
-}
-
-if(btnSaveManualBackup) {
-    btnSaveManualBackup.addEventListener('click', () => {
-        const now = new Date();
-        const timeStr = padZ(now.getHours()) + ":" + padZ(now.getMinutes());
-        localStorage.setItem('antimo_manualBackupTime', timeStr);
-        if(backupManualeDate) backupManualeDate.innerHTML = `Oggi (Manuale) - ${timeStr}`;
-        alert("Versione manuale della giornata salvata con successo!");
-    });
-}
-
-if(btnCloseBackup) {
-    btnCloseBackup.addEventListener('click', () => {
-        backupModal.classList.add('hidden');
-    });
-}
-
-// Apertura modale singola versione
-document.querySelectorAll('.btn-desc-version').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        const version = e.target.getAttribute('data-version');
-        let contentHtml = "";
-        
-        const currentVersionEl = document.getElementById('appVersionStamp');
-        const currentVersion = currentVersionEl ? (currentVersionEl.innerText || currentVersionEl.textContent).split(' - ')[0].trim() : "v24.3";
-        const isCurrent = (version === currentVersion || version === currentVersion + "-manual");
-
-        // Genera il changelog
-        if(isCurrent && version !== "v24.3" && version !== "v24.3-manual") {
-            contentHtml = `
-                <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px;">🌟 Ultima Versione</h4>
-                <div style="padding: 10px; background: #e0f2fe; color: #0284c7; border-left: 4px solid #0ea5e9; border-radius: 4px; font-size: 0.9rem;">
-                    <strong>${version}</strong>: Aggiornamento automatico con ottimizzazioni alle logiche di sistema ed interfaccia utente.
-                </div>
-            `;
-        } else if(version === "v24.3" || version === "v24.3-manual") {
-            contentHtml = `
-                <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px;">🌟 Novità Principali</h4>
-                <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 15px;">
-                    <li><strong>Backup Versioni e AI:</strong> Integrata la nuova tabella per visualizzare lo storico delle versioni.</li>
-                    <li><strong>Ricerca Intelligente:</strong> Nuova funzionalità per chiedere all'AI i dettagli sulle caratteristiche dell'app.</li>
-                    <li><strong>Layout Unificato PC/Mobile:</strong> Interfaccia utente ottimizzata dinamicamente per entrambi i dispositivi.</li>
-                </ul>
-                <h4 style="color: #166534; border-bottom: 1px solid #ddd; padding-bottom: 5px;">🔧 Dettagli Tecnici</h4>
-                <ul style="padding-left: 20px; margin-bottom: 15px;">
-                    <li>Modali separati per settings, backup e note versione.</li>
-                    <li>Implementazione Event Listeners asincroni protetti.</li>
-                </ul>
-            `;
-        } else if(version === "v24.2") {
-            contentHtml = `
-                <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px;">🌟 Novità Principali</h4>
-                <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 15px;">
-                    <li><strong>Modulo Interventi Rapido:</strong> Fusione di 'in corso' e 'nuovo', con singola schermata e modulo chilometri incluso sin da subito.</li>
-                    <li><strong>Statistiche Superiori:</strong> Icone statistiche divise per Oggi, Domani e Programmati con evidenza di 'non eseguiti' (NP).</li>
-                </ul>
-                <h4 style="color: #ea580c; border-bottom: 1px solid #ddd; padding-bottom: 5px;">⚠️ Bug Fixes</h4>
-                <ul style="padding-left: 20px; margin-bottom: 15px;">
-                    <li>Riparato lo scorrimento e il caricamento dei modali da mobile iOS/Android.</li>
-                </ul>
-            `;
-        } else if(version === "v24.0") {
-            contentHtml = `
-                <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px;">🚀 Lancio Major Update</h4>
-                <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 15px;">
-                    <li><strong>Architettura Firebase Firestore:</strong> I dati passano da Google Sheets a sistema real-time in Cloud Firebase.</li>
-                    <li><strong>Funzione Offline-First:</strong> Se manca internet, tutto si salva in IndexedDB e si auto-sincronizza al ritorno della rete.</li>
-                    <li><strong>Gestione Anagrafiche:</strong> Sezione esterna integrata e dinamica per clienti e fornitori.</li>
-                </ul>
-            `;
-        }
-        
-        verTitleDesc.innerText = version;
-        versionDescContent.innerHTML = contentHtml;
-        versionDescModal.classList.remove('hidden');
-    });
-});
-
-// Logica Reinstalla Versione
-document.querySelectorAll('.btn-reinstall-version').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        const version = e.target.getAttribute('data-version');
-        if (confirm(`Sei sicuro di voler reinstallare la versione ${version}?\nQuesta operazione ripristinerà l'app a quello stato.`)) {
-            alert(`Sincronizzazione completata: Versione ${version} pronta. L'app verrà riavviata.`);
-            window.location.reload(true);
-        }
-    });
-});
-
-if(btnAllVersions) {
-    btnAllVersions.addEventListener('click', () => {
-        let contentHtml = "";
-        const now = new Date();
-        const d2 = new Date(); d2.setDate(now.getDate() - 2);
-        const d7 = new Date(); d7.setDate(now.getDate() - 7);
-        
-        let savedTime = localStorage.getItem('antimo_manualBackupTime');
-        
-        // 1. Manuale
-        if(savedTime) {
-            contentHtml += `<div style="background: #f0fdf4; padding: 10px; border-radius: 8px; border: 1px solid #bbf7d0; margin-bottom: 20px;">
-                                <h3 style="margin:0; color:#15803d; font-size: 1.1rem;">Oggi - ${savedTime} (Salvataggio Manuale)</h3>
-                                <p style="margin: 5px 0 0; font-size: 0.9rem; color: #166534; font-weight: 500;">Ultima versione dell'app salvata direttamente dall'utente in locale.</p>
-                            </div>`;
-        }
-        
-        // 2. Oggi
-        const currentVersionEl = document.getElementById('appVersionStamp');
-        const currentVersion = currentVersionEl ? (currentVersionEl.innerText || currentVersionEl.textContent).split(' - ')[0].trim() : "v24.3";
-        
-        contentHtml += `<div style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px dashed #eee;">
-                            <h3 style="margin:0 0 10px; color:#ea580c; font-size: 1.1rem;">📅 Oggi (${formatDateDMY(now)} - Mattina) - ${currentVersion}</h3>
-                            <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top:5px;">🌟 Novità Principali</h4>
-                            <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 10px;">
-                                <li><strong>Backup Versioni e AI:</strong> Integrata la nuova tabella per visualizzare lo storico delle versioni e i salvataggi personalizzati.</li>
-                                <li><strong>Ricerca Intelligente:</strong> Nuova funzionalità per chiedere all'AI i dettagli sulle caratteristiche dell'app.</li>
-                                <li><strong>Layout Unificato PC/Mobile:</strong> Interfaccia utente ottimizzata dinamicamente per entrambi i dispositivi.</li>
-                            </ul>
-                        </div>`;
-                        
-        // 3. 2 Giorni fa
-        contentHtml += `<div style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px dashed #eee;">
-                            <h3 style="margin:0 0 10px; color:#ea580c; font-size: 1.1rem;">📅 ${formatDateDMY(d2)} - v24.2</h3>
-                            <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top:5px;">🌟 Novità Principali</h4>
-                            <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 10px;">
-                                <li><strong>Modulo Interventi Rapido:</strong> Fusione di 'in corso' e 'nuovo', con modulo chilometri incluso sin da subito.</li>
-                                <li><strong>Statistiche Superiori:</strong> Icone statistiche divise per Oggi, Domani e Programmati con evidenza di 'NP'.</li>
-                            </ul>
-                        </div>`;
-                        
-        // 4. 1 Settimana fa
-        contentHtml += `<div>
-                            <h3 style="margin:0 0 10px; color:#ea580c; font-size: 1.1rem;">📅 ${formatDateDMY(d7)} - v24.0</h3>
-                            <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top:5px;">🚀 Lancio Major Update</h4>
-                            <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 10px;">
-                                <li><strong>Architettura Firebase Firestore:</strong> Passaggio da Google Sheets a sistema real-time in Cloud Firebase.</li>
-                                <li><strong>Funzione Offline-First:</strong> Auto-sincronizzazione al ritorno della rete tramite IndexedDB.</li>
-                                <li><strong>Gestione Anagrafiche:</strong> Sezione esterna integrata e dinamica per clienti e fornitori.</li>
-                            </ul>
-                        </div>`;
-
-        verTitleDesc.innerText = "Tutte le Versioni (Cronologia)";
-        versionDescContent.innerHTML = contentHtml;
-        versionDescModal.classList.remove('hidden');
-    });
-}
-
-if(btnCloseVersionDesc) {
-    btnCloseVersionDesc.addEventListener('click', () => {
-        versionDescModal.classList.add('hidden');
-    });
-}
-
-// Motore ricerca AI mock
-if(btnAiSearch) {
-    btnAiSearch.addEventListener('click', () => {
-        const query = aiSearchInput.value.trim().toLowerCase();
-        if(!query) return;
-        
-        aiSearchResult.classList.remove('hidden');
-        aiSearchResult.innerHTML = "<em>L'AI sta analizzando la tua richiesta... 🤖</em>";
-        
-        setTimeout(() => {
-            let response = "";
-            if(query.includes("km") || query.includes("chilometri") || query.includes("rimborso") || query.includes("distanza")) {
-                response = "<strong>🚗 Gestione Chilometri:</strong> L'app prevede l'opzione (attivabile in Impostazioni) di richiedere obbligatoriamente i km percorsi per ogni intervento, utile per i rimborsi spese di trasferta. Sono registrati a fine attività.";
-            } else if (query.includes("allegat") || query.includes("foto") || query.includes("pdf") || query.includes("scatta")) {
-                response = "<strong>📎 Gestione Allegati:</strong> L'app supporta il caricamento di immagini dirette da fotocamera mobile o file multimediali per ogni attività sia in avvio (Programmazione) che a fine intervento (Operatore Campo), inviati direttamente nello Storage Firebase.";
-            } else if (query.includes("sincro") || query.includes("cloud") || query.includes("internet") || query.includes("offline") || query.includes("connessione")) {
-                 response = "<strong>☁️ Offline-First & Sync:</strong> Se non c'è connessione, i tuoi interventi vengono salvati prima sul dispositivo locale (IndexedDB). Non appena l'app rileva una connessione o premi 'Sincronizza Dati', verranno sparati in Firebase.";
-            } else if (query.includes("anagrafich") || query.includes("pazient") || query.includes("utent")) {
-                 response = "<strong>📇 Anagrafiche:</strong> Tramite il portale dedicato (raggiungibile cliccando 'GESTIONE ANAGRAFICHE'), puoi inserire Clienti, Pazienti ed Enti. Essi si autocompleteranno nei moduli di creazione intervento.";
-            } else {
-                 response = "<strong>🧠 AI-Assistant:</strong> Attualmente la versione 24.3 dell'app permette registrazione interventi in un click, gestione anagrafiche, salvataggi allegati in cloud offline-ready, e organizzazione programmati Ognuno categorizzato per giorno. Prova a chiedermi di 'allegati', 'sincronizzazione', 'chilometri' o 'anagrafiche'!";
+        const createBadge = (text, type, onRemove) => {
+            hasFilters = true;
+            const badge = document.createElement('span');
+            badge.className = `filter-badge filter-badge-${type}`;
+            badge.innerHTML = `${text}`;
+            if (onRemove) {
+                const closeBtn = document.createElement('span');
+                closeBtn.className = 'filter-badge-remove';
+                closeBtn.innerHTML = '×';
+                closeBtn.onclick = onRemove;
+                badge.appendChild(closeBtn);
             }
-            aiSearchResult.innerHTML = response;
-        }, 1200);
-    });
-}
-
-
-
-function renderAttachmentsPreview() {
-    filePreviewContainer.innerHTML = '';
-    if(currentAttachments.length === 0) {
-        filePreviewContainer.classList.add('hidden');
-        return;
-    }
-    
-    filePreviewContainer.classList.remove('hidden');
-    currentAttachments.forEach((att, index) => {
-        const div = document.createElement('div');
-        div.style.cssText = "position: relative; border: 1px solid #ccc; border-radius: 8px; padding: 5px; text-align: center; width: 100px; display: flex; flex-direction: column; align-items: center; background: white;";
-        
-        const removeBtn = document.createElement('button');
-        removeBtn.innerHTML = "&times;";
-        removeBtn.style.cssText = "position: absolute; top: -5px; right: -5px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-weight: bold;";
-        removeBtn.onclick = () => {
-            currentAttachments.splice(index, 1);
-            renderAttachmentsPreview();
+            container.appendChild(badge);
         };
-        
-        if (att.type.startsWith('image/')) {
-            const img = document.createElement('img');
-            img.src = att.data;
-            img.style.cssText = "width: 80px; height: 80px; object-fit: cover; border-radius: 4px;";
-            div.appendChild(img);
-        } else {
-            const icon = document.createElement('div');
-            icon.style.cssText = "width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; font-size: 2rem; background: #f1f5f9; border-radius: 4px;";
-            icon.innerText = "📎";
-            div.appendChild(icon);
-            const nameObj = document.createElement('div');
-            nameObj.style.cssText = "font-size: 0.6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; margin-top: 4px;";
-            nameObj.innerText = att.name;
-            div.appendChild(nameObj);
-        }
-        
-        div.appendChild(removeBtn);
-        filePreviewContainer.appendChild(div);
-    });
-}
 
-inputAllegato.addEventListener('change', (e) => {
-    const files = Array.from(e.target.files);
-    if (!files || files.length === 0) return;
-    
-    files.forEach(file => {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            currentAttachments.push({
-                data: event.target.result,
-                type: file.type,
-                name: file.name
+        // Years
+        if (filterState.years.size > 0 && filterState.years.size < 20) {
+            // Check if not all years are selected
+            const allAvailableYears = new Set();
+            appData.forEach(i => { try { const d = new Date(i.date); if(!isNaN(d)) allAvailableYears.add(d.getFullYear()); } catch(e){} });
+            
+            if (filterState.years.size < allAvailableYears.size && allAvailableYears.size > 0) {
+                const sortedYears = Array.from(filterState.years).sort();
+                createBadge(`Anni: ${sortedYears.join(', ')}`, 'year');
+            }
+        }
+
+        // Months
+        if (filterState.months.size > 0 && filterState.months.size < 12) {
+            const mNames = ["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"];
+            const mSelected = Array.from(filterState.months).sort((a,b)=>a-b).map(m => mNames[m-1]);
+            createBadge(`Mesi: ${mSelected.join(', ')}`, 'month');
+        }
+
+        // Types (Global Checkboxes & Grouped Popovers)
+        if (filterState.types.size > 0) {
+             const allAppTypes = new Set(appData.map(d => d.type).filter(Boolean));
+             if (filterState.types.size < allAppTypes.size && allAppTypes.size > 0) {
+                 createBadge(`Tipi: ${Array.from(filterState.types).join(', ')}`, 'type');
+             }
+        }
+
+        // Categories (Global Checkboxes & Grouped Popovers)
+        if (filterState.categories.size > 0) {
+             const allAppCats = new Set(appData.map(d => d.category || 'Generico').filter(Boolean));
+             if (filterState.categories.size < allAppCats.size && allAppCats.size > 0) {
+                 createBadge(`Causali: ${filterState.categories.size} selezionate`, 'category');
+             }
+        }
+
+        // Descriptions
+        if (filterState.descriptions.size > 0) {
+             createBadge(`Descrizioni: ${filterState.descriptions.size} selezionali`, 'desc', () => {
+                 filterState.descriptions.clear();
+                 renderTable();
+             });
+        }
+
+        // Search Query
+        if (filterState.searchQuery && filterState.searchQuery.trim() !== '') {
+            createBadge(`Ricerca: "${filterState.searchQuery}"`, 'search', () => {
+                filterState.searchQuery = '';
+                const searchInput = document.getElementById('global-search-input');
+                if (searchInput) searchInput.value = '';
+                renderTable();
             });
-            renderAttachmentsPreview();
-        };
-        reader.readAsDataURL(file);
-    });
-    
-    // Non azzeriamo l'input per permettere selezioni successive se desiderato,
-    // o lo azzeriamo per forzare il re-trigger a parità di file. È meglio azzerarlo
-    // dato che gestiamo l'array in JS.
-    inputAllegato.value = "";
-});
-
-function renderProgAttachmentsPreview() {
-    progPreviewContainer.innerHTML = '';
-    if(currentProgAttachments.length === 0) {
-        progPreviewContainer.classList.add('hidden');
-        return;
-    }
-    
-    progPreviewContainer.classList.remove('hidden');
-    currentProgAttachments.forEach((att, index) => {
-        const div = document.createElement('div');
-        div.style.cssText = "position: relative; border: 1px solid #ea580c; border-radius: 8px; padding: 5px; text-align: center; width: 100px; display: flex; flex-direction: column; align-items: center; background: white;";
-        
-        const removeBtn = document.createElement('button');
-        removeBtn.innerHTML = "&times;";
-        removeBtn.style.cssText = "position: absolute; top: -5px; right: -5px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-weight: bold;";
-        removeBtn.onclick = () => {
-            currentProgAttachments.splice(index, 1);
-            renderProgAttachmentsPreview();
-        };
-        
-        if (att.type.startsWith('image/')) {
-            const img = document.createElement('img');
-            img.src = att.data;
-            img.style.cssText = "width: 80px; height: 80px; object-fit: cover; border-radius: 4px;";
-            div.appendChild(img);
-        } else {
-            const icon = document.createElement('div');
-            icon.style.cssText = "width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; font-size: 2rem; background: #fff7ed; border-radius: 4px; color: #ea580c;";
-            icon.innerText = "📎";
-            div.appendChild(icon);
-            const nameObj = document.createElement('div');
-            nameObj.style.cssText = "font-size: 0.6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; margin-top: 4px; color: #ea580c;";
-            nameObj.innerText = att.name;
-            div.appendChild(nameObj);
         }
-        
-        div.appendChild(removeBtn);
-        progPreviewContainer.appendChild(div);
-    });
-}
 
-inputAllegatoProgrammazione.addEventListener('change', (e) => {
-    const files = Array.from(e.target.files);
-    if (!files || files.length === 0) return;
-    
-    files.forEach(file => {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            currentProgAttachments.push({
-                data: event.target.result,
-                type: file.type,
-                name: file.name
+        // Column Filters (Single select from table header)
+        if (filterState.columnFilters.type) {
+            createBadge(`Col Tipo: ${filterState.columnFilters.type}`, 'type', () => {
+                filterState.columnFilters.type = '';
+                renderTable();
             });
-            renderProgAttachmentsPreview();
-        };
-        reader.readAsDataURL(file);
-    });
-    
-    inputAllegatoProgrammazione.value = "";
-});
-
-
-
-// Logic for Multi-Select Checklists
-function setupCustomChecklist(btnAddId, inputId, wrapperClass) {
-    const btnAdd = document.getElementById(btnAddId);
-    const input = document.getElementById(inputId);
-    if(btnAdd && input) {
-        btnAdd.addEventListener('click', () => {
-            const val = input.value.trim();
-            if(val) {
-                const label = document.createElement('label');
-                label.style.cssText = "display:flex; align-items:center; gap:8px; cursor:pointer;";
-                label.innerHTML = `<input type="checkbox" value="${val}" class="${wrapperClass}" checked> ${val}`;
-                input.parentElement.parentElement.insertBefore(label, input.parentElement);
-                input.value = '';
-            }
-        });
-        input.addEventListener('keypress', (e) => {
-            if(e.key === 'Enter') { e.preventDefault(); btnAdd.click(); }
-        });
-    }
-}
-setupCustomChecklist('btnAddAltroTipoIdx', 'altroTipoIdx', 'cb-tipo-idx');
-setupCustomChecklist('btnAddAltroDispIdx', 'altroDispIdx', 'cb-disp-idx');
-
-function getChecklistValues(className) {
-    return Array.from(document.querySelectorAll('.' + className + ':checked')).map(cb => cb.value).join(', ');
-}
-
-
-btnPlanIntervention.addEventListener('click', async () => {
-    const blocksData = extractDynamicBlocksData('dynamicInterventionsContainer');
-    if(!blocksData.tipoStr || !iPaziente.value || !iLocalita.value || !iIndirizzo.value) {
-        return alert("Compila Tipo intervento, Paziente, Località e Indirizzo per salvare l'intervento programmato!");
-    }
-    
-    let tipiSelezionati = blocksData.tipoStr;
-    let dispFinale = blocksData.dispStr || "Nessuno";
-    let matricolaText = blocksData.matStr;
-
-    // Calcola data prevista (default: domani)
-    let dProgrammata = inputDataProgrammata.value;
-    if (!dProgrammata) {
-        let domani = new Date();
-        domani.setDate(domani.getDate() + 1);
-        dProgrammata = domani.toISOString().split('T')[0];
-    }
-    const inputOraProgrammata = document.getElementById('oraProgrammata');
-    let oProgrammata = inputOraProgrammata ? inputOraProgrammata.value : "";
-
-    const plannedId = "plan_" + Date.now().toString();
-
-    const oldBtnPlanHtml = btnPlanIntervention.innerHTML;
-    btnPlanIntervention.innerHTML = `<span class="btn-icon">⏳</span> CARICAMENTO...`;
-    btnPlanIntervention.disabled = true;
-
-    // Upload prog attachments on Firebase
-    let fileUrlsProgrammati = [];
-    if(isFirebaseConfigured && currentProgAttachments.length > 0) {
-        try {
-            const { ref, uploadString, getDownloadURL } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js");
-            for(let i = 0; i < currentProgAttachments.length; i++) {
-                const att = currentProgAttachments[i];
-                let ext = "jpg";
-                if(att.name) ext = att.name.split('.').pop();
-                else if(att.type === "application/pdf") ext = "pdf";
-                else if(att.type && att.type.startsWith("video/")) ext = "mp4";
-
-                const storageRef = ref(storage, `allegatiProg/${plannedId}_${i}.${ext}`);
-                await uploadString(storageRef, att.data, 'data_url');
-                const url = await getDownloadURL(storageRef);
-                fileUrlsProgrammati.push(url);
-            }
-        } catch(err) {
-            console.error("Errore upload allegati programmazione", err);
         }
-    }
-
-    const planned = {
-        id: plannedId,
-        tipo: tipiSelezionati,
-        paziente: iPaziente.value,
-        localita: iLocalita.value,
-        indirizzo: iIndirizzo.value,
-        telefono: iTelefono ? iTelefono.value : "",
-        dispositivi: dispFinale,
-        matricola: matricolaText,
-        operatoreValutazione: blocksData.operatoreValutazioneStr,
-        esito: blocksData.esitoStr,
-        statoValutazione: blocksData.statoValutazioneStr,
-        tecnicoAssegnato: document.getElementById('tecnicoAssegnato') ? document.getElementById('tecnicoAssegnato').value : "",
-        interventiList: blocksData.array, // Nuovo payload strutturato
-        note: iNote.value,
-        dataPrevista: dProgrammata,
-        oraPrevista: oProgrammata,
-        status: 'planned',
-        timestamp: new Date().getTime(),
-        fileUrlsProgrammati: fileUrlsProgrammati
-    };
-
-    // Salvataggio DIRETTO sul cloud VERO (Firestore programmati)
-    if (isFirebaseConfigured) {
-        try {
-            const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-            // Usiamo l'id fisso per facilitare cancellazioni future
-            await addDoc(collection(db, "programmati"), planned);
-            console.log("Programmato salvato su Cloud");
-        } catch(e) {
-            console.error("Errore salvataggio programmato in Cloud", e);
-            alert("Errore salvataggio nel Cloud. Salvo solo in locale.");
-            plannedInterventions.push(planned);
-            saveState();
+        if (filterState.columnFilters.category) {
+            createBadge(`Col Cat: ${filterState.columnFilters.category}`, 'category', () => {
+                filterState.columnFilters.category = '';
+                renderTable();
+            });
         }
-    } else {
-        plannedInterventions.push(planned);
-        saveState();
-    }
-    
-    // Aggiorniamo la lista globale prendendola da Firestore
-    if(isFirebaseConfigured) {
-        await syncPlannedInterventions();
-    } else {
-        updateUI();
-    }
-    
-    // Reset form
-    newInterventionForm.reset();
-    inputAllegato.value = ""; 
-    currentAttachments = [];
-    filePreviewContainer.innerHTML = '';
-    filePreviewContainer.classList.add('hidden');
-    inputAllegatoProgrammazione.value = "";
-    currentProgAttachments = [];
-    progPreviewContainer.innerHTML = '';
-    progPreviewContainer.classList.add('hidden');
-    
-    btnPlanIntervention.innerHTML = oldBtnPlanHtml;
-    btnPlanIntervention.disabled = false;
+        if (filterState.columnFilters.description) {
+            createBadge(`Col Desc: ${filterState.columnFilters.description}`, 'desc', () => {
+                filterState.columnFilters.description = '';
+                renderTable();
+            });
+        }
 
-    interventionSection.classList.add('hidden'); // Chiude la scheda dopo il salvataggio
-    
-    updateUI();
-});
-
-newInterventionForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    // Validazione KM (Obbligatori se impostato su ON nelle Impostazioni)
-    if (requireKm && !inputKmPercorsi.value) {
-        return alert("Inserisci i Km percorsi prima di salvare l'attività (Obbligatorio dalle Impostazioni).");
-    }
-
-    const blocksData = extractDynamicBlocksData('dynamicInterventionsContainer');
-    if(blocksData.array.length === 0 || !blocksData.tipoStr) {
-        return alert("Devi inserire almeno un intervento compilando la tipologia.");
-    }
-    
-    let tipiSelezionati = blocksData.tipoStr;
-    let dispFinale = blocksData.dispStr || "Nessuno";
-    let matricolaTxt = blocksData.matStr;
-
-    // UI Loading state indication
-    const oldBtnText = btnStartIntervention.innerHTML;
-    btnStartIntervention.innerHTML = `<span class="btn-icon">⏳</span> SALVATAGGIO IN CORSO...`;
-    btnStartIntervention.disabled = true;
-
-    // Creazione Oggetto Intervento (Ora inizia e finisce nello stesso momento base)
-    let invToSave = {
-        id: Date.now().toString(),
-        dataObj: new Date().getTime(),
-        tipo: tipiSelezionati,
-        paziente: iPaziente.value,
-        localita: iLocalita.value,
-        indirizzo: iIndirizzo.value,
-        telefono: iTelefono ? iTelefono.value : "",
-        dispositivi: dispFinale,
-        matricola: matricolaTxt,
-        operatoreValutazione: blocksData.operatoreValutazioneStr,
-        esito: blocksData.esitoStr,
-        statoValutazione: blocksData.statoValutazioneStr,
-        tecnicoAssegnato: document.getElementById('tecnicoAssegnato') ? document.getElementById('tecnicoAssegnato').value : (localStorage.getItem('antimo_user_name') || "Sconosciuto"),
-        interventiList: blocksData.array,
-        note: iNote.value,
-        operatore: localStorage.getItem('antimo_user_name') || "Sconosciuto",
-        attachments: currentAttachments, // Base64 Array se offline
-        fileUrlsProgrammati: pendingFileUrlsProgrammati, 
-        startTime: new Date().getTime(),
-        endTime: new Date().getTime(), // Immediato in modalità 1-Step
-        kmPercorsi: inputKmPercorsi.value || "0"
-    };
-    
-    pendingFileUrlsProgrammati = [];
-    
-    let cloudSaveSuccess = false;
-    let uploadedUrls = [];
-
-    try {
-        if(isFirebaseConfigured) {
-            // Upload multiplo file dal Tecnico
-            if(invToSave.attachments && invToSave.attachments.length > 0) {
-                const { ref: storageRefCall, uploadString, getDownloadURL } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js");
-                for(let i = 0; i < invToSave.attachments.length; i++) {
-                    const att = invToSave.attachments[i];
-                    let ext = "jpg";
-                    if(att.name) ext = att.name.split('.').pop();
-                    else if(att.type === "application/pdf") ext = "pdf";
-                    else if(att.type && att.type.startsWith("video/")) ext = "mp4";
-
-                    const storageRef = storageRefCall(storage, `allegati/${invToSave.id}_${i}.${ext}`);
-                    await uploadString(storageRef, att.data, 'data_url');
-                    const url = await getDownloadURL(storageRef);
-                    uploadedUrls.push(url);
-                }
-            }
-            
-            // Fonde eventuali allegati di programmazione se erano link esistenti
-            if(invToSave.fileUrlsProgrammati && invToSave.fileUrlsProgrammati.length > 0) {
-                uploadedUrls = [...uploadedUrls, ...invToSave.fileUrlsProgrammati];
-            }
-
-            // Upload Firestore
-            const { collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-            const payloadToSave = {
-                timestamp: serverTimestamp(),
-                id: invToSave.id,
-                tipo: invToSave.tipo || "Gen",
-                paziente: invToSave.paziente || "Sconosciuto",
-                localita: invToSave.localita || "",
-                indirizzo: invToSave.indirizzo || "",
-                telefono: invToSave.telefono || "",
-                dispositivi: invToSave.dispositivi || "",
-                matricola: invToSave.matricola || "",
-                interventiList: invToSave.interventiList || [], 
-                note: invToSave.note || "",
-                operatore: invToSave.operatore || "Sconosciuto",
-                startTime: invToSave.startTime,
-                endTime: invToSave.endTime,
-                kmPercorsi: invToSave.kmPercorsi,
-                fileUrls: uploadedUrls.length > 0 ? uploadedUrls : null,
-                haAllegato: uploadedUrls.length > 0
-            };
-
-            Object.keys(payloadToSave).forEach(k => payloadToSave[k] === undefined && delete payloadToSave[k]);
-            await addDoc(collection(db, "interventi"), payloadToSave);
-            
-            if (activeProgFbId) {
-                try {
-                    const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                    await deleteDoc(doc(db, "programmati", activeProgFbId));
-                    console.log(`Programmato ${activeProgFbId} eliminato definitivamente dopo esecuzione`);
-                } catch(e) {
-                    console.error("Non sono riuscito ad aggiornare lo status in Firebase", e);
-                }
-                activeProgFbId = null;
-                activeProgItem = null;
-            }
-            
-            // Nuova logica: se salvo un intervento per un paziente, chiudo in automatico i suoi vecchi N.ESEG.
-            try {
-                const { collection, query, where, getDocs, doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                const qNeseg = query(
-                    collection(db, "programmati"), 
-                    where("paziente", "==", invToSave.paziente),
-                    where("status", "==", "justified_not_executed")
-                );
-                const snapsNeseg = await getDocs(qNeseg);
-                snapsNeseg.forEach(async (d) => {
-                    await updateDoc(doc(db, "programmati", d.id), { status: "completed" });
-                    console.log(`Vecchio N.ESEG ${d.id} chiuso automaticamente per il paziente ${invToSave.paziente}`);
+        // Sorting
+        if (filterState.sortCols && filterState.sortCols.length > 0) {
+            // Only show badge if it's not the default sort
+            if (!(filterState.sortCols.length === 1 && filterState.sortCols[0].col === 'date' && filterState.sortCols[0].dir === 'desc')) {
+                const sorts = filterState.sortCols.map(s => {
+                    const mapNames = { date: 'Data', type: 'Tipo', category: 'Cat', description: 'Desc', amount: 'Importo' };
+                    return `${mapNames[s.col] || s.col} ${s.dir === 'asc' ? '↑' : '↓'}`;
                 });
-            } catch(e) {
-                console.error("Errore pulizia vecchi N.ESEG", e);
+                createBadge(`Ordina: ${sorts.join(', ')}`, 'sort', () => {
+                    filterState.sortCols = [{ col: 'date', dir: 'desc' }];
+                    renderTable();
+                });
             }
-            
-            cloudSaveSuccess = true;
         }
-    } catch (error) {
-        console.error("Errore salvataggio Cloud, forzo modalità offline:", error);
-        alert("Rete instabile o errore Cloud. L'intervento è stato SALVATO IN LOCALE offline. Clicca poi su 'Sincronizza' appena la rete torna.");
+
+        // No Filters Fallback
+        if (!hasFilters) {
+            container.innerHTML = '<span style="font-size: 0.85em; color: #94a3b8; font-style: italic;">Nessun filtro specifico (Vista Predefinita)</span>';
+        }
     }
 
-    // Passaggio logico locale completato
-    invToSave.cloudSynced = cloudSaveSuccess;
-    invToSave.fileUrls = (uploadedUrls && uploadedUrls.length > 0) ? uploadedUrls : (invToSave.fileUrlsProgrammati || null);
-    invToSave.haAllegato = !!(invToSave.attachments?.length > 0 || invToSave.fileUrls?.length > 0);
-    
-    // Pulizia dei pesanti base64 prima di salvare in mem locale
-    delete invToSave.attachments; 
-    delete invToSave.fileData; 
-    delete invToSave.fileUrlsProgrammati;
+    function updateFilterUI() {
+        if (filtersGeneratedOnce) return; // For MVP, we generate only once on meaningful load to avoid cursor reset bugs or losing state
 
-    completedInterventions.push(invToSave);
-    
-    // Se stiamo per saturare il localStorage eliminiamo le foto Base64 appena dopo il salvataggio in Cloud
-    if (cloudSaveSuccess) {
-        completedInterventions.forEach(i => { delete i.fileData; });
+        const availableYears = new Set();
+        const availableTypes = new Set();
+        const availableCategories = new Set();
+        
+        appData.forEach(i => {
+            if (i.type) availableTypes.add(i.type);
+            if (i.category) availableCategories.add(i.category);
+            try {
+                const d = new Date(i.date);
+                if(!isNaN(d)) availableYears.add(d.getFullYear());
+            } catch(e){}
+        });
+
+        if(availableYears.size === 0) return; // No data
+
+        // Years
+        yearFiltersContainer.innerHTML = '';
+        const sortedYears = Array.from(availableYears).sort().reverse();
+        sortedYears.forEach(y => {
+            filterState.years.add(y); // Select all by default
+            yearFiltersContainer.innerHTML += `
+                <label>
+                    <input type="checkbox" class="flt-year" value="${y}" checked>
+                    ${y}
+                </label>
+            `;
+        });
+        
+        // Types
+        typeFiltersContainer.innerHTML = '';
+        const sortedTypes = Array.from(availableTypes).sort();
+        const typeLabels = {
+            'REVENUE_EUBIOS': 'RICAVI EUBIOS',
+            'COSTS_EUBIOS': 'COSTI EUBIOS',
+            'REVENUE_EUBIOTECH': 'RICAVI EUBIOTECH',
+            'COSTS_EUBIOTECH': 'COSTI EUBIOTECH',
+            'Costi risorse umane': 'COSTI RISORSE UMANE (EUBIOTECH) [Obs]', 'COGS_TECH': 'COSTI PERSONALE EUBIOTECH (Legacy)',
+            'Costi altri': 'COSTI ALTRI (EUBIOTECH) [Obs]', 'OPEX_TECH': 'ALTRI COSTI EUBIOTECH (Legacy)',
+            'REVENUE': 'RICAVI EUBIOS (Legacy)',
+            'COGS': 'COSTI EUBIOS (Legacy)',
+            'OPEX': 'ALTRI COSTI (Legacy)'
+        };
+        sortedTypes.forEach(t => {
+            filterState.types.add(t);
+            typeFiltersContainer.innerHTML += `
+                <label>
+                    <input type="checkbox" class="flt-type" value="${t}" checked>
+                    ${typeLabels[t] || t}
+                </label>
+            `;
+        });
+        
+        // Categories
+        categoryFiltersContainer.innerHTML = '';
+        const sortedCategories = Array.from(availableCategories).sort();
+        sortedCategories.forEach(c => {
+            filterState.categories.add(c);
+            categoryFiltersContainer.innerHTML += `
+                <label style="border: 1px solid #e2e8f0; padding: 0.25rem 0.5rem; border-radius: 4px; background: white;">
+                    <input type="checkbox" class="flt-category" value="${c}" checked>
+                    ${c}
+                </label>
+            `;
+        });
+
+        // Months
+        const months = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
+        monthFiltersContainer.innerHTML = '';
+        months.forEach((mLabel, index) => {
+            const mNum = index + 1;
+            monthFiltersContainer.innerHTML += `
+                <label>
+                    <input type="checkbox" class="flt-month" value="${mNum}" checked>
+                    ${mLabel}
+                </label>
+            `;
+        });
+
+        // Bind Events to checkboxes
+        document.querySelectorAll('.flt-year').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                const val = parseInt(e.target.value);
+                if(e.target.checked) filterState.years.add(val);
+                else filterState.years.delete(val);
+                renderTable(); // Re-render instantly
+            });
+        });
+
+        document.querySelectorAll('.flt-month').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                const val = parseInt(e.target.value);
+                if(e.target.checked) filterState.months.add(val);
+                else filterState.months.delete(val);
+                renderTable(); // Re-render instantly
+            });
+        });
+        
+        document.querySelectorAll('.flt-type').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                const val = e.target.value;
+                if(e.target.checked) filterState.types.add(val);
+                else filterState.types.delete(val);
+                renderTable(); // Re-render instantly
+            });
+        });
+        
+        document.querySelectorAll('.flt-category').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                const val = e.target.value;
+                if(e.target.checked) filterState.categories.add(val);
+                else filterState.categories.delete(val);
+                renderTable(); // Re-render instantly
+            });
+        });
+
+        filtersGeneratedOnce = true;
     }
-    saveState(); 
-    updateUI(); 
-    updateInterventiCount();
-    
-    // Reset Globale della Form e Componenti
-    newInterventionForm.reset();
-    inputKmPercorsi.value = ""; 
-    const dynamicContainer = document.getElementById('dynamicInterventionsContainer');
-    if (dynamicContainer) {
-        // Reinserisci il blocco iniziale vuoto sfruttando la funziona di init
-        initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
-    }
-    inputAllegato.value = ""; 
-    currentAttachments = [];
-    filePreviewContainer.innerHTML = '';
-    filePreviewContainer.classList.add('hidden');
-    inputAllegatoProgrammazione.value = "";
-    currentProgAttachments = [];
-    progPreviewContainer.innerHTML = '';
-    progPreviewContainer.classList.add('hidden');
 
-    btnStartIntervention.innerHTML = oldBtnText;
-    btnStartIntervention.disabled = false;
-    
-    interventionSection.classList.add('hidden'); // Chiude la scheda
-    
-    alert("Intervento salvato correttamente! ✅");
-});
-
-if(btnManualSyncMobile) {
-    btnManualSyncMobile.addEventListener('click', async () => {
-        const oldHtml = btnManualSyncMobile.innerHTML;
-        try {
-            btnManualSyncMobile.innerHTML = `<span class="btn-icon">⏳</span> RISOLUZIONE...`;
-            btnManualSyncMobile.disabled = true;
-            
-            // Forziamo il controllo della configurazione
-            if (!isFirebaseConfigured) {
-                alert("Errore: Firebase risulta non configurato in questo momento. Aspetta qualche secondo che si colleghi alla rete.");
+    // Quick Quarter Selectors
+    document.querySelectorAll('.quick-selects button').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            if (e.target.id === 'sel-all-categories') {
+                const allCatCbs = document.querySelectorAll('.flt-category');
+                allCatCbs.forEach(cb => {
+                    cb.checked = true;
+                    filterState.categories.add(cb.value);
+                });
+                renderTable();
                 return;
             }
-            
-            // Forziamo il flag per far scattare l'alert di debug in syncLocalDataToCloud
-            window._antimo_forcing_sync = true;
-            
-            const count = await syncLocalDataToCloud();
-            window._antimo_forcing_sync = false;
-            
-            if (count === 0) {
-                alert("Ottimo! Non ci sono dati bloccati sul tuo telefono. Tutto quello che hai registrato risulta già sincronizzato (oppure è stato perso dalla cache precedentemente).");
-            } else {
-                alert(`Perfetto! ${count} interventi bloccati sono stati salvati forzatamente nel Cloud!`);
+            if (e.target.id === 'desel-all-categories') {
+                const allCatCbs = document.querySelectorAll('.flt-category');
+                filterState.categories.clear();
+                allCatCbs.forEach(cb => cb.checked = false);
+                renderTable();
+                return;
             }
-            
-        } catch(e) {
-            alert("ERRORE DI RETE o PERMESSI FIREBASE: " + e.message);
-        } finally {
-            btnManualSyncMobile.innerHTML = oldHtml;
-            btnManualSyncMobile.disabled = false;
-        }
-    });
-}
 
-document.addEventListener('DOMContentLoaded', () => {
-    if(btnShareCSV) {
-        btnShareCSV.addEventListener('click', async () => {
-             // Generiamo CSV come nell'export
-            let interventiDaEsportare = completedInterventions;
-            if(isFirebaseConfigured) {
+            const q = e.target.getAttribute('data-q');
+            const allMonthsCbs = document.querySelectorAll('.flt-month');
+            
+            if (q) {
+                // Quarter button
+                const qNum = parseInt(q);
+                const targetMonths = [(qNum-1)*3 + 1, (qNum-1)*3 + 2, (qNum-1)*3 + 3]; // e.g Q1 -> 1,2,3
+                
+                filterState.months.clear();
+                targetMonths.forEach(m => filterState.months.add(m));
+
+                allMonthsCbs.forEach(cb => {
+                    cb.checked = targetMonths.includes(parseInt(cb.value));
+                });
+            } else if (e.target.id === 'sel-all-months') {
+                // Select all button
+                [1,2,3,4,5,6,7,8,9,10,11,12].forEach(m => filterState.months.add(m));
+                allMonthsCbs.forEach(cb => cb.checked = true);
+            }
+            renderTable();
+        });
+    });
+
+    groupBySelect.addEventListener('change', (e) => {
+        filterState.groupBy = e.target.value;
+        renderTable();
+    });
+
+    // Global Reset Filters (Dropdown Cancel Button)
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', () => {
+            // Restore default states
+            filterState.years.clear();
+            
+            filterState.months = new Set([1,2,3,4,5,6,7,8,9,10,11,12]);
+            
+            filterState.types.clear();
+            filterState.categories.clear();
+            filterState.descriptions.clear();
+            filterState.searchQuery = '';
+            filterState.sortCols = [{ col: 'date', dir: 'desc' }];
+            filterState.groupBy = 'year';
+            filterState.columnFilters = { type: '', category: '', description: '' };
+
+            const searchInput = document.getElementById('global-search-input');
+            if (searchInput) searchInput.value = '';
+            
+            const groupSelect = document.getElementById('group-by-select');
+            if (groupSelect) groupSelect.value = 'year';
+
+            appData.forEach(i => {
+                if (i.type) filterState.types.add(i.type);
+                if (i.category) filterState.categories.add(i.category);
+                if (i.description) filterState.descriptions.add(i.description);
                 try {
-                    btnShareCSV.innerHTML = `<span class="btn-icon">⏳</span> PREPARO...`;
-                    const snap = await getDocs(collection(db, "interventi"));
-                    const fetched = [];
-                    snap.forEach(doc => fetched.push(doc.data()));
-                    if(fetched.length > 0) {
-                        fetched.sort((a,b) => a.startTime - b.startTime);
-                        interventiDaEsportare = fetched;
+                    const d = new Date(i.date);
+                    if(!isNaN(d)) filterState.years.add(d.getFullYear());
+                } catch(e){}
+            });
+
+            // Update UI Checkboxes
+            document.querySelectorAll('.flt-year, .flt-month, .flt-type, .flt-category').forEach(cb => {
+                cb.checked = true;
+            });
+
+            // Close dropdown
+            const actionsDropdownContent = document.getElementById('actions-dropdown-content');
+            if(actionsDropdownContent) actionsDropdownContent.classList.remove('show');
+
+            renderTable();
+        });
+    }
+
+    // Toggle Filters Setion
+    if (toggleFiltersBtn && filterContainer) {
+        toggleFiltersBtn.addEventListener('click', () => {
+            if (filterContainer.style.display === 'none') {
+                filterContainer.style.display = 'grid';
+            } else {
+                filterContainer.style.display = 'none';
+            }
+            // Close dropdown menu manually after clicking
+            const actionsDropdownContent = document.getElementById('actions-dropdown-content');
+            if(actionsDropdownContent) actionsDropdownContent.classList.remove('show');
+        });
+    }
+
+    // --- POPOVER LOGIC ---
+    const popover = document.getElementById('category-popover');
+    const popoverContent = document.getElementById('popover-content');
+    const popoverClose = document.getElementById('close-popover');
+    const popoverSelAll = document.getElementById('popover-sel-all');
+    const popoverDeselAll = document.getElementById('popover-desel-all');
+    let currentPopoverTypes = [];
+    let currentPopoverFilterType = 'category';
+
+    function closePopover() {
+        if(popover) popover.classList.add('hidden');
+    }
+
+    if (popoverClose) popoverClose.addEventListener('click', closePopover);
+
+    document.addEventListener('click', (e) => {
+        if (popover && !popover.classList.contains('hidden') && !popover.contains(e.target) && !e.target.closest('.interactive-header')) {
+            closePopover();
+        }
+    });
+
+    function openPopoverForHeader(headerEl) {
+        currentPopoverFilterType = headerEl.getAttribute('data-filter-type') || 'category';
+        
+        const titleEl = document.querySelector('#category-popover h4');
+        if (titleEl) {
+            if (currentPopoverFilterType === 'year') titleEl.textContent = 'Filtra Anno';
+            else if (currentPopoverFilterType === 'month') titleEl.textContent = 'Filtra Mese';
+            else if (currentPopoverFilterType === 'quarter') titleEl.textContent = 'Filtra Trimestre';
+            else if (currentPopoverFilterType === 'type') titleEl.textContent = 'Filtra Tipo';
+            else if (currentPopoverFilterType === 'description') titleEl.textContent = 'Filtra Descrizione';
+            else titleEl.textContent = 'Filtra Causali';
+        }
+        
+        popoverContent.innerHTML = '';
+        
+        if (currentPopoverFilterType === 'year') {
+            const relevantYears = new Set();
+            appData.forEach(item => {
+                try {
+                    const d = new Date(item.date);
+                    if(!isNaN(d)) relevantYears.add(d.getFullYear());
+                } catch(e){}
+            });
+            
+            if (relevantYears.size === 0) {
+                popoverContent.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">Nessun anno trovato.</p>';
+            } else {
+                Array.from(relevantYears).sort((a,b)=>b-a).forEach(y => {
+                    const isChecked = filterState.years.has(y);
+                    const lbl = document.createElement('label');
+                    lbl.innerHTML = `<input type="checkbox" value="${y}" ${isChecked ? 'checked' : ''}> ${y}`;
+                    
+                    const cb = lbl.querySelector('input');
+                    cb.addEventListener('change', (e) => {
+                        const val = parseInt(y);
+                        if (e.target.checked) filterState.years.add(val);
+                        else filterState.years.delete(val);
+                        
+                        const mainCb = document.querySelector(`.flt-year[value="${val}"]`);
+                        if (mainCb) mainCb.checked = e.target.checked;
+                        
+                        renderTable();
+                    });
+                    
+                    popoverContent.appendChild(lbl);
+                });
+            }
+        } else if (currentPopoverFilterType === 'month' || currentPopoverFilterType === 'quarter') {
+            const isQuarter = currentPopoverFilterType === 'quarter';
+            const items = isQuarter ? [1, 2, 3, 4] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+            const monthNames = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
+            
+            items.forEach(val => {
+                let isChecked = false;
+                let labelText = '';
+                
+                if (isQuarter) {
+                    labelText = `Q${val}`;
+                    // A quarter is checked if all its 3 months are checked
+                    const qMonths = [(val-1)*3 + 1, (val-1)*3 + 2, (val-1)*3 + 3];
+                    isChecked = qMonths.every(m => filterState.months.has(m));
+                } else {
+                    labelText = monthNames[val-1];
+                    isChecked = filterState.months.has(val);
+                }
+
+                const lbl = document.createElement('label');
+                lbl.innerHTML = `<input type="checkbox" value="${val}" ${isChecked ? 'checked' : ''}> ${labelText}`;
+                
+                const cb = lbl.querySelector('input');
+                cb.addEventListener('change', (e) => {
+                    if (isQuarter) {
+                        const qNum = parseInt(val);
+                        const qMonths = [(qNum-1)*3 + 1, (qNum-1)*3 + 2, (qNum-1)*3 + 3];
+                        qMonths.forEach(m => {
+                            if (e.target.checked) filterState.months.add(m);
+                            else filterState.months.delete(m);
+                            const mainCb = document.querySelector(`.flt-month[value="${m}"]`);
+                            if (mainCb) mainCb.checked = e.target.checked;
+                        });
+                    } else {
+                        const mNum = parseInt(val);
+                        if (e.target.checked) filterState.months.add(mNum);
+                        else filterState.months.delete(mNum);
+                        const mainCb = document.querySelector(`.flt-month[value="${mNum}"]`);
+                        if (mainCb) mainCb.checked = e.target.checked;
                     }
-                } catch(e) { console.error("Cloud fetch share err", e); }
-            }
-            
-            if(interventiDaEsportare.length === 0) {
-                btnShareCSV.innerHTML = `<span class="btn-icon">📤</span> ESTRAI & CONDIVIDI`;
-                return alert("Nessun intervento da condividere.");
-            }
-
-            let header = ["Data", "Partenza", "Destinazione", "Tipo attivita", "Paziente / Ente", "Km A/R", "Dispositivi", "Matricola", "Note", "Ora Inizio", "Ora Fine", "Ha_Allegato", "URL_Allegato_Cloud"];
-            let csvContent = header.join(";") + "\n";
-            interventiDaEsportare.forEach(inv => {
-                let d = new Date(inv.startTime), e = new Date(inv.endTime);
-                let row = [
-                    `"${formatDateDMY(d)}"`, `"${inv.tipo}"`, `"${inv.destinazione.replace(/"/g, '""')}"`,
-                    `"${(inv.tipo + ' ' + inv.dispositivi + ' ' + inv.paziente + ' ' + inv.destinazione).trim().replace(/"/g, '""')}"`,
-                    `"${inv.paziente.replace(/"/g, '""')}"`, `"${inv.kmPercorsi}"`, `"${inv.dispositivi.replace(/"/g, '""')}"`, `"${inv.matricola ? inv.matricola.replace(/"/g, '""') : ''}"`,
-                    `"${inv.note.replace(/"/g, '""')}"`, `"${padZ(d.getHours())}:${padZ(d.getMinutes())}"`, `"${padZ(e.getHours())}:${padZ(e.getMinutes())}"`,
-                    `"${inv.haAllegato ? 'SI' : 'NO'}"`, `"${inv.fileUrl || ""}"`
-                ];
-                csvContent += row.join(";") + "\n";
-            });
-
-            try {
-                // Su Android/PWA a volte i blob CSV generati a runtime vengono bloccati dalle policy di sicurezza.
-                // Proviamo a condividere direttamente il testo ben formattato a WhatsApp/Telegram
-                let textShare = "📝 *REPORT ATTIVITÀ:*\n\n";
-                interventiDaEsportare.forEach(inv => {
-                    let d = new Date(inv.startTime), e = new Date(inv.endTime);
-                    textShare += `🔹 *${inv.paziente}* (${inv.destinazione})\n` +
-                                 `   ⌚ ${padZ(d.getHours())}:${padZ(d.getMinutes())} - ${padZ(e.getHours())}:${padZ(e.getMinutes())} | Km: ${inv.kmPercorsi}\n` +
-                                 `   📌 ${inv.tipo} (${inv.dispositivi})\n`;
-                    if(inv.fileUrl) textShare += `   📎 Link: ${inv.fileUrl}\n`;
-                    if(inv.note) textShare += `   📝 Note: ${inv.note}\n`;
-                    textShare += "\n";
+                    renderTable();
                 });
-
-                if (navigator.share) {
-                    await navigator.share({
-                        title: 'Attività Giornata',
-                        text: textShare
-                    });
-                } else {
-                    // Fallback
-                    const blob = new Blob(["\uFEFF"+csvContent], { type: 'text/csv;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `Attivita_Esterne_${formatDateDMY(new Date())}.csv`;
-                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                }
-            } catch(err) {
-                 console.error(err);
-            } finally {
-                btnShareCSV.innerHTML = `<span class="btn-icon">📤</span> ESTRAI & CONDIVIDI`;
-            }
-        });
-    }
-});
-
-if(btnViewActivities) {
-    btnViewActivities.addEventListener('click', () => {
-        if(activitiesListContainer.classList.contains('hidden')) {
-            activitiesListContainer.classList.remove('hidden');
-            renderActivitiesList();
-            btnViewActivities.innerHTML = `<span class="btn-icon">🙈</span> NASCONDI ATTIVITÀ`;
-        } else {
-            activitiesListContainer.classList.add('hidden');
-            btnViewActivities.innerHTML = `<span class="btn-icon">👁</span> VISUALIZZA ATTIVITÀ`;
-        }
-    });
-}
-
-function renderActivitiesList() {
-    activitiesList.innerHTML = '';
-    
-    // Filtrare per data odierna (Mezzanotte)
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const endOfToday = startOfToday + 24 * 60 * 60 * 1000 - 1;
-
-    // 1. Interventi Programmati (Da fare oggi) - Rossi
-    const targetFilter = filterTecnicoOggi ? filterTecnicoOggi.value : "MIO";
-    const myName = localStorage.getItem('antimo_user_name') || "";
-    const filterName = targetFilter === "MIO" ? myName : targetFilter;
-
-    const toDO = plannedInterventions.filter(inv => {
-        if (inv.status !== 'planned') return false;
-        
-        if (targetFilter !== "TUTTI") {
-            if (inv.tecnicoAssegnato && inv.tecnicoAssegnato !== filterName) return false;
-            if (!inv.tecnicoAssegnato) return false; // Nascondi quelli non assegnati se il filtro MIO è attivo
-        }
-
-        if (inv.dataPrevista) {
-            const dpString = inv.dataPrevista; // "YYYY-MM-DD"
-            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-            if (isNesegVisible) {
-                // Return all past and present missed
-                return dpString <= todayStr;
-            } else {
-                // Default Oggi view
-                return dpString === todayStr;
-            }
-        }
-        return false;
-    });
-
-    // 2. Interventi Completati (Eseguiti oggi) - Verdi
-    
-    let done = [];
-    if (!isNesegVisible) {
-        if (targetFilter === "MIO" || targetFilter === "" || !window.firebaseEseguitiOggi) {
-            done = completedInterventions.filter(inv => {
-                const d = new Date(inv.startTime).getTime();
-                return (d >= startOfToday && d <= endOfToday);
+                
+                popoverContent.appendChild(lbl);
             });
-        } else {
-            if (targetFilter === "TUTTI") {
-                done = window.firebaseEseguitiOggi;
-            } else {
-                done = window.firebaseEseguitiOggi.filter(inv => inv.operatore === targetFilter);
-            }
-            // Ordiniamo
-            done.sort((a,b) => a.startTime - b.startTime);
-        }
-    }
-
-    if (isEseguitiVisible) {
-        toDO.length = 0; // Svuotiamo Rossi
-    }
-
-    if(toDO.length === 0 && done.length === 0) {
-        activitiesList.innerHTML = '<p style="text-align:center; color:gray; font-size:0.9rem;">Nessuna attività programmata o eseguita per oggi.</p>';
-        return;
-    }
-
-    // Rendering DA FARE (Rossi)
-    if(toDO.length > 0) {
-        const title1 = document.createElement('h4');
-        title1.style.cssText = "color: #ef4444; margin-bottom: 8px;";
-        title1.innerText = "🔴 DA FARE OGGI";
-        activitiesList.appendChild(title1);
-
-        toDO.forEach((inv, index) => {
-            const origIndex = plannedInterventions.findIndex(p => p.id === inv.id);
-            const div = document.createElement('div');
-            div.className = "card-item-container";
-            div.style.borderLeft = "4px solid #ef4444";
+        } else if (currentPopoverFilterType === 'category') {
+            const typesAttr = headerEl.getAttribute('data-type');
+            const filterTypes = typesAttr ? typesAttr.split(',') : [];
+            const hasTypeFilter = filterTypes.length > 0;
             
-            let fileBadget = (inv.fileUrlsProgrammati && inv.fileUrlsProgrammati.length > 0) ? `<span style="font-size:0.8rem; background:var(--orange-light); color:white; padding:2px 5px; border-radius:4px; margin-left:5px;">📎</span>` : '';
-            
-            let attachHtml = '';
-            if (inv.fileUrlsProgrammati && inv.fileUrlsProgrammati.length > 0) {
-                attachHtml = `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dotted #ccc;">
-                    <strong>📎 Allegati Sede:</strong><br>
-                    ${inv.fileUrlsProgrammati.map((url, i) => `<a href="${url}" target="_blank" style="color: var(--blue-primary); font-size: 0.85rem; text-decoration: underline;">Allegato ${i+1}</a>`).join('<br>')}
-                </div>`;
-            }
-
-            const showOra = inv.oraPrevista ? ` ore ${inv.oraPrevista}` : '';
-            div.innerHTML = `
-                <div class="card-compact-view">
-                    <div style="flex:1;">
-                        <div style="font-size:0.80rem; color:red; margin-bottom:4px;"><strong>⏳ PROGRAMMATO${showOra}</strong></div>
-                        <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${inv.paziente} ${fileBadget}</div>
-                        <div style="font-size:0.85rem; color:#555;">📍 ${inv.localita || inv.destinazione} | 🔧 ${window.decodeCodeToLabel(inv.tipo, 'interventi')}</div>
-                    </div>
-                    <div style="display: flex; gap: 8px; align-items: center; padding-left: 10px;">
-                        <button class="btn btn-primary btn-orange btn-sm" style="padding:6px 10px; font-size:0.8rem; line-height:1; min-width:auto;" data-action="avvia" data-index="${origIndex}">▶ AVVIA</button>
-                        <span class="expand-icon" style="font-size:1.2rem; color:var(--blue-light); padding:10px;">▼</span>
-                    </div>
-                </div>
-                
-                <div class="card-expanded-view hidden">
-                    <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${inv.indirizzo || ''}</div>
-                    <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${inv.telefono || '-'}</div>
-                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi') || 'Nessuno'}</div>
-                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Matricola:</strong> ${inv.matricola || 'N/D'}</div>
-                    <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:5px;"><strong>Note:</strong> ${inv.note || 'Nessuna'}</div>
-                    <div style="font-size:0.85rem; color:#0f172a; margin-top:5px; padding-bottom:10px;"><strong>⏳ Prog. da:</strong> ${inv.programmatoDa || 'N/D'}</div>
-                    ${attachHtml}
-                </div>
-            `;
-            
-            setupAccordionCard(div);
-            
-            div.querySelector('button[data-action="avvia"]').addEventListener('click', () => {
-                const dataToLoad = plannedInterventions[origIndex];
-                
-                // Trapping the origin ID so we can formally close it in DB upon Save
-                activeProgFbId = dataToLoad.idFb || dataToLoad.id || null;
-                activeProgItem = dataToLoad;
-            
-            // Popoliamo il form coi blocchi dinamici
-            const container = document.getElementById('dynamicInterventionsContainer');
-            if (container) {
-                const hooks = initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
-                container.innerHTML = '';
-                if (dataToLoad.interventiList && dataToLoad.interventiList.length > 0) {
-                    dataToLoad.interventiList.forEach(item => hooks.addBlock(item));
-                } else {
-                    hooks.addBlock({ tipo: dataToLoad.tipo, disp: dataToLoad.dispositivi, mat: dataToLoad.matricola||"" });
+            const relevantCategories = new Set();
+            appData.forEach(item => {
+                if (!hasTypeFilter || filterTypes.includes(item.type)) {
+                    relevantCategories.add(item.category || 'Generico');
                 }
-            }
-
-            iPaziente.value = dataToLoad.paziente || "";
-            if(iLocalita) iLocalita.value = dataToLoad.localita || dataToLoad.destinazione || "";
-            if(iIndirizzo) iIndirizzo.value = dataToLoad.indirizzo || "";
-            if(iTelefono) iTelefono.value = dataToLoad.telefono || "";
-            
-            if(iNote) iNote.value = dataToLoad.note || "";
-            pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
-
-                plannedInterventions.splice(origIndex, 1);
-                saveState();
-                updateUI();
-                activitiesListContainer.classList.add('hidden');
-                btnViewActivities.innerHTML = `<span class="btn-icon">📅</span> INTERVENTI DELLA GIORNATA`;
-                interventionSection.classList.remove('hidden');
-                interventionSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                alert("Dati caricati nel form! Adesso clicca su 'TERMINA ATTIVITA'' quando finisci il lavoro.");
             });
-            
-            activitiesList.appendChild(div);
-        });
-    }
 
-    // Rendering ESEGUITI (Verdi)
-    if(done.length > 0) {
-        const title2 = document.createElement('h4');
-        title2.style.cssText = "color: #22c55e; margin-bottom: 8px; margin-top: 15px;";
-        title2.innerText = "✅ ESEGUITI OGGI";
-        activitiesList.appendChild(title2);
-
-        // Mostriamo dalla più recente alla più vecchia
-        const revList = [...done].reverse();
-        revList.forEach(inv => {
-            const d = new Date(inv.startTime);
-            const e = new Date(inv.endTime);
-            const div = document.createElement('div');
-            div.className = "card-item-container";
-            div.style.borderLeft = "4px solid #22c55e";
-            
-            let fileBadget = inv.haAllegato ? `<span style="font-size:0.8rem; background:var(--blue-light); color:white; padding:2px 5px; border-radius:4px; margin-left:5px;">📎</span>` : '';
-            
-            let attachHtml = '';
-            if (inv.fileUrls && inv.fileUrls.length > 0) {
-                attachHtml = `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dotted #ccc;">
-                    <strong>📎 Allegati:</strong><br>
-                    ${inv.fileUrls.map((url, i) => `<a href="${url}" target="_blank" style="color: var(--blue-primary); font-size: 0.85rem; text-decoration: underline;">Allegato ${i+1}</a>`).join('<br>')}
-                </div>`;
-            }
-
-            div.innerHTML = `
-                <div class="card-compact-view">
-                    <div style="flex:1;">
-                        <div style="font-size:0.80rem; color:#22c55e; margin-bottom:4px;"><strong>✅ Dalle ${padZ(d.getHours())}:${padZ(d.getMinutes())} alle ${padZ(e.getHours())}:${padZ(e.getMinutes())}</strong></div>
-                        <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${inv.paziente} ${fileBadget}</div>
-                        <div style="font-size:0.85rem; color:#555;">📍 ${inv.localita || inv.destinazione} | 🔧 ${window.decodeCodeToLabel(inv.tipo, 'interventi')}</div>
-                        ${inv.operatore && inv.operatore !== myName ? `<div style="font-size:0.80rem; color:#8b5cf6; margin-top:2px;">👨‍🔧 Eseguito da: <strong>${inv.operatore}</strong></div>` : ''}
-                    </div>
-                    <div style="display: flex; gap: 8px; align-items: center; padding-left: 10px;">
-                        <span class="expand-icon" style="font-size:1.2rem; color:var(--blue-light); padding:10px;">▼</span>
-                    </div>
-                </div>
-                
-                <div class="card-expanded-view hidden">
-                    <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${inv.indirizzo || ''}</div>
-                    <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${inv.telefono || '-'}</div>
-                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi') || 'Nessuno'}</div>
-                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Matricola:</strong> ${inv.matricola || 'N/D'}</div>
-                    <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${inv.note || 'Nessuna'}</div>
-                    <div style="font-size:0.85rem; color:#15803d; margin-top:5px;"><strong>Km A/R:</strong> ${inv.kmPercorsi || '0'}</div>
-                    ${attachHtml}
-                </div>
-            `;
-            
-            setupAccordionCard(div);
-            activitiesList.appendChild(div);
-        });
-    }
-}
-
-// --- RUBRICA SMS IPHONE / ANDROID ---
-const btnOpenRubrica = document.getElementById('btnOpenRubrica');
-const rubricaModal = document.getElementById('rubricaModal');
-const btnCloseRubrica = document.getElementById('btnCloseRubrica');
-const newRubricaForm = document.getElementById('newRubricaForm');
-const rubricaNome = document.getElementById('rubricaNome');
-const rubricaTelefono = document.getElementById('rubricaTelefono');
-const rubricaList = document.getElementById('rubricaList');
-
-let localeRubrica = JSON.parse(localStorage.getItem('antimo_rubrica')) || [];
-
-function renderRubrica() {
-    if(!rubricaList) return;
-    rubricaList.innerHTML = '';
-    if(localeRubrica.length === 0) {
-        rubricaList.innerHTML = '<div style="text-align: center; color: #666; font-size: 0.9rem; padding: 10px;">Nessun contatto salvato in rubrica. Aggiungine uno qui sopra!</div>';
-        return;
-    }
-    
-    localeRubrica.forEach((contatto, i) => {
-        const div = document.createElement('div');
-        div.style.cssText = "display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; background: #f9fafb; border-radius: 6px;";
-        div.innerHTML = `
-            <div style="flex: 1;">
-                <strong style="color: var(--blue-dark); font-size: 1rem;">${contatto.nome}</strong><br>
-                <a href="tel:${contatto.numero}" style="font-size: 0.85rem; color: #555; text-decoration: none;">📞 ${contatto.numero}</a>
-            </div>
-            <div style="display: flex; gap: 8px;">
-                <button class="btn btn-primary btn-sm btn-invia-sms" style="background:var(--orange); border:none; padding:8px 12px; font-weight: bold;" data-tel="${contatto.numero}">InvSMS</button>
-                <button class="btn btn-danger btn-sm btn-elimina-rubrica" style="padding:8px 12px; font-weight: bold;" data-index="${i}">✖</button>
-            </div>
-        `;
-        rubricaList.appendChild(div);
-    });
-    
-    document.querySelectorAll('.btn-elimina-rubrica').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const idx = e.target.getAttribute('data-index');
-            if(confirm('Eliminare questo contatto dalla rubrica?')) {
-                localeRubrica.splice(idx, 1);
-                localStorage.setItem('antimo_rubrica', JSON.stringify(localeRubrica));
-                renderRubrica();
-            }
-        });
-    });
-    
-    document.querySelectorAll('.btn-invia-sms').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const tel = e.target.getAttribute('data-tel');
-            const msgT = document.getElementById('msgText');
-            let bodyText = encodeURIComponent(msgT && msgT.value.trim() ? msgT.value.trim() : "Notifica dall'app.");
-            
-            const os = navigator.userAgent.toLowerCase();
-            if(os.includes("iphone") || os.includes("ipad")) {
-                 window.location.href = `sms:${tel}&body=${bodyText}`;
+            if (relevantCategories.size === 0) {
+                popoverContent.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">Nessuna causale trovata.</p>';
             } else {
-                 window.location.href = `sms:${tel}?body=${bodyText}`;
-            }
-        });
-    });
-}
-
-if(btnOpenRubrica) {
-    btnOpenRubrica.addEventListener('click', () => {
-        renderRubrica();
-        rubricaModal.classList.remove('hidden');
-    });
-}
-if(btnCloseRubrica) {
-    btnCloseRubrica.addEventListener('click', () => {
-        rubricaModal.classList.add('hidden');
-    });
-}
-
-const btnOpenUsersList = document.getElementById('btnOpenUsersList');
-const appUsersModal = document.getElementById('appUsersModal');
-const btnCloseUsersList = document.getElementById('btnCloseUsersList');
-const appUsersList = document.getElementById('appUsersList');
-
-async function renderAppUsersList() {
-    if (!appUsersList) return;
-    appUsersList.innerHTML = '<div style="text-align: center; color: #666; font-size: 0.9rem;">Caricamento dipendenti in corso...</div>';
-    try {
-        if (!isFirebaseConfigured) {
-            appUsersList.innerHTML = '<div style="text-align: center; color: red; font-size: 0.9rem;">Firebase non configurato.</div>';
-            return;
-        }
-        const { collection, getDocs, query, where } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        const q = query(collection(db, "anagrafiche"), where("localita", "==", "App (Dipendente)"));
-        const snap = await getDocs(q);
-        
-        let usersHtml = '';
-        snap.forEach(doc => {
-            const data = doc.data();
-            const currentRole = data.ruolo || "";
-            const rolesOptions = (window.antimoDropdownLists && window.antimoDropdownLists.ruoli) 
-                ? window.antimoDropdownLists.ruoli.map(r => `<option value="${r.id}" ${currentRole === r.id ? "selected" : ""}>${r.desc}</option>`).join('')
-                : '';
-                
-            usersHtml += `
-            <div style="padding: 10px; border-bottom: 1px solid #eee; background: #f9fafb; border-radius: 6px; display:flex; flex-direction:column; gap:4px;">
-                <strong style="color: var(--blue-dark); font-size: 1rem;">${data.nome} ${data.cognome}</strong>
-                <a href="mailto:${data.email}" style="font-size: 0.85rem; color: var(--blue-primary); text-decoration: none;">📧 ${data.email}</a>
-                <a href="tel:${data.telefono1 || ''}" style="font-size: 0.85rem; color: #555; text-decoration: none;">📞 ${data.telefono1 || 'Nessun Telefono'}</a>
-                <div style="margin-top: 5px; font-size: 0.85rem;">
-                    <label>Ruolo:</label>
-                    <select onchange="window.updateUserRole('${doc.id}', this.value)" style="padding: 4px; border-radius: 4px; border: 1px solid #ccc; background: white; margin-left: 5px;">
-                        <option value="" ${currentRole === "" ? "selected" : ""}>Nessun Ruolo</option>
-                        ${rolesOptions}
-                    </select>
-                </div>
-            </div>
-            `;
-        });
-        
-        if (!usersHtml) {
-            appUsersList.innerHTML = '<div style="text-align: center; color: #666; font-size: 0.9rem;">Nessun dipendente registrato.</div>';
-        } else {
-            appUsersList.innerHTML = usersHtml;
-        }
-    } catch(err) {
-        console.error("Errore caricamento utenti", err);
-        appUsersList.innerHTML = '<div style="text-align: center; color: red; font-size: 0.9rem;">Errore caricamento.</div>';
-    }
-}
-
-window.updateUserRole = async function(docId, newRole) {
-    try {
-        const { doc: fsDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        await updateDoc(fsDoc(db, "anagrafiche", docId), { ruolo: newRole });
-    } catch(err) {
-        console.error("Errore salvataggio ruolo", err);
-        alert("Errore salvataggio ruolo.");
-    }
-};
-
-if(btnOpenUsersList) {
-    btnOpenUsersList.addEventListener('click', () => {
-        appUsersModal.classList.remove('hidden');
-        renderAppUsersList();
-    });
-}
-if(btnCloseUsersList) {
-    btnCloseUsersList.addEventListener('click', () => {
-        appUsersModal.classList.add('hidden');
-    });
-}
-
-if(newRubricaForm) {
-    newRubricaForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        localeRubrica.push({
-            nome: rubricaNome.value.trim(),
-            numero: rubricaTelefono.value.trim()
-        });
-        localStorage.setItem('antimo_rubrica', JSON.stringify(localeRubrica));
-        rubricaNome.value = '';
-        rubricaTelefono.value = '';
-        renderRubrica();
-    });
-}
-
-// Auth Check e Login Aziendale
-async function checkLoginStatus() {
-    const userEmail = localStorage.getItem('antimo_user_email');
-    if (!userEmail) {
-        document.getElementById('loginModal').classList.remove('hidden');
-    } else {
-        let userName = localStorage.getItem('antimo_user_name');
-        
-        // MIGRATION: Retroactively assign antimo_user_name for users logged in before the update
-        if (!userName && userEmail.includes('@eubios.it')) {
-            try {
-                const parts = userEmail.split('@')[0].split('.');
-                let nome = parts[0] || '';
-                let cognome = parts.length > 1 ? parts[1] : '';
-                nome = nome ? nome.charAt(0).toUpperCase() + nome.slice(1) : '';
-                cognome = cognome ? cognome.charAt(0).toUpperCase() + cognome.slice(1) : '';
-                userName = (nome + ' ' + cognome).trim();
-                if(userName) localStorage.setItem('antimo_user_name', userName);
-            } catch(e) {
-                console.error("Migration error user name", e);
-            }
-        }
-        
-        if (!userName) userName = userEmail;
-
-        const userNameDisp = document.getElementById('loggedInUserDisplay');
-        if (userNameDisp) {
-            userNameDisp.innerText = `👤 ${userName}`;
-        }
-    }
-}
-
-const loginForm = document.getElementById('loginForm');
-if (loginForm) {
-    loginForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const email = document.getElementById('loginEmail').value.trim().toLowerCase();
-        const phone = document.getElementById('loginPhone').value.trim();
-        const errDiv = document.getElementById('loginError');
-        const btnLoginSubmit = document.getElementById('btnLoginSubmit');
-        
-        const emailRegex = /^[a-z]+\.[a-z]+@eubios\.it$/;
-        
-        if (!emailRegex.test(email)) {
-            errDiv.textContent = "Accesso negato. Usa formato valido: nome.cognome@eubios.it";
-            errDiv.style.display = "block";
-            return;
-        }
-        
-        errDiv.style.display = "none";
-        btnLoginSubmit.disabled = true;
-        btnLoginSubmit.innerHTML = "VERIFICA IN CORSO...";
-        
-        try {
-            const parts = email.split('@')[0].split('.');
-            let nome = parts[0] || '';
-            let cognome = parts.length > 1 ? parts[1] : '';
-            
-            nome = nome ? nome.charAt(0).toUpperCase() + nome.slice(1) : '';
-            cognome = cognome ? cognome.charAt(0).toUpperCase() + cognome.slice(1) : '';
-            const fullName = (nome + ' ' + cognome).trim();
-            
-            if (isFirebaseConfigured) {
-                const { collection, query, where, getDocs, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                const q = query(collection(db, "anagrafiche"), where("email", "==", email));
-                const snap = await getDocs(q);
-                
-                if (snap.empty) {
-                    await addDoc(collection(db, "anagrafiche"), {
-                        id: Date.now().toString(),
-                        timestamp: serverTimestamp(),
-                        nome: nome,
-                        cognome: cognome,
-                        email: email,
-                        telefono1: phone,
-                        localita: "App (Dipendente)",
-                        indirizzo: "-",
-                        codiceFiscale: "",
-                        provincia: ""
+                Array.from(relevantCategories).sort().forEach(c => {
+                    const isChecked = filterState.categories.has(c);
+                    const lbl = document.createElement('label');
+                    lbl.innerHTML = `<input type="checkbox" value="${c}" ${isChecked ? 'checked' : ''}> ${c}`;
+                    
+                    const cb = lbl.querySelector('input');
+                    cb.addEventListener('change', (e) => {
+                        if (e.target.checked) filterState.categories.add(c);
+                        else filterState.categories.delete(c);
+                        
+                        const mainCb = document.querySelector(`.flt-category[value="${c}"]`);
+                        if (mainCb) mainCb.checked = e.target.checked;
+                        
+                        renderTable();
                     });
-                }
-            }
-            localStorage.setItem('antimo_user_email', email);
-            localStorage.setItem('antimo_user_phone', phone);
-            localStorage.setItem('antimo_user_name', fullName);
-            
-            document.getElementById('loginModal').classList.add('hidden');
-        } catch(err) {
-            console.error("Errore login / anagrafiche", err);
-            errDiv.textContent = "Errore di connessione al database.";
-            errDiv.style.display = "block";
-            btnLoginSubmit.disabled = false;
-            btnLoginSubmit.innerHTML = "AUTENTICATI";
-        }
-    });
-}
-checkLoginStatus();
-
-// Inizializzazione Globale
-initApp();
-
-// ========================================================
-// REPARTO DATA BACKUP & RIPRISTINO (Esportazione Cloud .json)
-// ========================================================
-const btnOpenDataBackup = document.getElementById('btnOpenDataBackup');
-const dataBackupModal = document.getElementById('dataBackupModal');
-const btnCloseDataBackup = document.getElementById('btnCloseDataBackup');
-const btnExportDataJson = document.getElementById('btnExportDataJson');
-const btnImportDataJson = document.getElementById('btnImportDataJson');
-const importDataFile = document.getElementById('importDataFile');
-
-if(btnOpenDataBackup) {
-    btnOpenDataBackup.addEventListener('click', () => {
-        if(dataBackupModal) dataBackupModal.classList.remove('hidden');
-        const settingsModal = document.getElementById('settingsModal');
-        if(settingsModal) settingsModal.classList.add('hidden');
-    });
-}
-if(btnCloseDataBackup) {
-    btnCloseDataBackup.addEventListener('click', () => {
-        if(dataBackupModal) dataBackupModal.classList.add('hidden');
-    });
-}
-
-if(btnExportDataJson) {
-    btnExportDataJson.addEventListener('click', async () => {
-        if(!isFirebaseConfigured) { alert("Firebase non configurato! Nessun database reperibile."); return; }
-        try {
-            btnExportDataJson.textContent = "Elaborazione in corso...";
-            btnExportDataJson.disabled = true;
-            
-            const { getDocs, collection } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-            
-            const collectionsToExport = ["interventi", "programmati", "messaggi", "anagrafiche"];
-            const exportData = {};
-            
-            for(let collName of collectionsToExport) {
-                exportData[collName] = [];
-                const snap = await getDocs(collection(db, collName));
-                snap.forEach(d => {
-                    exportData[collName].push({ __firebaseDocId: d.id, ...d.data() });
+                    
+                    popoverContent.appendChild(lbl);
                 });
             }
+        } else if (currentPopoverFilterType === 'type') {
+            const relevantTypes = new Set();
+            appData.forEach(item => {
+                if(item.type) relevantTypes.add(item.type);
+            });
+
+            if (relevantTypes.size === 0) {
+                popoverContent.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">Nessun tipo trovato.</p>';
+            } else {
+                const typeLabels = {
+                    'REVENUE_EUBIOS': 'RICAVI EUBIOS',
+                    'COSTS_EUBIOS': 'COSTI EUBIOS',
+                    'REVENUE_EUBIOTECH': 'RICAVI EUBIOTECH',
+                    'COSTS_EUBIOTECH': 'COSTI EUBIOTECH',
+                    'Costi risorse umane': 'COSTI RISORSE UMANE (EUBIOTECH) [Obs]', 'COGS_TECH': 'COSTI PERSONALE EUBIOTECH (Legacy)',
+                    'Costi altri': 'COSTI ALTRI (EUBIOTECH) [Obs]', 'OPEX_TECH': 'ALTRI COSTI EUBIOTECH (Legacy)',
+                    'REVENUE': 'RICAVI EUBIOS (Legacy)',
+                    'COGS': 'COSTI EUBIOS (Legacy)',
+                    'OPEX': 'ALTRI COSTI (Legacy)'
+                };
+                Array.from(relevantTypes).sort().forEach(t => {
+                    const isChecked = filterState.types.has(t);
+                    const lbl = document.createElement('label');
+                    lbl.innerHTML = `<input type="checkbox" value="${t}" ${isChecked ? 'checked' : ''}> ${typeLabels[t] || t}`;
+                    
+                    const cb = lbl.querySelector('input');
+                    cb.addEventListener('change', (e) => {
+                        if (e.target.checked) filterState.types.add(t);
+                        else filterState.types.delete(t);
+                        
+                        const mainCb = document.querySelector(`.flt-type[value="${t}"]`);
+                        if (mainCb) mainCb.checked = e.target.checked;
+                        
+                        renderTable();
+                    });
+                    
+                    popoverContent.appendChild(lbl);
+                });
+            }
+        } else if (currentPopoverFilterType === 'description') {
+            const relevantDesc = new Set();
+            appData.forEach(item => {
+                if(item.description && item.description.trim() !== '') relevantDesc.add(item.description);
+            });
+
+            if (relevantDesc.size === 0) {
+                popoverContent.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">Nessuna descrizione trovata.</p>';
+            } else {
+                Array.from(relevantDesc).sort().forEach(d => {
+                    const isChecked = filterState.descriptions.has(d);
+                    const lbl = document.createElement('label');
+                    lbl.innerHTML = `<input type="checkbox" value="${d}" ${isChecked ? 'checked' : ''}> ${d}`;
+                    
+                    const cb = lbl.querySelector('input');
+                    cb.addEventListener('change', (e) => {
+                        if (e.target.checked) filterState.descriptions.add(d);
+                        else filterState.descriptions.delete(d);
+                        
+                        renderTable();
+                    });
+                    
+                    popoverContent.appendChild(lbl);
+                });
+            }
+        }
+
+        const rect = headerEl.getBoundingClientRect();
+        popover.style.top = (rect.bottom + window.scrollY + 5) + 'px';
+        popover.style.left = (rect.left + window.scrollX) + 'px';
+        popover.classList.remove('hidden');
+    }
+
+    if(popoverSelAll) {
+        popoverSelAll.addEventListener('click', () => {
+            const cbs = popoverContent.querySelectorAll('input[type="checkbox"]');
+            cbs.forEach(cb => {
+                if(!cb.checked) {
+                    cb.checked = true;
+                    if (currentPopoverFilterType === 'year') {
+                        const val = parseInt(cb.value);
+                        filterState.years.add(val);
+                        const mainCb = document.querySelector(`.flt-year[value="${val}"]`);
+                        if(mainCb) mainCb.checked = true;
+                    } else if (currentPopoverFilterType === 'month') {
+                        const mNum = parseInt(cb.value);
+                        filterState.months.add(mNum);
+                        const mainCb = document.querySelector(`.flt-month[value="${mNum}"]`);
+                        if(mainCb) mainCb.checked = true;
+                    } else if (currentPopoverFilterType === 'quarter') {
+                        const qNum = parseInt(cb.value);
+                        const qMonths = [(qNum-1)*3 + 1, (qNum-1)*3 + 2, (qNum-1)*3 + 3];
+                        qMonths.forEach(m => {
+                            filterState.months.add(m);
+                            const mainCb = document.querySelector(`.flt-month[value="${m}"]`);
+                            if(mainCb) mainCb.checked = true;
+                        });
+                    } else if (currentPopoverFilterType === 'type') {
+                        filterState.types.add(cb.value);
+                        const mainCb = document.querySelector(`.flt-type[value="${cb.value}"]`);
+                        if(mainCb) mainCb.checked = true;
+                    } else if (currentPopoverFilterType === 'description') {
+                        filterState.descriptions.add(cb.value);
+                    } else {
+                        filterState.categories.add(cb.value);
+                        const mainCb = document.querySelector(`.flt-category[value="${cb.value}"]`);
+                        if(mainCb) mainCb.checked = true;
+                    }
+                }
+            });
+            renderTable();
+        });
+    }
+
+    if(popoverDeselAll) {
+        popoverDeselAll.addEventListener('click', () => {
+             const cbs = popoverContent.querySelectorAll('input[type="checkbox"]');
+             cbs.forEach(cb => {
+                 if(cb.checked) {
+                     cb.checked = false;
+                     if (currentPopoverFilterType === 'year') {
+                         const val = parseInt(cb.value);
+                         filterState.years.delete(val);
+                         const mainCb = document.querySelector(`.flt-year[value="${val}"]`);
+                         if(mainCb) mainCb.checked = false;
+                     } else if (currentPopoverFilterType === 'month') {
+                         const mNum = parseInt(cb.value);
+                         filterState.months.delete(mNum);
+                         const mainCb = document.querySelector(`.flt-month[value="${mNum}"]`);
+                         if(mainCb) mainCb.checked = false;
+                     } else if (currentPopoverFilterType === 'quarter') {
+                         const qNum = parseInt(cb.value);
+                         const qMonths = [(qNum-1)*3 + 1, (qNum-1)*3 + 2, (qNum-1)*3 + 3];
+                         qMonths.forEach(m => {
+                             filterState.months.delete(m);
+                             const mainCb = document.querySelector(`.flt-month[value="${m}"]`);
+                             if(mainCb) mainCb.checked = false;
+                         });
+                     } else if (currentPopoverFilterType === 'type') {
+                         filterState.types.delete(cb.value);
+                         const mainCb = document.querySelector(`.flt-type[value="${cb.value}"]`);
+                         if(mainCb) mainCb.checked = false;
+                     } else if (currentPopoverFilterType === 'description') {
+                         filterState.descriptions.delete(cb.value);
+                     } else {
+                         filterState.categories.delete(cb.value);
+                         const mainCb = document.querySelector(`.flt-category[value="${cb.value}"]`);
+                         if(mainCb) mainCb.checked = false;
+                     }
+                 }
+             });
+             renderTable();
+        });
+    }
+
+    // 4. Save Data helper (To Local & Cloud)
+    async function saveData(bypassCloudSync = false, affectedItem = null) {
+        try {
+            // Always keep local cache for offline/instant load
+            localStorage.setItem(DATA_KEY, JSON.stringify(appData));
+            renderTable();
             
-            const jsonStr = JSON.stringify(exportData, null, 2);
-            const blob = new Blob([jsonStr], { type: "application/json" });
+            // se non sto facendo operazioni massive come reset totali, aggiorno il cloud sul singolo item
+            if (!bypassCloudSync && affectedItem) {
+                // If the item exists in our array but we want to update/add to cloud
+                const docRef = dataCollection.doc(affectedItem.id);
+                await docRef.set(affectedItem);
+            }
+        } catch (e) {
+            console.error("Error saving data:", e);
+        }
+    }
+    
+    // Helper to Delete entirely
+    async function deleteDataCloud(itemId) {
+         try {
+             await dataCollection.doc(itemId).delete();
+         } catch(e) {
+             console.error("Error deleting from cloud:", e);
+         }
+    }
+
+    // 5. Delete Entry
+    async function deleteEntry(id) {
+        if (confirm("Vuoi davvero eliminare questo record?")) {
+            appData = appData.filter(item => item.id !== id);
+            
+            localStorage.setItem(DATA_KEY, JSON.stringify(appData));
+            renderTable();
+            updateSummaryCards(appData); // also update sums
+            
+            // Delete from cloud independently
+            await deleteDataCloud(id);
+        }
+    }
+
+    // 6. Handle Form Submit
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const date = document.getElementById('date-input').value;
+        const type = document.getElementById('type-input').value;
+        
+        let category = categorySelect.value;
+        if (category === 'altro') {
+            category = customCategoryInput.value.trim();
+        }
+        
+        let description = descInput ? descInput.value : '';
+        if (description === 'altro' && customDescInput) description = customDescInput.value.trim();
+        
+        let cliente = clienteInputSelect ? clienteInputSelect.value : '';
+        let fornitore = fornitoreInputSelect ? fornitoreInputSelect.value : '';
+        
+        const dettaglioInput = document.getElementById('dettaglio-input');
+        const dettaglio = dettaglioInput ? dettaglioInput.value.trim() : '';
+        
+        const amount = parseFloat(document.getElementById('amount-input').value);
+
+        if (!date || !type || !category || isNaN(amount)) {
+            alert("Compila tutti i campi obbligatori correttamente.");
+            return;
+        }
+
+        const attachmentInput = document.getElementById('attachment-input');
+        const file = attachmentInput && attachmentInput.files[0];
+        let attachmentUrl = null;
+        let attachmentName = null;
+
+        if (file) {
+            const uploadProgressText = document.getElementById('upload-progress');
+            const uploadPercentText = document.getElementById('upload-percent');
+            uploadProgressText.style.display = 'block';
+            submitBtn.disabled = true;
+
+            try {
+                const storageRef = storage.ref();
+                const fileRef = storageRef.child(`attachments/${Date.now()}_${file.name}`);
+                const uploadTask = fileRef.put(file);
+
+                await new Promise((resolve, reject) => {
+                    uploadTask.on('state_changed', 
+                        (snapshot) => {
+                            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                            uploadPercentText.textContent = Math.round(progress);
+                        },
+                        (error) => reject(error),
+                        () => resolve()
+                    );
+                });
+
+                attachmentUrl = await fileRef.getDownloadURL();
+                attachmentName = file.name;
+            } catch (error) {
+                console.error("Errore upload file:", error);
+                alert("Errore durante il caricamento dell'allegato.");
+                uploadProgressText.style.display = 'none';
+                submitBtn.disabled = false;
+                return;
+            }
+            uploadProgressText.style.display = 'none';
+            submitBtn.disabled = false;
+        }
+
+        if (editingId) {
+            // Update existing record
+            const idx = appData.findIndex(item => item.id === editingId);
+            if (idx > -1) {
+                appData[idx].date = date;
+                appData[idx].type = type;
+                appData[idx].category = category;
+                appData[idx].description = description;
+                appData[idx].dettaglio = dettaglio;
+                appData[idx].cliente = cliente;
+                appData[idx].fornitore = fornitore;
+                appData[idx].amount = amount;
+                if (file) {
+                    appData[idx].attachmentUrl = attachmentUrl;
+                    appData[idx].attachmentName = attachmentName;
+                }
+                
+                saveData(false, appData[idx]);
+            }
+            alert("Record aggiornato con successo!");
+            cancelEdit(); // Reset form state
+        } else {
+            // Create new record
+            const newEntry = {
+                id: 'raw-' + Date.now() + Math.random().toString(36).substr(2, 5),
+                date: date,
+                type: type,
+                category: category,
+                description: description,
+                dettaglio: dettaglio,
+                cliente: cliente,
+                fornitore: fornitore,
+                amount: amount,
+                attachmentUrl: attachmentUrl || null,
+                attachmentName: attachmentName || null,
+                createdAt: new Date().toISOString()
+            };
+
+            appData.push(newEntry);
+            saveData(false, newEntry);
+            
+            // Output message
+            alert("Record salvato con successo!");
+            
+            // Reset form but keep date and type for faster sequential entry
+            document.getElementById('category-input').value = '';
+            if (descInput) descInput.value = '';
+            if (dettaglioInput) dettaglioInput.value = '';
+            if (clienteInputSelect) clienteInputSelect.value = '';
+            if (fornitoreInputSelect) fornitoreInputSelect.value = '';
+            document.getElementById('amount-input').value = '';
+            if (attachmentInput) attachmentInput.value = '';
+            document.getElementById('category-input').focus();
+            if (customCategoryInput) customCategoryInput.style.display = 'none';
+        }
+        
+        // Update category dropdown and UI
+        populateCategoryDropdown();
+    });
+
+    // Handle Edit Cancel
+    if (cancelEditBtn) {
+        cancelEditBtn.addEventListener('click', cancelEdit);
+    }
+
+    function cancelEdit() {
+        editingId = null;
+        if (submitBtn) submitBtn.textContent = 'Salva Record';
+        if (cancelEditBtn) cancelEditBtn.style.display = 'none';
+        
+        // Clear form
+        document.getElementById('date-input').value = '';
+        document.getElementById('type-input').value = 'REVENUE_EUBIOS';
+        document.getElementById('category-input').value = '';
+        if (descInput) descInput.value = '';
+        if (customDescInput) customDescInput.style.display = 'none';
+        const detInput = document.getElementById('dettaglio-input');
+        if (detInput) detInput.value = '';
+        if (clienteInputSelect) clienteInputSelect.value = '';
+        if (fornitoreInputSelect) fornitoreInputSelect.value = '';
+        document.getElementById('amount-input').value = '';
+        const attInput = document.getElementById('attachment-input');
+        if (attInput) attInput.value = '';
+        if (customCategoryInput) customCategoryInput.style.display = 'none';
+    }
+
+    // --- EDIT LOGIC ---
+    function editEntry(id) {
+        const item = appData.find(d => d.id === id);
+        if (item) {
+            // Load data into form
+            document.getElementById('date-input').value = item.date;
+            document.getElementById('type-input').value = item.type;
+            
+            // Load category
+            // First simulate type change to populate valid categories for this type
+            typeInput.dispatchEvent(new Event('change'));
+            
+            let catOptions = Array.from(categorySelect.options).map(opt => opt.value);
+            if (catOptions.includes(item.category)) {
+                categorySelect.value = item.category;
+                if(customCategoryInput) customCategoryInput.style.display = 'none';
+            } else {
+                categorySelect.value = 'altro';
+                if(customCategoryInput) {
+                    customCategoryInput.style.display = 'block';
+                    customCategoryInput.value = item.category;
+                }
+            }
+            
+            function syncSelectValue(selectEl, customInputEl, value) {
+                if(!selectEl) return;
+                let options = Array.from(selectEl.options).map(opt => opt.value);
+                if (options.includes(value) || !value) {
+                    selectEl.value = value || '';
+                    if(customInputEl) customInputEl.style.display = 'none';
+                } else {
+                    selectEl.value = 'altro';
+                    if(customInputEl) {
+                        customInputEl.style.display = 'block';
+                        customInputEl.value = value;
+                    }
+                }
+            }
+
+            syncSelectValue(descInput, customDescInput, item.description);
+            const detInput = document.getElementById('dettaglio-input');
+            if (detInput) detInput.value = item.dettaglio || '';
+            syncSelectValue(clienteInputSelect, null, item.cliente);
+            syncSelectValue(fornitoreInputSelect, null, item.fornitore);
+            
+            document.getElementById('amount-input').value = item.amount;
+            
+            // Set App State
+            editingId = item.id;
+            if (submitBtn) submitBtn.textContent = 'Aggiorna Record';
+            if (cancelEditBtn) cancelEditBtn.style.display = 'inline-block';
+            
+            // Scroll to top to see form
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }
+
+    // --- CONTEXT MENU LOGIC ---
+    // Show Menu
+    tableBody.addEventListener('contextmenu', (e) => {
+        const rawRow = e.target.closest('.raw-data-row');
+        const summaryRow = e.target.closest('.inner-summary-row');
+        
+        let targetId = null;
+        if (rawRow) targetId = rawRow.getAttribute('data-id');
+        else if (summaryRow) {
+            const idsList = summaryRow.getAttribute('data-ids');
+            // If it's a single ID, we allow it. If multiple, maybe we don't open edit/delete, or just the first.
+            if (idsList && idsList.split(',').length === 1 && idsList.length > 0) {
+                targetId = idsList;
+            } else if (idsList && idsList.split(',').length > 1) {
+                // Optional: alert that multiple records can't be edited simultaneously
+                // return; 
+            }
+        }
+        
+        if (targetId) {
+            e.preventDefault();
+            contextMenuTargetId = targetId;
+            contextMenu.style.display = 'block';
+            
+            // Position menu at cursor
+            let mouseX = e.pageX;
+            let mouseY = e.pageY;
+            // Prevent menu from going offscreen
+            if (mouseX + contextMenu.offsetWidth > window.innerWidth) {
+                mouseX = window.innerWidth - contextMenu.offsetWidth;
+            }
+            if (mouseY + contextMenu.offsetHeight > window.innerHeight) {
+                mouseY = window.innerHeight - contextMenu.offsetHeight;
+            }
+            
+            contextMenu.style.left = mouseX + 'px';
+            contextMenu.style.top = mouseY + 'px';
+        }
+    });
+
+    // Hide Menu on click outside
+    document.addEventListener('click', (e) => {
+        if (!contextMenu.contains(e.target)) {
+            contextMenu.style.display = 'none';
+        }
+    });
+
+    // Edit from Context Menu
+    ctxEditBtn.addEventListener('click', () => {
+        contextMenu.style.display = 'none';
+        if (!contextMenuTargetId) return;
+        editEntry(contextMenuTargetId);
+    });
+
+    // Delete from Context Menu
+    ctxDeleteBtn.addEventListener('click', () => {
+        contextMenu.style.display = 'none';
+        if (contextMenuTargetId) {
+            deleteEntry(contextMenuTargetId);
+            if (editingId === contextMenuTargetId) {
+                cancelEdit(); // Stop editing if deleted
+            }
+        }
+    });
+
+    // 7. Handle Clear All
+    clearBtn.addEventListener('click', async () => {
+        if (appData.length > 0 && confirm("ATTENZIONE STRUTTURALE: Vuoi davvero cancellare TUTTI i dati salvati? Questa operazione eliminerà i dati PER SEMPRE dal Database in Cloud. Nessuno potrà recuperarli.")) {
+            if(confirm("Sei assolutamente sicuro? Non c'è modo di tornare indietro (a meno che tu non abbia esplorato prima con 'Esporta Backup').")) {
+                 appData = [];
+                 localStorage.setItem(DATA_KEY, JSON.stringify(appData));
+                 renderTable();
+                 populateCategoryDropdown(); 
+                 
+                 // Clear Cloud - Warning: for huge datasets you should delete in batches or server-side, 
+                 // but for this scale we can query and delete in chunks from client
+                 try {
+                     const snapshot = await dataCollection.get();
+                     let b = db.batch();
+                     let count = 0;
+                     snapshot.docs.forEach((doc) => {
+                         b.delete(doc.ref);
+                         count++;
+                         // Batch limit is 500 max writes
+                         if (count === 490) {
+                             b.commit();
+                             b = db.batch();
+                             count = 0;
+                         }
+                     });
+                     await b.commit();
+                     alert("Database azzerato completamente.");
+                 } catch(e) {
+                     console.error("Errore reset database cloud", e);
+                 }
+            }
+        }
+    });
+
+    // --- EXPORT/IMPORT FULL BACKUP LOGIC ---
+    if (exportBackupBtn) {
+        exportBackupBtn.addEventListener('click', () => {
+            const dataStr = JSON.stringify(appData, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
             const url = URL.createObjectURL(blob);
-            
             const a = document.createElement('a');
             a.href = url;
-            const now = new Date();
-            const pdZ = n => n.toString().padStart(2, '0');
-            a.download = `Backup_Antimo_${now.getFullYear()}${pdZ(now.getMonth()+1)}${pdZ(now.getDate())}.json`;
+            a.download = `eubiotech_backup_${new Date().toISOString().slice(0, 10)}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            
-            btnExportDataJson.innerHTML = `<span class="btn-icon">⬇️</span> Scarica Database (.json)`;
-            btnExportDataJson.disabled = false;
-        } catch(e) {
-            alert("Errore esportazione dati: " + e.message);
-            btnExportDataJson.innerHTML = `<span class="btn-icon">⬇️</span> Scarica Database (.json)`;
-            btnExportDataJson.disabled = false;
-        }
-    });
-}
+            URL.revokeObjectURL(url);
+        });
+    }
 
-if(btnImportDataJson) {
-    btnImportDataJson.addEventListener('click', async () => {
-        if(!isFirebaseConfigured) { alert("Firebase non è configurato per il ripristino!"); return; }
+    if (importBackupBtn && importBackupFile) {
+        importBackupBtn.addEventListener('click', () => {
+            importBackupFile.click();
+        });
+
+        importBackupFile.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(evt) {
+                try {
+                    const parsed = JSON.parse(evt.target.result);
+                    if (Array.isArray(parsed)) {
+                        appData = parsed;
+                        localStorage.setItem(DATA_KEY, JSON.stringify(appData));
+                        renderTable();
+                        populateCategoryDropdown();
+                        alert("File JSON letto con successo. Avvio sincronizzazione cloud massiva... L'app potrebbe sembrare bloccata per qualche secondo.");
+                        
+                        // Overwrite cloud
+                        const batch = db.batch();
+                        // For safety, clear existing ones first or let user clear it? We will just update/set what is in the JSON
+                        let count = 0;
+                        const batches = [db.batch()];
+                        let batchIndex = 0;
+                        
+                        parsed.forEach(item => {
+                            const docRef = dataCollection.doc(item.id);
+                            batches[batchIndex].set(docRef, item);
+                            count++;
+                            if (count >= 490) {
+                                batches.push(db.batch());
+                                batchIndex++;
+                                count = 0;
+                            }
+                        });
+                        
+                        for (let b of batches) {
+                            await b.commit();
+                        }
+                        
+                        alert("Backup caricato e sincronizzato in Cloud con successo!");
+                    } else {
+                        alert("Formato file non valido. Attendere un array JSON.");
+                    }
+                } catch (err) {
+                    console.error("Errore importazione backup:", err);
+                    alert("Si è verificato un errore durante la lettura del file di backup o sync Cloud.");
+                }
+                importBackupFile.value = ''; // reset
+            };
+            reader.readAsText(file);
+        });
+    }
+
+    // --- SETTINGS (GESTIONE CAUSALI) LOGIC ---
+    async function loadCustomGroupings() {
+        try {
+            const settingsDoc = await db.collection('settings').doc('custom_groupings').get();
+            if (settingsDoc.exists) {
+                customGroupings = settingsDoc.data().groupings || [];
+                localStorage.setItem('EUBIOTECH_custom_groups', JSON.stringify(customGroupings));
+            } else {
+                // Fallback to local storage if Firebase doc doesn't exist yet
+                const stored = localStorage.getItem('EUBIOTECH_custom_groups');
+                if (stored) {
+                    try {
+                        customGroupings = JSON.parse(stored);
+                        // Save it to Firebase so it's available everywhere
+                        await db.collection('settings').doc('custom_groupings').set({ groupings: customGroupings });
+                    } catch(e) { customGroupings = []; }
+                } else {
+                    customGroupings = [];
+                }
+            }
+        } catch (e) {
+            console.error("Error loading custom groupings from Firebase:", e);
+            // Offline fallback
+            const stored = localStorage.getItem('EUBIOTECH_custom_groups');
+            if (stored) {
+                try {
+                    customGroupings = JSON.parse(stored);
+                } catch(err) { customGroupings = []; }
+            } else {
+                customGroupings = [];
+            }
+        }
+    }
+
+    async function saveCustomGroupingsLocally() {
+        localStorage.setItem('EUBIOTECH_custom_groups', JSON.stringify(customGroupings));
+        try {
+            await db.collection('settings').doc('custom_groupings').set({ groupings: customGroupings });
+        } catch (e) {
+            console.error("Error saving custom groupings to Firebase:", e);
+        }
+    }
+
+    function openSettingsModal() {
+        if (!settingsModal) return;
         
-        if(!importDataFile || !importDataFile.files[0]) {
-            alert("Devi prima selezionare un file JSON usando il tasto Scegli File!");
+        // Reset form
+        editingGroupId = null;
+        if(newGroupNameInput) newGroupNameInput.value = '';
+        if(settingsFormTitle) settingsFormTitle.textContent = 'Crea Nuovo Raggruppamento';
+        if(saveGroupBtn) saveGroupBtn.textContent = 'Salva Raggruppamento';
+        if(cancelGroupBtn) cancelGroupBtn.style.display = 'none';
+
+        // Get unique current values from appData
+        const relevantTypes = new Set();
+        const relevantCategories = new Set();
+        const relevantDescriptions = new Set();
+        appData.forEach(item => {
+            if(item.type) relevantTypes.add(item.type);
+            if(item.category) relevantCategories.add(item.category);
+            if(item.description) relevantDescriptions.add(item.description);
+        });
+
+        // Render Checkboxes
+        renderSettingsCheckboxes(settingsTypesContainer, Array.from(relevantTypes).sort());
+        renderSettingsCheckboxes(settingsCategoriesContainer, Array.from(relevantCategories).sort());
+        renderSettingsCheckboxes(settingsDescriptionsContainer, Array.from(relevantDescriptions).sort());
+
+        // Render existing combinations
+        renderCustomGroupsAdminList();
+
+        settingsModal.classList.remove('hidden');
+    }
+
+    function closeSettingsModalFunc() {
+        if(settingsModal) settingsModal.classList.add('hidden');
+        renderTable(); // Re-render in case groups changed
+    }
+
+    function renderSettingsCheckboxes(container, itemsArray, preselected = []) {
+        if (!container) return;
+        container.innerHTML = '';
+        
+        if (itemsArray.length === 0) {
+            container.innerHTML = '<span style="color:#94a3b8;font-size:0.85em;">Nessun dato disponibile</span>';
             return;
         }
-        
-        if(!confirm("ATTENZIONE CRITICA: Stai per inviare i dati di questo file JSON sul Server Cloud.\n\nQuesta operazione non cancellerà i dati esistenti che non sono nel file, ma AGGIUNGERÀ o SOVRASCRIVERÀ i documenti che hanno lo stesso ID. Continuare?")) return;
-        
-        const file = importDataFile.files[0];
-        const reader = new FileReader();
-        
-        reader.onload = async (e) => {
-            try {
-                btnImportDataJson.textContent = "Ripristino in corso...";
-                btnImportDataJson.disabled = true;
-                
-                const data = JSON.parse(e.target.result);
-                const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                
-                let successCount = 0;
-                for(let collName of Object.keys(data)) {
-                    for(let item of data[collName]) {
-                        // Identifichiamo l'ID del documento Firestore salvato precedentemente
-                        const itemFbId = item.__firebaseDocId || item.id || item.fbId || Date.now().toString();
-                        
-                        let payload = {...item};
-                        delete payload.__firebaseDocId; // rimuovo la traccia interna
-                        
-                        await setDoc(doc(db, collName, itemFbId), payload, { merge: true });
-                        successCount++;
-                    }
-                }
-                
-                alert(`✅ Ripristino Database Completato!\nSono stati letti ed elaborati ${successCount} record.\nL'applicazione si aggiornerà ora per mostrare i dati ripristinati.`);
-                
-                // Forza reinizializzazione per leggere il nuovo db
-                window.location.reload(true);
-            } catch(err) {
-                alert("Errore nel ripristino o formato file JSON non valido:\n" + err.message);
-                btnImportDataJson.innerHTML = `<span class="btn-icon">⬆️</span> Ripristina da File .json`;
-                btnImportDataJson.disabled = false;
-            }
+
+        const typeLabels = {
+            'REVENUE_EUBIOS': 'RICAVI EUBIOS',
+            'COSTS_EUBIOS': 'COSTI EUBIOS',
+            'REVENUE_EUBIOTECH': 'RICAVI EUBIOTECH',
+            'COSTS_EUBIOTECH': 'COSTI EUBIOTECH',
+            'Costi risorse umane': 'COSTI RISORSE UMANE (EUBIOTECH) [Obs]', 'COGS_TECH': 'COSTI PERSONALE EUBIOTECH (Legacy)',
+            'Costi altri': 'COSTI ALTRI (EUBIOTECH) [Obs]', 'OPEX_TECH': 'ALTRI COSTI EUBIOTECH (Legacy)',
+            'REVENUE': 'RICAVI EUBIOS (Legacy)',
+            'COGS': 'COSTI EUBIOS (Legacy)',
+            'OPEX': 'ALTRI COSTI (Legacy)'
         };
-        reader.readAsText(file);
-    });
-}
 
-// ==========================================
-// AUTO-COMPLETAMENTO ASSISTITI E DATALIST
-// ==========================================
-window.renderAssistitiDatalist = function() {
-    const dlist = document.getElementById('assistitiDatalist');
-    if(!dlist) return;
-    const assistiti = JSON.parse(localStorage.getItem('antimo_assistiti') || '[]');
-    dlist.innerHTML = '';
-    assistiti.forEach(a => {
-        let opt = document.createElement('option');
-        opt.value = a.paziente;
-        dlist.appendChild(opt);
-    });
-};
-
-document.addEventListener('DOMContentLoaded', () => {
-    window.renderAssistitiDatalist(); // Run at startup
-});
-
-// Event Delegation for Autofill
-document.addEventListener('input', (e) => {
-    if (e.target.tagName === 'INPUT' && e.target.getAttribute('list') === 'assistitiDatalist') {
-        const assistiti = JSON.parse(localStorage.getItem('antimo_assistiti') || '[]');
-        const val = e.target.value.trim();
-        const found = assistiti.find(a => a.paziente === val);
-        
-        if (found) {
-            let prefix = "";
-            if (e.target.id.startsWith("editProg")) prefix = "editProg";
-            else if (e.target.id.startsWith("edit")) prefix = "edit";
-            else prefix = "";
-
-            const disEl = document.getElementById(prefix ? prefix + "Dispositivi" : "dispositivi");
-            const locEl = document.getElementById(prefix ? prefix + "Localita" : "localita");
-            const indEl = document.getElementById(prefix ? prefix + "Indirizzo" : "indirizzo");
-
-            // Solo auto-fill se sono vuoti (per non sovrascrivere roba scritta a mano)
-            if(disEl && found.dispositivi && !disEl.value) disEl.value = found.dispositivi;
-            if(locEl && found.localita && !locEl.value) locEl.value = found.localita;
-            if(indEl && found.indirizzo && !indEl.value) indEl.value = found.indirizzo;
-        }
-    }
-});
-
-// ==========================================
-// GESTIONE VOCI (DISP/INT)
-// ==========================================
-const btnOpenListsSetup = document.getElementById('btnOpenListsSetup');
-const listsSetupModal = document.getElementById('listsSetupModal');
-const btnCloseListsSetup = document.getElementById('btnCloseListsSetup');
-const btnTabInterventi = document.getElementById('btnTabInterventi');
-const btnTabDispositivi = document.getElementById('btnTabDispositivi');
-const listsSetupTable = document.getElementById('listsSetupTable');
-const newListItemDesc = document.getElementById('newListItemDesc');
-const btnAddListItem = document.getElementById('btnAddListItem');
-const btnSaveFirebaseLists = document.getElementById('btnSaveFirebaseLists');
-
-let currentListTab = 'interventi'; // 'interventi', 'dispositivi' o 'ruoli'
-
-function updateListsTabUI() {
-    if(btnTabInterventi) {
-        btnTabInterventi.className = currentListTab === 'interventi' ? 'btn btn-primary' : 'btn btn-secondary';
-        btnTabInterventi.style.background = currentListTab === 'interventi' ? 'var(--blue-primary)' : '';
-    }
-    if(btnTabDispositivi) {
-        btnTabDispositivi.className = currentListTab === 'dispositivi' ? 'btn btn-primary' : 'btn btn-secondary';
-        btnTabDispositivi.style.background = currentListTab === 'dispositivi' ? 'var(--blue-primary)' : '';
-    }
-    const btnTabRuoli = document.getElementById('btnTabRuoli');
-    if(btnTabRuoli) {
-        btnTabRuoli.className = currentListTab === 'ruoli' ? 'btn btn-primary' : 'btn btn-secondary';
-        btnTabRuoli.style.background = currentListTab === 'ruoli' ? 'var(--blue-primary)' : '';
-    }
-    renderListsSetupTable();
-}
-
-if(btnOpenListsSetup) {
-    btnOpenListsSetup.addEventListener('click', () => {
-        listsSetupModal.classList.remove('hidden');
-        renderListsSetupTable();
-    });
-}
-
-if(btnCloseListsSetup) {
-    btnCloseListsSetup.addEventListener('click', () => {
-        listsSetupModal.classList.add('hidden');
-    });
-}
-
-if(btnTabInterventi) {
-    btnTabInterventi.addEventListener('click', () => {
-        currentListTab = 'interventi';
-        updateListsTabUI();
-    });
-}
-
-if(btnTabDispositivi) {
-    btnTabDispositivi.addEventListener('click', () => {
-        currentListTab = 'dispositivi';
-        updateListsTabUI();
-    });
-}
-
-const btnTabRuoli = document.getElementById('btnTabRuoli');
-if(btnTabRuoli) {
-    btnTabRuoli.addEventListener('click', () => {
-        currentListTab = 'ruoli';
-        updateListsTabUI();
-    });
-}
-
-function renderListsSetupTable() {
-    if(!listsSetupTable) return;
-    listsSetupTable.innerHTML = '';
-    const list = window.antimoDropdownLists[currentListTab] || [];
-    
-    // Mostra/nascondi campo Valore in alto
-    const valInput = document.getElementById('newListItemVal');
-    if (valInput) {
-        valInput.style.display = currentListTab === 'interventi' ? 'block' : 'none';
-    }
-
-    if(list.length === 0) {
-        listsSetupTable.innerHTML = '<tr><td style="text-align:center; padding: 20px; color: #666;">Nessuna voce presente.</td></tr>';
-        return;
-    }
-
-    list.forEach((item, index) => {
-        const hasVal = currentListTab === 'interventi';
-        let valFieldHtml = '';
-        if (hasVal) {
-            valFieldHtml = `<div style="margin-top:5px; display:flex; gap: 5px; align-items:center;">
-                                <label style="font-size:0.75rem; color:#666;">Valore €</label>
-                                <input type="number" id="val_${item.id}" value="${item.val || 0}" step="0.01" style="width: 80px; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
-                            </div>`;
-        }
-
-        const tr = document.createElement('tr');
-        tr.style.borderBottom = '1px solid #eee';
-        
-        tr.innerHTML = `
-            <td style="padding: 10px; width: 30%; color: #888; font-size: 0.8rem; vertical-align: top;">
-                ID: ${item.id}
-            </td>
-            <td style="padding: 10px; width: 40%; vertical-align: top;">
-                <input type="text" id="desc_${item.id}" value="${item.desc.replace(/"/g, '&quot;')}" style="width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
-                ${valFieldHtml}
-            </td>
-            <td style="padding: 10px; width: 30%; text-align: right; vertical-align: top; padding-top: 15px;">
-                <button class="btn btn-primary btn-sm" onclick="salvaVoceEdit('${item.id}')" style="padding: 6px 10px; margin: 0 5px 0 0; font-size: 0.8rem;">Salva</button>
-                <button class="btn btn-danger btn-sm" onclick="eliminaVoce('${item.id}')" style="padding: 6px 10px; margin: 0; font-size: 0.8rem;">X</button>
-            </td>
-        `;
-        listsSetupTable.appendChild(tr);
-    });
-}
-
-window.salvaVoceEdit = function(id) {
-    const input = document.getElementById('desc_' + id);
-    if(!input) return;
-    const newDesc = input.value.trim();
-    if(!newDesc) {
-        alert("La descrizione non può essere vuota.");
-        return;
-    }
-    const list = window.antimoDropdownLists[currentListTab];
-    const item = list.find(x => x.id === id);
-    if(item) {
-        item.desc = newDesc;
-        if(currentListTab === 'interventi') {
-            const valInput = document.getElementById('val_' + id);
-            item.val = valInput ? parseFloat(valInput.value || 0) : 0;
-        }
-        renderListsSetupTable();
-        alert("Modifica applicata! Ricordati di premere 'SALVA MODIFICHE E CHIUDI' per salvare su Cloud.");
-    }
-};
-
-window.eliminaVoce = function(id) {
-    if(!confirm("Sei sicuro di voler eliminare questa voce? I vecchi record mostreranno il codice invece del nome se la elimini.")) return;
-    let list = window.antimoDropdownLists[currentListTab];
-    window.antimoDropdownLists[currentListTab] = list.filter(x => x.id !== id);
-    renderListsSetupTable();
-};
-
-if(btnAddListItem) {
-    btnAddListItem.addEventListener('click', () => {
-        const desc = newListItemDesc.value.trim();
-        if(!desc) return alert("Inserisci una descrizione valida.");
-        
-        let prefix = 'ID_';
-        if (currentListTab === 'interventi') prefix = 'INT_';
-        else if (currentListTab === 'dispositivi') prefix = 'DEV_';
-        else if (currentListTab === 'ruoli') prefix = 'RUO_';
-        const newId = prefix + Date.now().toString();
-        
-        let newItem = { id: newId, desc: desc };
-        if (currentListTab === 'interventi') {
-            const valInput = document.getElementById('newListItemVal');
-            newItem.val = valInput ? parseFloat(valInput.value || 0) : 0;
-        }
-        
-        window.antimoDropdownLists[currentListTab].push(newItem);
-        newListItemDesc.value = '';
-        if (document.getElementById('newListItemVal')) document.getElementById('newListItemVal').value = '';
-        renderListsSetupTable();
-    });
-}
-
-if(btnSaveFirebaseLists) {
-    btnSaveFirebaseLists.addEventListener('click', async () => {
-        try {
-            btnSaveFirebaseLists.disabled = true;
-            btnSaveFirebaseLists.innerHTML = "Salvataggio...";
+        itemsArray.forEach(val => {
+            const isChecked = preselected.includes(val);
+            const lbl = document.createElement('label');
+            lbl.style.display = 'flex';
+            lbl.style.alignItems = 'center';
+            lbl.style.gap = '8px';
+            lbl.style.marginBottom = '5px';
+            lbl.style.fontSize = '0.9em';
+            lbl.style.cursor = 'pointer';
             
-            // Auto-salva tutti gli input della tabella visibile prima di inviare al db
-            const list = window.antimoDropdownLists[currentListTab];
-            if(list) {
-                list.forEach(item => {
-                    const descInput = document.getElementById('desc_' + item.id);
-                    if(descInput) item.desc = descInput.value.trim();
-                    if(currentListTab === 'interventi') {
-                        const valInput = document.getElementById('val_' + item.id);
-                        if(valInput) item.val = parseFloat(valInput.value || 0);
+            const displayVal = (container === settingsTypesContainer) ? (typeLabels[val] || val) : val;
+
+            lbl.innerHTML = `<input type="checkbox" value="${String(val).replace(/"/g, '&quot;')}" ${isChecked ? 'checked' : ''}> <span>${String(displayVal)}</span>`;
+            container.appendChild(lbl);
+        });
+    }
+
+    function renderCustomGroupsAdminList() {
+        if(!customGroupsContainer) return;
+        customGroupsContainer.innerHTML = '';
+
+        if(customGroupings.length === 0) {
+            customGroupsContainer.innerHTML = '<span style="color:#94a3b8; font-style:italic; font-size:0.9em;">Nessun raggruppamento creato.</span>';
+            return;
+        }
+
+        customGroupings.forEach(group => {
+            const tag = document.createElement('div');
+            tag.className = 'group-tag';
+            tag.innerHTML = `
+                <strong>${group.name}</strong> 
+                <span style="color:#64748b; font-size:0.8em;">(${group.filters.categories.length} cat, ${group.filters.types.length} tipi)</span>
+                <div class="group-tag-actions">
+                    <button class="edit-group" data-id="${group.id}" title="Modifica">✏️</button>
+                    <button class="del-group" data-id="${group.id}" title="Elimina" style="color:var(--danger)">✖</button>
+                </div>
+            `;
+            customGroupsContainer.appendChild(tag);
+        });
+
+        // Bind inner buttons
+        customGroupsContainer.querySelectorAll('.edit-group').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const id = e.currentTarget.getAttribute('data-id');
+                editCustomGroup(id);
+            });
+        });
+        customGroupsContainer.querySelectorAll('.del-group').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const id = e.currentTarget.getAttribute('data-id');
+                deleteCustomGroup(id);
+            });
+        });
+    }
+
+    function editCustomGroup(id) {
+        const group = customGroupings.find(g => g.id === id);
+        if(!group) return;
+
+        editingGroupId = id;
+        if(settingsFormTitle) settingsFormTitle.textContent = 'Modifica Raggruppamento';
+        if(saveGroupBtn) saveGroupBtn.textContent = 'Aggiorna Raggruppamento';
+        if(cancelGroupBtn) cancelGroupBtn.style.display = 'inline-block';
+        if(newGroupNameInput) newGroupNameInput.value = group.name;
+
+        // Re-render checkboxes with preselected values
+        const relevantTypes = Array.from(new Set(appData.map(i => i.type).filter(Boolean))).sort();
+        const relevantCategories = Array.from(new Set(appData.map(i => i.category).filter(Boolean))).sort();
+        const relevantDescriptions = Array.from(new Set(appData.map(i => i.description).filter(Boolean))).sort();
+
+        renderSettingsCheckboxes(settingsTypesContainer, relevantTypes, group.filters.types || []);
+        renderSettingsCheckboxes(settingsCategoriesContainer, relevantCategories, group.filters.categories || []);
+        renderSettingsCheckboxes(settingsDescriptionsContainer, relevantDescriptions, group.filters.descriptions || []);
+    }
+
+    if (cancelGroupBtn) {
+        cancelGroupBtn.addEventListener('click', () => {
+            openSettingsModal(); // Resets the form state
+        });
+    }
+
+    if (saveGroupBtn) {
+        saveGroupBtn.addEventListener('click', () => {
+            if(!newGroupNameInput) return;
+            const name = newGroupNameInput.value.trim();
+            if(!name) { alert("Inserisci un nome per il raggruppamento."); return; }
+
+            const selectedTypes = Array.from(settingsTypesContainer.querySelectorAll('input:checked')).map(cb => cb.value);
+            const selectedCategories = Array.from(settingsCategoriesContainer.querySelectorAll('input:checked')).map(cb => cb.value);
+            const selectedDescriptions = Array.from(settingsDescriptionsContainer.querySelectorAll('input:checked')).map(cb => cb.value);
+
+            if (selectedTypes.length === 0 && selectedCategories.length === 0 && selectedDescriptions.length === 0) {
+                alert("Seleziona almeno un Tipo, una Categoria o una Descrizione da includere nel raggruppamento.");
+                return;
+            }
+
+            if (editingGroupId) {
+                // Update existing
+                const idx = customGroupings.findIndex(g => g.id === editingGroupId);
+                if(idx > -1) {
+                    customGroupings[idx].name = name;
+                    customGroupings[idx].filters = {
+                        types: selectedTypes,
+                        categories: selectedCategories,
+                        descriptions: selectedDescriptions
+                    };
+                }
+            } else {
+                // Create new
+                customGroupings.push({
+                    id: 'grp_' + Date.now(),
+                    name: name,
+                    filters: {
+                        types: selectedTypes,
+                        categories: selectedCategories,
+                        descriptions: selectedDescriptions
                     }
                 });
             }
 
-            const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-            const docRef = doc(db, "configurazioni", "liste_dropdown");
-            await setDoc(docRef, window.antimoDropdownLists);
+            saveCustomGroupingsLocally();
+            openSettingsModal(); // Resets form and updates list
             
-            localStorage.setItem('antimo_dropdown_lists', JSON.stringify(window.antimoDropdownLists));
-            alert("Liste aggiornate con successo su Cloud!");
-            listsSetupModal.classList.add('hidden');
-            initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
-            initDynamicBlocks('dynamicProgInterventionsContainer', 'btnAddProgInterventionBlock');
-        } catch(e) {
-            console.error("Errore salvataggio liste", e);
-            alert("Errore durante il salvataggio.");
-        } finally {
-            btnSaveFirebaseLists.disabled = false;
-            btnSaveFirebaseLists.innerHTML = '<span class="btn-icon">💾</span> SALVA MODIFICHE E CHIUDI';
-        }
-    });
-}
-
-/* ==========================================
- * VALORIZZAZIONE ATTIVITÀ
- * ========================================== */
-const btnOpenValuation = document.getElementById('btnOpenValuation');
-const valorizzazioneModal = document.getElementById('valorizzazioneModal');
-const btnCloseValuation = document.getElementById('btnCloseValuation');
-const valPeriod = document.getElementById('valPeriod');
-const valCustomDates = document.getElementById('valCustomDates');
-const valDateFrom = document.getElementById('valDateFrom');
-const valDateTo = document.getElementById('valDateTo');
-const valRole = document.getElementById('valRole');
-const valOperator = document.getElementById('valOperator');
-const btnCalculateValuation = document.getElementById('btnCalculateValuation');
-const valDetailsTableBody = document.getElementById('valDetailsTableBody');
-const valTotalCount = document.getElementById('valTotalCount');
-const valTotalAmount = document.getElementById('valTotalAmount');
-const valExportBtn = document.getElementById('valExportBtn');
-
-if(valPeriod) {
-    valPeriod.addEventListener('change', (e) => {
-        if(e.target.value === 'custom') valCustomDates.classList.remove('hidden');
-        else valCustomDates.classList.add('hidden');
-    });
-}
-
-function initValuationDropdowns() {
-    const currentUser = localStorage.getItem('antimo_user_name') || "";
-    const userEmail = (localStorage.getItem('antimo_user_email') || "").toLowerCase();
-    
-    // Bypass di sicurezza per amministratori originali
-    let isDirezione = false;
-    if (userEmail.includes('eubios') || userEmail.includes('giuseppe') || currentUser.toLowerCase().includes('antimo')) isDirezione = true;
-
-    if(window.anagrafiche) {
-        const u = window.anagrafiche.find(a => (a.ragioneSociale || (a.nome + " " + (a.cognome||""))).trim() === currentUser);
-        if(u && u.ruolo && u.ruolo.toUpperCase().includes('DIREZ')) isDirezione = true;
+            // Re-render UI to update custom filter badges / selects if we need
+            updateFilterUI();
+        });
     }
 
-    if(valRole && window.antimoDropdownLists && window.antimoDropdownLists.ruoli) {
-        valRole.innerHTML = '<option value="">Tutti i Ruoli</option>';
-        if (!isDirezione) {
-            valRole.disabled = true;
-        } else {
-            window.antimoDropdownLists.ruoli.forEach(r => {
-                valRole.innerHTML += `<option value="${r.desc}">${r.desc}</option>`;
-            });
-            valRole.disabled = false;
+    function deleteCustomGroup(id) {
+        if(confirm("Sei sicuro di voler eliminare questo raggruppamento?")) {
+            customGroupings = customGroupings.filter(g => g.id !== id);
+            saveCustomGroupingsLocally();
+            
+            // If we are currently filtering by this group, we should probably clear the filters or refresh
+            filterState.customGroups.delete(id); 
+            
+            renderCustomGroupsAdminList();
+            updateFilterUI();
+            
+            if(editingGroupId === id) {
+                openSettingsModal(); // Reset form if we deleted what we were editing
+            }
         }
     }
-    if(valOperator && window.anagrafiche) {
-        if (!isDirezione) {
-            valOperator.innerHTML = `<option value="${currentUser}">${currentUser}</option>`;
-            valOperator.disabled = true;
-        } else {
-            valOperator.innerHTML = '<option value="">Tutti gli Operatori</option>';
-            const dipendenti = window.anagrafiche.filter(d => !!d.qualifica).map(d => (d.ragioneSociale || (d.nome + " " + (d.cognome || ""))).trim()).sort();
-            /* Rimuovo i duplicati */
-            const dedupe = [...new Set(dipendenti)];
-            dedupe.forEach(nome => {
-                if(nome) valOperator.innerHTML += `<option value="${nome}">${nome}</option>`;
-            });
-            valOperator.disabled = false;
+
+    // --- CATEGORY DYNAMIC DROPDOWN ---
+    function populateCategoryDropdown() {
+        if (!categorySelect || !typeInput) return;
+        
+        const selectedType = typeInput.value;
+        const uniqueCategories = new Set();
+        
+        let validTypes = [selectedType];
+        if (selectedType === 'COSTS_EUBIOTECH' || selectedType === 'COSTS_EUBIOS') {
+            validTypes = validTypes.concat(['COSTI EUBIOTECH', 'COSTI EUBIOS', 'Costi Eubiotech', 'Costi Eubios', 'Costo Variabile', 'Costo Fisso', 'Arval', 'Costo del Personale', 'Banca o Cassa', 'Giroconto o Altro', 'Costo del Venduto', 'OPEX_TECH', 'COGS_TECH', 'OPEX', 'COGS']);
+        } else if (selectedType.includes('REVENUE')) {
+            validTypes = validTypes.concat(['Ricavo', 'RICAVI EUBIOTECH', 'Ricavi Eubiotech', 'RICAVI EUBIOS', 'Ricavi Eubios']);
         }
-    }
-}
-
-if(btnOpenValuation) {
-    btnOpenValuation.addEventListener('click', () => {
-        initValuationDropdowns();
-        valorizzazioneModal.classList.remove('hidden');
-        valDetailsTableBody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #94a3b8;">Imposta i filtri e clicca su Calcola per visualizzare la valorizzazione economica.</td></tr>';
-        valTotalCount.textContent = "0";
-        valTotalAmount.textContent = "€ 0.00";
-        valExportBtn.style.display = 'none';
-        valExportBtn.onclick = null;
-    });
-}
-if(btnCloseValuation) {
-    btnCloseValuation.addEventListener('click', () => {
-        valorizzazioneModal.classList.add('hidden');
-    });
-}
-
-if(btnCalculateValuation) {
-    btnCalculateValuation.addEventListener('click', async () => {
-        try {
-            if(!isFirebaseConfigured) return alert("Firebase non configurato o offline.");
-            
-            btnCalculateValuation.innerHTML = '<span class="btn-icon">⏳</span> CARICAMENTO...';
-            btnCalculateValuation.disabled = true;
-
-            const now = new Date();
-            let startTs = 0; let endTs = 0;
-            const p = valPeriod.value;
-
-            if(p === 'oggi') {
-                startTs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-                endTs = startTs + 86399999;
-            } else if(p === 'ieri') {
-                startTs = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime();
-                endTs = startTs + 86399999;
-            } else if(p === 'mese_corrente') {
-                startTs = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-                endTs = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime();
-            } else if(p === 'mese_scorso') {
-                startTs = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
-                endTs = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).getTime();
-            } else if(p === 'trimestre') {
-                const q = Math.floor(now.getMonth() / 3);
-                startTs = new Date(now.getFullYear(), q * 3, 1).getTime();
-                endTs = new Date(now.getFullYear(), q * 3 + 3, 0, 23, 59, 59).getTime();
-            } else if(p === 'anno') {
-                startTs = new Date(now.getFullYear(), 0, 1).getTime();
-                endTs = new Date(now.getFullYear(), 11, 31, 23, 59, 59).getTime();
-            } else if(p === 'custom') {
-                if(!valDateFrom.value || !valDateTo.value) { alert("Inserisci le date di inizio e fine."); btnCalculateValuation.disabled = false; btnCalculateValuation.innerHTML = '<span class="btn-icon">🧮</span> CALCOLA'; return; }
-                startTs = new Date(valDateFrom.value).getTime();
-                endTs = new Date(valDateTo.value);
-                endTs.setHours(23, 59, 59, 999);
-                endTs = endTs.getTime();
-            }
-
-
-            const { collection, getDocs, query, where, doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-            
-            // Esposizione per funzione Elimina Test
-            window.deleteValuationIntervention = async function(id) {
-                if(!confirm("⚠️ Vuoi eliminare DEFINITIVAMENTE questo intervento su Cloud? Non potrà essere recuperato.")) return;
-                try {
-                    await deleteDoc(doc(db, "interventi", id));
-                    // Rimuove la riga visualmente o ricalcola
-                    btnCalculateValuation.click(); 
-                } catch(e) {
-                    alert("Errore durante l'eliminazione: " + e.message);
-                }
-            };
-
-            // Filtra su Firestore con limite Date
-            const q = query(collection(db, "interventi"), where("startTime", ">=", startTs), where("startTime", "<=", endTs));
-            const snaps = await getDocs(q);
-
-            // Mappa ruoli 
-            let cacheRuoliApp = {};
-            if(window.anagrafiche) {
-                window.anagrafiche.forEach(a => {
-                    const nm = (a.ragioneSociale || (a.nome + " " + (a.cognome||""))).trim();
-                    if(nm) cacheRuoliApp[nm] = a.ruolo || "Sconosciuto";
-                });
-            }
-
-            const rFilter = valRole.value;
-            let oFilter = valOperator.value;
-            
-            // SECURITY: Forza filtro se non è direzione
-            const currentUser = localStorage.getItem('antimo_user_name') || "";
-            const userEmail = (localStorage.getItem('antimo_user_email') || "").toLowerCase();
-            let isDirCalc = false;
-            
-            // Bypass sicurezza per amministratori base (risolve problema "Non funziona nulla")
-            if (userEmail.includes('eubios') || userEmail.includes('giuseppe') || currentUser.toLowerCase().includes('antimo')) isDirCalc = true;
-
-            const currentUserRole = cacheRuoliApp[currentUser] || "Sconosciuto";
-            if (currentUserRole.toUpperCase().includes('DIREZ')) isDirCalc = true;
-
-            if (!isDirCalc) {
-                oFilter = currentUser;
-            }
-
-            let validCount = 0;
-            let sumVal = 0;
-            let rowsHtml = '';
-            let resultsCSV = [];
-
-            // Costruisci dizionario val
-            let valInterventi = {};
-            if(window.antimoDropdownLists && window.antimoDropdownLists.interventi) {
-                window.antimoDropdownLists.interventi.forEach(i => valInterventi[i.id] = parseFloat(i.val || 0));
-            }
-
-            snaps.forEach(documentSnapshot => {
-                const data = documentSnapshot.data();
-                let opStr = data.operatore || "Sconosciuto";
-                let rStr = cacheRuoliApp[opStr] || "Sconosciuto";
-
-                if (oFilter && opStr !== oFilter) return;
-                if (rFilter && rStr !== rFilter) return;
-
-                let tipis = data.tipo ? data.tipo.split(',').map(x => x.trim()) : [];
-                let msgTipo = window.decodeCodeToLabel(data.tipo, 'interventi');
-                let curVal = 0;
-                tipis.forEach(tCode => {
-                    if (valInterventi[tCode]) curVal += valInterventi[tCode];
-                });
-
-                validCount++;
-                sumVal += curVal;
+        
+        // Add existing categories from data exactly as they are in the database
+        appData.forEach(item => {
+            if (validTypes.includes(item.type) && item.category) {
+                // Ensure category is treated as a string to prevent .toUpperCase() or .trim() TypeErrors from legacy data
+                const catStr = String(item.category);
                 
-                const dDate = new Date(data.startTime);
-                const dStr = `${String(dDate.getDate()).padStart(2,'0')}/${String(dDate.getMonth()+1).padStart(2,'0')}/${dDate.getFullYear()}`;
-
-                rowsHtml += `<tr style="border-bottom: 1px solid #e2e8f0; background: ${validCount % 2 === 0 ? '#f8fafc' : 'white'};">
-                    <td style="padding: 10px;">${dStr}</td>
-                    <td style="padding: 10px; font-weight: bold; color: var(--blue-dark);">${opStr}</td>
-                    <td style="padding: 10px; color: #475569;">${rStr} / <strong>${data.paziente}</strong></td>
-                    <td style="padding: 10px; color: #475569;">${msgTipo}</td>
-                    <td style="padding: 10px; text-align: right; color: #64748b;">€ ${curVal.toFixed(2)}</td>
-                    <td style="padding: 10px; text-align: right; font-weight: bold; color: #15803d;">€ ${curVal.toFixed(2)}</td>
-                    <td style="padding: 10px; text-align: center;">
-                        <button onclick="deleteValuationIntervention('${documentSnapshot.id}')" style="background:none; border:none; cursor:pointer; font-size:1.1rem;" title="Elimina definitivamente">🗑️</button>
-                    </td>
-                </tr>`;
-
-                resultsCSV.push({ date: dStr, op: opStr, role: rStr, patient: data.paziente, type: msgTipo, value: curVal });
-            });
-
-            valTotalCount.textContent = validCount.toString();
-            valTotalAmount.textContent = "€ " + sumVal.toFixed(2);
-            
-            if(validCount === 0) {
-                valDetailsTableBody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #94a3b8;">Nessun intervento e nessun valore economico generato nei filtri.</td></tr>';
-                valExportBtn.style.display = 'none';
-            } else {
-                valDetailsTableBody.innerHTML = rowsHtml;
-                valExportBtn.style.display = 'inline-block';
-                valExportBtn.onclick = () => {
-                   let csvContent = "Data;Operatore;Ruolo;Paziente;Tipo Intervento;Valore\n";
-                   resultsCSV.forEach(r => {
-                       csvContent += `"${r.date}";"${r.op}";"${r.role}";"${r.patient.replace(/"/g, '""')}";"${r.type}";"${r.value.toFixed(2).replace('.', ',')}"\n`;
-                   });
-                   const blob = new Blob(["\uFEFF"+csvContent], { type: 'text/csv;charset=utf-8;' });
-                   const url = URL.createObjectURL(blob);
-                   const a = document.createElement("a");
-                   a.href = url;
-                   a.download = `Valorizzazione_${p}.csv`;
-                   document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                };
+                if(catStr.toUpperCase() !== 'TOTALE' && catStr.toUpperCase() !== 'NOLEGGIO AUTO') {
+                    uniqueCategories.add(catStr.trim()); 
+                }
             }
+        });
+        
+        let sortedCategories = Array.from(uniqueCategories).sort();
+        
+        // Build HTML
+        let html = `<option value="" disabled selected>Seleziona o aggiungi categoria...</option>`;
+        
+        if (sortedCategories.length > 0) {
+            html += `<optgroup label="Voci / Nominativi Esistenti">`;
+            sortedCategories.forEach(cat => {
+                html += `<option value="${cat}">${cat}</option>`;
+            });
+            html += `</optgroup>`;
+        }
+        
+        html += `<option value="altro" style="color: blue;">➕ Aggiungi nuova voce...</option>`;
+        
+        // Remember previous selection if possible
+        const prevValue = categorySelect.value;
+        categorySelect.innerHTML = html;
+        
+        if (sortedCategories.includes(prevValue)) {
+             categorySelect.value = prevValue;
+        }
+        
+        // Hide custom input by default
+        if (customCategoryInput) {
+            customCategoryInput.style.display = 'none';
+            customCategoryInput.required = false;
+        }
+    }
 
-        } catch(e) {
-            console.error(e);
-            alert("Errore durante il calcolo. Se compare FirebaseError, assicurati di aver creato l'indice su startTime in Firestore (clicca sul link nella Console di questo browser per crearlo).");
-        } finally {
-            btnCalculateValuation.innerHTML = '<span class="btn-icon">🧮</span> CALCOLA';
-            btnCalculateValuation.disabled = false;
+    if (typeInput && categorySelect) {
+        typeInput.addEventListener('change', () => {
+            populateCategoryDropdown();
+            populateOtherDropdowns();
+        });
+        
+        categorySelect.addEventListener('change', (e) => {
+            if (e.target.value === 'altro') {
+                customCategoryInput.style.display = 'block';
+                customCategoryInput.required = true;
+                customCategoryInput.focus();
+            } else {
+                customCategoryInput.style.display = 'none';
+                customCategoryInput.required = false;
+            }
+            populateOtherDropdowns();
+        });
+    }
+
+    function populateOtherDropdowns() {
+        const uniqueDesc = new Set();
+        const uniqueClienti = new Set();
+        const uniqueFornitori = new Set();
+        
+        const selectedType = typeInput ? typeInput.value : null;
+        const selectedCat = (categorySelect && categorySelect.value && categorySelect.value !== 'altro') ? categorySelect.value : null;
+        
+        let validTypes = [selectedType];
+        if (selectedType === 'COSTS_EUBIOTECH' || selectedType === 'COSTS_EUBIOS') {
+            validTypes = validTypes.concat(['COSTI EUBIOTECH', 'COSTI EUBIOS', 'Costi Eubiotech', 'Costi Eubios', 'Costo Variabile', 'Costo Fisso', 'Arval', 'Costo del Personale', 'Banca o Cassa', 'Giroconto o Altro', 'Costo del Venduto', 'OPEX_TECH', 'COGS_TECH', 'OPEX', 'COGS']);
+        } else if (selectedType && selectedType.includes('REVENUE')) {
+            validTypes = validTypes.concat(['Ricavo', 'RICAVI EUBIOTECH', 'Ricavi Eubiotech', 'RICAVI EUBIOS', 'Ricavi Eubios']);
+        }
+        
+        appData.forEach(item => {
+            if (selectedType && !validTypes.includes(item.type)) return;
+            
+            // Only collect descriptions that belong to the selected category (if a category is selected)
+            if (selectedCat && item.category && String(item.category).trim() !== selectedCat) return;
+            
+            if (item.description) uniqueDesc.add(String(item.description).trim());
+            
+            // Clienti and Fornitori are filtered by category as well now, though mostly they use Anagrafiche
+            if (item.cliente) uniqueClienti.add(String(item.cliente).trim());
+            if (item.fornitore) uniqueFornitori.add(String(item.fornitore).trim());
+        });
+
+        // Get anagrafiche arrays
+        const anagraficheClienti = anagraficheData.filter(a => a.tipo === 'cliente').map(a => a.ragioneSociale.trim());
+        const anagraficheFornitori = anagraficheData.filter(a => a.tipo === 'fornitore').map(a => a.ragioneSociale.trim());
+        
+        // Remove dedicated anagrafiche from historical ones to avoid duplicates (for Description only now)
+        function populateSelect(selectEl, customEl, itemsArr, emptyLabel, isStrict) {
+            if (!selectEl) return;
+            const sortedItems = Array.from(itemsArr).sort();
+            
+            let html = `<option value="" selected>${emptyLabel}</option>`;
+            
+            if (sortedItems.length > 0) {
+                if (isStrict) {
+                     html += `<optgroup label="Anagrafiche Qualificate">`;
+                } else {
+                     html += `<optgroup label="Voci">`;
+                }
+                sortedItems.forEach(val => html += `<option value="${val}">${val}</option>`);
+                html += `</optgroup>`;
+            }
+            
+            if (!isStrict) {
+                html += `<option value="altro" style="color: blue;">➕ Aggiungi nuova voce...</option>`;
+            } else {
+                html += `<option value="" disabled style="color: gray;">(Usa il pulsante 👥 per aggiungere)</option>`;
+            }
+            
+            const prevValue = selectEl.value;
+            selectEl.innerHTML = html;
+            
+            if (sortedItems.includes(prevValue)) {
+                selectEl.value = prevValue;
+            } else if (isStrict && prevValue && prevValue !== 'altro') {
+                // If we are editing a legacy record whose name isn't in the qualified DB anymore
+                html += `<option value="${prevValue}" style="color: red;">${prevValue} (Non in Anagrafica)</option>`;
+                selectEl.innerHTML = html;
+                selectEl.value = prevValue;
+            }
+            
+            if (customEl) {
+                customEl.style.display = selectEl.value === 'altro' ? 'block' : 'none';
+                customEl.required = selectEl.value === 'altro';
+            }
+        }
+        
+        populateSelect(descInput, customDescInput, uniqueDesc, "Nessuna descrizione", false);
+        // Strict mapping: Cliente/Fornitore only from qualified Anagrafiche
+        populateSelect(clienteInputSelect, customClienteInput, anagraficheClienti, "Nessun cliente", true);
+        populateSelect(fornitoreInputSelect, customFornitoreInput, anagraficheFornitori, "Nessun fornitore", true);
+    }
+
+    function setupOtherDropdownsListeners() {
+        function attachListener(selectEl, customEl) {
+            if (selectEl && customEl) {
+                selectEl.addEventListener('change', (e) => {
+                    if (e.target.value === 'altro') {
+                        customEl.style.display = 'block';
+                        customEl.required = true;
+                        customEl.focus();
+                    } else {
+                        customEl.style.display = 'none';
+                        customEl.required = false;
+                    }
+                });
+            }
+        }
+        attachListener(descInput, customDescInput);
+    }
+    
+    setupOtherDropdownsListeners();
+
+    // --- ANAGRAFICA MODAL LOGIC ---
+    const anagraficaModal = document.getElementById('anagrafica-modal');
+    const closeAnagraficaBtn = document.getElementById('close-anagrafica-modal');
+    const cancelAnagraficaBtn = document.getElementById('cancel-anagrafica-btn');
+    const anagraficaForm = document.getElementById('anagrafica-form');
+    
+    function openAnagraficaModal(tipoStr = 'cliente') {
+        if (!anagraficaModal) return;
+        anagraficaForm.reset();
+        document.getElementById('anagrafica-type').value = tipoStr;
+        document.getElementById('anagrafica-id').value = '';
+        document.getElementById('anagrafica-modal-title').textContent = 'Gestione Anagrafica';
+        
+        // Nessun text auto-fill dal form principale poiché rimosso
+        
+        anagraficaModal.classList.remove('hidden');
+    }
+
+    function closeAnagraficaModalFunc() {
+        if (anagraficaModal) anagraficaModal.classList.add('hidden');
+    }
+
+    if (closeAnagraficaBtn) closeAnagraficaBtn.addEventListener('click', closeAnagraficaModalFunc);
+    if (cancelAnagraficaBtn) cancelAnagraficaBtn.addEventListener('click', closeAnagraficaModalFunc);
+
+    const btnAnaGeneral = document.getElementById('open-anagrafica-general-btn');
+    if (btnAnaGeneral) btnAnaGeneral.addEventListener('click', () => openAnagraficaModal('cliente'));
+
+    if (anagraficaForm) {
+        anagraficaForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const btn = document.getElementById('save-anagrafica-btn');
+            if (btn) btn.disabled = true;
+            
+            try {
+                const tipo = document.getElementById('anagrafica-type').value;
+                const rsociale = document.getElementById('ana-ragione-sociale').value.trim();
+                
+                const payload = {
+                    tipo: tipo,
+                    ragioneSociale: rsociale,
+                    piva: document.getElementById('ana-piva').value.trim(),
+                    cf: document.getElementById('ana-cf').value.trim(),
+                    sdi: document.getElementById('ana-sdi').value.trim(),
+                    pec: document.getElementById('ana-pec').value.trim(),
+                    indirizzo: document.getElementById('ana-indirizzo').value.trim(),
+                    email: document.getElementById('ana-email').value.trim(),
+                    telefono: document.getElementById('ana-telefono').value.trim(),
+                    updatedAt: new Date().toISOString()
+                };
+
+                const id = document.getElementById('anagrafica-id').value;
+                if (id) {
+                    await anagraficheCollection.doc(id).set(payload, { merge: true });
+                    // Update locally
+                    const idx = anagraficheData.findIndex(a => a.id === id);
+                    if (idx > -1) anagraficheData[idx] = { id, ...payload };
+                } else {
+                    const docRef = await anagraficheCollection.add(payload);
+                    anagraficheData.push({ id: docRef.id, ...payload });
+                }
+                
+                // If it's a new entry, we want to auto-select it in the dropdown
+                populateOtherDropdowns();
+                
+                if (tipo === 'cliente' && clienteInputSelect) {
+                    clienteInputSelect.value = rsociale;
+                } else if (tipo === 'fornitore' && fornitoreInputSelect) {
+                    fornitoreInputSelect.value = rsociale;
+                }
+
+                closeAnagraficaModalFunc();
+                alert(`Anagrafica ${tipo} salvata con successo!`);
+            } catch (error) {
+                console.error("Errore salvataggio anagrafica:", error);
+                alert("Errore durante il salvataggio. Riprova.");
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        });
+    }
+
+    // --- FATTURA MODAL LOGIC ---
+    const fatturaModal = document.getElementById('fattura-modal');
+    const openFatturaBtn = document.getElementById('open-fattura-btn');
+    const closeFatturaBtn = document.getElementById('close-fattura-modal');
+    const fatturaForm = document.getElementById('fattura-form');
+    const fatClienteSelect = document.getElementById('fat-cliente');
+    const btnNuovoClienteFat = document.getElementById('btn-nuovo-cliente-fat');
+
+    function populateFatturaClienti() {
+        if (!fatClienteSelect) return;
+        const clienti = anagraficheData.filter(a => a.tipo === 'cliente').sort((a,b) => a.ragioneSociale.localeCompare(b.ragioneSociale));
+        
+        let html = '<option value="" disabled selected>Seleziona Cliente...</option>';
+        clienti.forEach(c => {
+            html += `<option value="${c.id}">${c.ragioneSociale}</option>`;
+        });
+        
+        fatClienteSelect.innerHTML = html;
+    }
+
+    function openFatturaModal() {
+        if (!fatturaModal) return;
+        fatturaForm.reset();
+        populateFatturaClienti();
+        
+        // Auto-set data emissione a oggi
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('fat-data').value = today;
+        
+        calcFatturaTotali();
+        fatturaModal.classList.remove('hidden');
+    }
+
+    function closeFatturaModal() {
+        if (fatturaModal) fatturaModal.classList.add('hidden');
+    }
+
+    if (openFatturaBtn) openFatturaBtn.addEventListener('click', openFatturaModal);
+    if (closeFatturaBtn) closeFatturaBtn.addEventListener('click', closeFatturaModal);
+    if (btnNuovoClienteFat) btnNuovoClienteFat.addEventListener('click', () => {
+        openAnagraficaModal('cliente');
+        // When closing anagrafica, we would ideally re-populate, but populateOtherDropdowns is called already on save.
+        // We'll hook into that or just rely on user opening it again, but better to expose a refresh.
+    });
+
+    // We intercept populateOtherDropdowns to also update fattura client select
+    const oldPopulate = populateOtherDropdowns;
+    populateOtherDropdowns = function() {
+        oldPopulate();
+        populateFatturaClienti();
+    };
+
+    // Fattura Calculations
+    const inpImponibile = document.getElementById('fat-imponibile');
+    const inpIva = document.getElementById('fat-iva');
+    
+    function calcFatturaTotali() {
+        if (!inpImponibile) return;
+        
+        const imp = parseFloat(inpImponibile.value) || 0;
+        const percIva = parseFloat(inpIva.value) || 0;
+        
+        const iva = imp * (percIva / 100);
+        const totale = imp + iva;
+        
+        document.getElementById('fat-calc-imponibile').textContent = `€ ${imp.toFixed(2)}`;
+        document.getElementById('fat-calc-iva').textContent = `€ ${iva.toFixed(2)}`;
+        document.getElementById('fat-calc-totale').textContent = `€ ${totale.toFixed(2)}`;
+    }
+
+    [inpImponibile, inpIva].forEach(el => {
+        if(el) {
+            el.addEventListener('input', calcFatturaTotali);
+            el.addEventListener('change', calcFatturaTotali);
         }
     });
-}
 
+    if (fatturaForm) {
+        fatturaForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('save-fattura-btn');
+            if (btn) btn.disabled = true;
+            
+            try {
+                const clienteId = fatClienteSelect.value;
+                const clienteData = anagraficheData.find(a => a.id === clienteId);
+                
+                const payload = {
+                    cliente_id: clienteId,
+                    cliente_ragioneSociale: clienteData ? clienteData.ragioneSociale : 'Sconosciuto',
+                    numero: document.getElementById('fat-numero').value.trim(),
+                    data_emissione: document.getElementById('fat-data').value,
+                    data_scadenza: document.getElementById('fat-scadenza').value,
+                    descrizione: document.getElementById('fat-descrizione').value.trim(),
+                    imponibile: parseFloat(inpImponibile.value) || 0,
+                    perc_iva: parseFloat(inpIva.value) || 0,
+                    totale: parseFloat(document.getElementById('fat-calc-totale').textContent.replace('€', '').trim()),
+                    createdAt: new Date().toISOString()
+                };
+
+                await fattureCollection.add(payload);
+                alert("Fattura emessa e salvata con successo!");
+                closeFatturaModal();
+            } catch (error) {
+                console.error("Errore salvataggio fattura:", error);
+                alert("Errore durante il salvataggio della fattura.");
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        });
+    }
+
+    // --- HISTORICAL DATA CLEANUP ---
+    // Remove old 'Totale', 'Noleggio auto', and legacy 'Costi Diversi Gestione Eubiotech' entries
+    let beforeLength = appData.length;
+    appData = appData.filter(item => {
+        if (!item.category) return true;
+        const catUpper = item.category.toUpperCase().trim();
+        if (catUpper === 'TOTALE' || catUpper.includes('TOTALE') || 
+            catUpper === 'FONDO ACCANTONAMENTO' || 
+            catUpper === 'NOLEGGIO AUTO' || catUpper.includes('NOLEGGIO AUTO') ||
+            catUpper.includes('COSTI DIVERSI GESTIONE EUBIOTECH')) {
+            // Need to delete individually from Cloud if filtered out during load
+            deleteDataCloud(item.id); 
+            return false;
+        }
+        return true;
+    });
+    if (appData.length !== beforeLength) {
+        localStorage.setItem(DATA_KEY, JSON.stringify(appData));
+        console.log(`Cleaned up ${beforeLength - appData.length} legacy aggregate rows ('Totale'/'Noleggio Auto').`);
+    }
+    
+    // Initial render logic will happen after Firestore fetch as it's async now!
+    renderTable(); 
+    populateCategoryDropdown();
+    populateOtherDropdowns();
+    
+    // --- DRILLDOWN MODAL LOGIC ---
+    const drilldownModal = document.getElementById('drilldown-modal');
+    const drilldownClose = document.getElementById('close-drilldown');
+    
+    if (drilldownClose) {
+        drilldownClose.addEventListener('click', () => {
+            if (drilldownModal) drilldownModal.classList.add('hidden');
+        });
+    }
+
+    document.addEventListener('click', (e) => {
+        const link = e.target.closest('.drilldown-link');
+        if (link) {
+            e.preventDefault();
+            const groupType = link.getAttribute('data-group-type');
+            const groupKey = link.getAttribute('data-group-key');
+            openDrilldownModal(groupType, groupKey);
+        }
+    });
+
+    function openDrilldownModal(groupType, groupKey) {
+        if (!drilldownModal) return;
+        
+        const titleEl = document.getElementById('drilldown-title');
+        const tbody = document.getElementById('drilldown-tbody');
+        if (titleEl) titleEl.innerHTML = `Dettaglio Righe: <span style="color:#3b82f6;">${groupKey}</span>`;
+        
+        // Filter filteredData based on groupType and groupKey
+        const records = filteredData.filter(item => {
+            if (groupType === 'smart_pivot') {
+                let desc = (item.description || item.category || 'Generico').toUpperCase().trim();
+                if (desc === 'PERSONALE EUBIOTECH' || desc === 'COSTI PERSONALE EUBIOTECH') desc = 'GENERICO';
+                return desc === groupKey;
+            } else if (groupType === 'description') {
+                const desc = item.description || 'Nessuna Descrizione';
+                return desc === groupKey;
+            } else if (groupType === 'category') {
+                const cat = item.category || 'Generico';
+                return cat === groupKey;
+            } else if (groupType === 'type') {
+                const typeLabels = {
+                    'REVENUE_EUBIOS': 'RICAVI EUBIOS', 'COSTS_EUBIOS': 'COSTI EUBIOS', 'REVENUE_EUBIOTECH': 'RICAVI EUBIOTECH',
+                    'Costi risorse umane': 'COSTI RISORSE UMANE (EUBIOTECH)', 'COGS_TECH': 'COSTI PERSONALE EUBIOTECH (Legacy)',
+                    'Costi altri': 'COSTI ALTRI (EUBIOTECH)', 'OPEX_TECH': 'ALTRI COSTI EUBIOTECH (Legacy)',
+                    'REVENUE': 'RICAVI EUBIOS (Legacy)', 'COGS': 'COSTI EUBIOS (Legacy)', 'OPEX': 'ALTRI COSTI (Legacy)'
+                };
+                return (typeLabels[item.type] || item.type) === groupKey;
+            } else if (groupType === 'year') {
+                const d = new Date(item.date);
+                if (isNaN(d)) return groupKey === 'N/A';
+                return d.getFullYear().toString() === groupKey;
+            } else if (groupType === 'month') {
+                const months = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+                const d = new Date(item.date);
+                if (isNaN(d)) return false;
+                return `${months[d.getMonth()]} ${d.getFullYear()}` === groupKey;
+            }
+            return false;
+        });
+
+        tbody.innerHTML = '';
+        if (records.length === 0) {
+             tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #64748b;">Nessun record esatto trovato per questo raggruppamento (prova a cercare direttamente).</td></tr>';
+        } else {
+             records.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(item => {
+                 const tr = document.createElement('tr');
+                 
+                 let displayDate = item.date;
+                 try {
+                     const parts = item.date.split('-');
+                     if(parts.length === 3) displayDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                 } catch(e){}
+                 
+                 const typeLabelsShort = {
+                     'REVENUE_EUBIOS': 'RICAVI EUBIOS', 'COSTS_EUBIOS': 'COSTI EUBIOS', 'REVENUE_EUBIOTECH': 'RICAVI EUBIOTECH',
+                     'Costi risorse umane': 'C. RISORSE UMANE', 'Costi altri': 'ALTRI COSTI'
+                 };
+                 const displayType = typeLabelsShort[item.type] || item.type;
+
+                 tr.innerHTML = `
+                     <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.85em;">${displayDate}</td>
+                     <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.9em; font-weight: 500;">${item.fornitore || '-'}</td>
+                     <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.9em;">${item.cliente || '-'}</td>
+                     <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.8em;"><strong>${displayType}</strong></td>
+                     <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.85em;">${item.category || '-'}</td>
+                     <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.85em; color: #475569;">${item.description || '-'}</td>
+                     <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.85em; color: #475569;">${item.dettaglio || '-'}</td>
+                     <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-family: monospace; font-size: 1.1em; text-align: right; font-weight: bold;">${formatCurrency(item.amount)}</td>
+                 `;
+                 tbody.appendChild(tr);
+             });
+        }
+        
+        drilldownModal.classList.remove('hidden');
+    }
+});
