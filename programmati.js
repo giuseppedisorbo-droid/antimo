@@ -45,18 +45,31 @@ async function loadDropdownLists() {
     const defaultDevices = ['Concentratore', 'Ventilatore', 'Aspiratore', 'D3', 'Stativo', 'Cpap', 'AutoCpap', 'Saturimetro'];
     const defaultRoles = ["TECNICO", "TRASPORTATORE", "AMMINISTRATIVO", "MAGAZZINO", "LOGISTICA", "DIREZIONE", "PRODUZIONE O2", "CONSULENTE E", "CONSULENTE D", "CONSULENTE M"];
     
-    window.antimoDropdownLists = {
+    let baseDropdownLists = {
         interventi: defaultTypes.map(t => ({ id: t, desc: t })),
         dispositivi: defaultDevices.map(d => ({ id: d, desc: d })),
         ruoli: defaultRoles.map(r => ({ id: r, desc: r }))
     };
+    
+    window.antimoDropdownLists = baseDropdownLists;
 
     if(db) {
         try {
             const docRef = doc(db, "configurazioni", "liste_dropdown");
             const docSnap = await getDoc(docRef);
             if(docSnap.exists()) {
-                window.antimoDropdownLists = docSnap.data();
+                const cloudData = docSnap.data();
+                let needsUpdate = false;
+                if(!cloudData.interventi) { cloudData.interventi = baseDropdownLists.interventi; needsUpdate = true; }
+                if(!cloudData.dispositivi) { cloudData.dispositivi = baseDropdownLists.dispositivi; needsUpdate = true; }
+                if(!cloudData.ruoli) { cloudData.ruoli = baseDropdownLists.ruoli; needsUpdate = true; }
+                
+                window.antimoDropdownLists = cloudData;
+                
+                if(needsUpdate) {
+                    await setDoc(docRef, window.antimoDropdownLists);
+                }
+                
                 localStorage.setItem('antimo_dropdown_lists', JSON.stringify(window.antimoDropdownLists));
             } else {
                 await setDoc(docRef, window.antimoDropdownLists);
@@ -103,11 +116,17 @@ async function loadDropdownLists() {
         } catch(e) {
             console.error("Errore fetch liste dropdown in programmati, uso cache", e);
             let cached = localStorage.getItem('antimo_dropdown_lists');
-            if(cached) window.antimoDropdownLists = JSON.parse(cached);
+            if(cached) {
+                window.antimoDropdownLists = JSON.parse(cached);
+                if(!window.antimoDropdownLists.ruoli) window.antimoDropdownLists.ruoli = baseDropdownLists.ruoli;
+            }
         }
     } else {
         let cached = localStorage.getItem('antimo_dropdown_lists');
-        if(cached) window.antimoDropdownLists = JSON.parse(cached);
+        if(cached) {
+            window.antimoDropdownLists = JSON.parse(cached);
+            if(!window.antimoDropdownLists.ruoli) window.antimoDropdownLists.ruoli = baseDropdownLists.ruoli;
+        }
     }
 }
 loadDropdownLists().then(() => {
