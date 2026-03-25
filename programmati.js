@@ -213,13 +213,15 @@ function renderWaitingTable() {
     waitingInterventions.forEach(p => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td style="font-weight: bold;">${p.paziente}</td>
+            <td style="font-weight: bold;">${p.paziente} <br><small style="color:#64748b;">(Prog. da: ${p.programmatoDa || 'N/D'})</small></td>
             <td>${p.localita || p.destinazione || 'N/D'}</td>
             <td>${p.indirizzo || ''} <br><small style="color:gray;">${p.telefono || ''}</small></td>
             <td>
-                <div style="display: flex; gap: 5px;">
+                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
                     <input type="date" id="date_${p.idFb}" style="padding: 5px; border-radius: 6px; border: 1px solid #ccc;">
                     <button class="btn btn-primary btn-sm" onclick="programmaAttesa('${p.idFb}')" style="padding: 5px 10px; font-size: 0.8rem; width: auto; text-transform: none;">Assegna</button>
+                    <button class="btn btn-secondary btn-sm" onclick="editProgrammato('${p.idFb}')" style="padding: 5px 10px; font-size: 0.8rem; width: auto; text-transform: none;">Modifica</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteProgrammato('${p.idFb}')" style="padding: 5px 10px; font-size: 0.8rem; width: auto; text-transform: none;">Elimina</button>
                 </div>
             </td>
         `;
@@ -251,7 +253,7 @@ function renderTable() {
 
         tr.innerHTML = `
             <td style="font-weight: 600; color: var(--blue-primary);">${dateStr}</td>
-            <td style="font-weight: bold;">${p.paziente}</td>
+            <td style="font-weight: bold;">${p.paziente} <br><small style="color:#64748b;">(Prog. da: ${p.programmatoDa || 'N/D'})</small></td>
             <td>${p.localita || p.destinazione || 'N/D'}</td>
             <td>${p.indirizzo || ''} <br><small style="color:gray;">${p.telefono || ''}</small></td>
             <td><span class="status-badge" style="background-color: #f1f5f9; color: var(--text-main); font-size: 0.8rem; padding: 4px 8px;">${window.decodeCodeToLabel(p.tipo, 'interventi') || 'Non spec.'}</span><br>${badgeVal}</td>
@@ -481,6 +483,7 @@ form.addEventListener('submit', async (e) => {
         dataPrevista: iData.value,
         oraPrevista: document.getElementById('oraProgrammata') ? document.getElementById('oraProgrammata').value : "",
         tecnicoAssegnato: document.getElementById('progTecnicoAssegnato') ? document.getElementById('progTecnicoAssegnato').value : "",
+        programmatoDa: localStorage.getItem('antimo_user_name') || "Sconosciuto",
         status: 'planned',
         timestamp: new Date().getTime()
     };
@@ -543,6 +546,7 @@ btnSaveWaiting.addEventListener('click', async () => {
         statoValutazione: blocksData.statoValutazioneStr,
         interventiList: blocksData.array,
         tecnicoAssegnato: document.getElementById('progTecnicoAssegnato') ? document.getElementById('progTecnicoAssegnato').value : "",
+        programmatoDa: localStorage.getItem('antimo_user_name') || "Sconosciuto",
         status: 'in_attesa',
         timestamp: new Date().getTime()
     };
@@ -594,7 +598,8 @@ window.deleteProgrammato = async function(idFb) {
 };
 
 window.editProgrammato = function(idFb) {
-    const p = plannedInterventions.find(x => x.idFb === idFb);
+    let p = plannedInterventions.find(x => x.idFb === idFb);
+    if (!p) p = waitingInterventions.find(x => x.idFb === idFb);
     if(!p) return;
     
     document.getElementById('editProgFbId').value = idFb;

@@ -3050,7 +3050,8 @@ function renderActivitiesList() {
                     <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${inv.telefono || '-'}</div>
                     <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi') || 'Nessuno'}</div>
                     <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Matricola:</strong> ${inv.matricola || 'N/D'}</div>
-                    <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${inv.note || 'Nessuna'}</div>
+                    <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:5px;"><strong>Note:</strong> ${inv.note || 'Nessuna'}</div>
+                    <div style="font-size:0.85rem; color:#0f172a; margin-top:5px; padding-bottom:10px;"><strong>⏳ Prog. da:</strong> ${inv.programmatoDa || 'N/D'}</div>
                     ${attachHtml}
                 </div>
             `;
