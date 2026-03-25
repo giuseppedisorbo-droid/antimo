@@ -26,12 +26,12 @@
             </button>
         </div>
 
-        <!-- Selettore Multi-Tenant (Visualizzazione Eseguiti) -->
+        <!-- Selettore Multi-Tenant (Visualizzazione Eseguiti e Programmati) -->
         <div style="margin-top: 5px; margin-bottom: 5px; text-align: center;">
             <select id="filterTecnicoOggi" style="width: 100%; max-width: 400px; padding: 6px 15px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.5); background: rgba(0,0,0,0.2); color: white; font-weight: bold; font-size: 0.85rem; outline: none; cursor: pointer; text-align: center;">
                 <option value="" style="color: black;">Mostra Interventi in base a...</option>
-                <option value="MIO" style="color: black;" selected>👨‍🔧 Solo i miei</option>
-                <option value="TUTTI" style="color: black;">🌍 Tutti i Tecnici (Cloud)</option>
+                <option value="MIO" style="color: black;" selected>👨‍🔧 Solo miei</option>
+                <option value="TUTTI" style="color: black;">🌍 Tutti</option>
             </select>
         </div>
 
@@ -196,6 +196,13 @@
                 <div class="form-group">
                     <label for="paziente">Paziente / Ente *</label>
                     <input type="text" id="paziente" placeholder="Nominativo" list="assistitiDatalist" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="tecnicoAssegnato">Tecnico Assegnato *</label>
+                    <select id="tecnicoAssegnato" required style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.9rem; font-family: inherit;">
+                        <option value="">Seleziona Tecnico...</option>
+                    </select>
                 </div>
 
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
@@ -368,6 +375,7 @@
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                     <button id="btnTabInterventi" class="btn btn-primary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal; background: var(--blue-primary);">Interventi</button>
                     <button id="btnTabDispositivi" class="btn btn-secondary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal;">Dispositivi</button>
+                    <button id="btnTabRuoli" class="btn btn-secondary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal;">Ruoli</button>
                 </div>
 
                 <div id="listsContentContainer" style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1;">
@@ -435,6 +443,12 @@
                     <div class="form-group">
                         <label>Paziente / Ente</label>
                         <input type="text" id="editPaziente" list="assistitiDatalist" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Tecnico Assegnato</label>
+                        <select id="editTecnicoAssegnato" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.9rem; font-family: inherit;">
+                            <option value="">Seleziona Tecnico...</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>Località</label>

@@ -44,12 +44,12 @@ if (isFirebaseConfigured) {
 // =====================================
 
 // Liste Dinamiche Dropdown
-window.antimoDropdownLists = { interventi: [], dispositivi: [] };
+window.antimoDropdownLists = { interventi: [], dispositivi: [], ruoli: [] };
 window.decodeCodeToLabel = function(codeRaw, type = 'interventi') {
     if(!codeRaw) return "";
     let codes = codeRaw.split(',').map(c => c.trim());
     return codes.map(c => {
-        let listStr = type === 'interventi' ? 'interventi' : 'dispositivi';
+        let listStr = type === 'interventi' ? 'interventi' : (type === 'ruoli' ? 'ruoli' : 'dispositivi');
         let found = window.antimoDropdownLists[listStr].find(item => item.id === c);
         return found ? found.desc : c;
     }).join(', ');
@@ -58,12 +58,14 @@ window.decodeCodeToLabel = function(codeRaw, type = 'interventi') {
 async function loadDropdownLists() {
     const defaultTypes = ['Visita', 'Sostituzione', 'Ritiro', 'Consegna', 'Manutenzione', 'Installazione', 'Riparazione'];
     const defaultDevices = ['Concentratore', 'Ventilatore', 'Aspiratore', 'D3', 'Stativo', 'Cpap', 'AutoCpap', 'Saturimetro'];
+    const defaultRoles = ["TECNICO", "TRASPORTATORE", "AMMINISTRATIVO", "MAGAZZINO", "LOGISTICA", "DIREZIONE", "PRODUZIONE O2", "CONSULENTE E", "CONSULENTE D", "CONSULENTE M"];
     
     // Default se Firebase non è configurato o offline primissimo avvio
     // Per retrocompatibilità al 100%, l'ID delle voci default combacia col loro nome testo originario.
     window.antimoDropdownLists = {
         interventi: defaultTypes.map(t => ({ id: t, desc: t })),
-        dispositivi: defaultDevices.map(d => ({ id: d, desc: d }))
+        dispositivi: defaultDevices.map(d => ({ id: d, desc: d })),
+        ruoli: defaultRoles.map(r => ({ id: r, desc: r }))
     };
 
     if(isFirebaseConfigured) {
@@ -580,6 +582,9 @@ function renderMessagesUI() {
     let activeNotes = [];
 
     const currentUser = localStorage.getItem('antimo_user_name') || "Sconosciuto";
+    const filterTecnico = document.getElementById('filterTecnicoOggi') ? document.getElementById('filterTecnicoOggi').value : "MIO";
+    const filterName = filterTecnico === "MIO" ? currentUser : filterTecnico;
+
     const searchText = (msgSearchText && msgSearchText.value) ? msgSearchText.value.toLowerCase() : "";
     const searchUser = (msgSearchUser && msgSearchUser.value) ? msgSearchUser.value : "";
     const searchDate = (msgSearchDate && msgSearchDate.value) ? msgSearchDate.value : "";
@@ -592,6 +597,11 @@ function renderMessagesUI() {
         let sN = d.sender || "Sconosciuto";
         let rN = d.recipients || "Bacheca (Tutti)";
         if (Array.isArray(rN)) rN = rN.join(', ');
+
+        if (filterTecnico !== "TUTTI") {
+            const isRelevantForFilter = (sN === filterName) || (rN.includes(filterName)) || (rN === "Bacheca (Tutti)");
+            if (!isRelevantForFilter) return; // skip
+        }
 
         // Apply shared filters (Search Text, Search User, Search Date)
         if (searchUser && sN !== searchUser && !rN.includes(searchUser)) return;
@@ -625,14 +635,32 @@ function renderMessagesUI() {
         }
     });
 
-    if(btnMsgTabAll) btnMsgTabAll.innerHTML = `Tutti (${countAll})`;
-    if(btnMsgTabUnread) btnMsgTabUnread.innerHTML = `Non Letti (${countUnread})`;
-    if(btnMsgTabReceived) btnMsgTabReceived.innerHTML = `Ricevuti (${countReceived})`;
-    if(btnMsgTabSent) btnMsgTabSent.innerHTML = `Inviati (${countSent})`;
-    if(btnMsgTabInCharge) btnMsgTabInCharge.innerHTML = `👷 Presi in Carico (${countInCharge})`;
-    if(btnMsgTabReplied) btnMsgTabReplied.innerHTML = `↩️ Risposti (${countReplied})`;
-    if(btnMsgTabDeleted) btnMsgTabDeleted.innerHTML = `Cestino (${countDeleted})`;
-    if(btnMsgTabResolved) btnMsgTabResolved.innerHTML = `✅ Risolti (${countResolved})`;
+    const applyCountStyle = (btn, count, exclude) => {
+        if(!btn) return;
+        if(exclude) {
+            btn.style.backgroundColor = "";
+            btn.style.color = "";
+            return;
+        }
+        if(count > 0) {
+            btn.style.backgroundColor = "var(--blue-primary, #0d6efd)";
+            btn.style.color = "white";
+            btn.style.border = "none";
+        } else {
+            btn.style.backgroundColor = "";
+            btn.style.color = "";
+            btn.style.border = "";
+        }
+    };
+
+    if(btnMsgTabAll) { btnMsgTabAll.innerHTML = `Tutti (${countAll})`; applyCountStyle(btnMsgTabAll, countAll, false); }
+    if(btnMsgTabUnread) { btnMsgTabUnread.innerHTML = `Non Letti (${countUnread})`; applyCountStyle(btnMsgTabUnread, countUnread, false); }
+    if(btnMsgTabReceived) { btnMsgTabReceived.innerHTML = `Ricevuti (${countReceived})`; applyCountStyle(btnMsgTabReceived, countReceived, false); }
+    if(btnMsgTabSent) { btnMsgTabSent.innerHTML = `Inviati (${countSent})`; applyCountStyle(btnMsgTabSent, countSent, false); }
+    if(btnMsgTabInCharge) { btnMsgTabInCharge.innerHTML = `👷 Presi in Carico (${countInCharge})`; applyCountStyle(btnMsgTabInCharge, countInCharge, false); }
+    if(btnMsgTabReplied) { btnMsgTabReplied.innerHTML = `↩️ Risposti (${countReplied})`; applyCountStyle(btnMsgTabReplied, countReplied, false); }
+    if(btnMsgTabDeleted) { btnMsgTabDeleted.innerHTML = `Cestino (${countDeleted})`; applyCountStyle(btnMsgTabDeleted, countDeleted, true); }
+    if(btnMsgTabResolved) { btnMsgTabResolved.innerHTML = `✅ Risolti (${countResolved})`; applyCountStyle(btnMsgTabResolved, countResolved, true); }
 
     if(btnEmptyTrash) {
         if (currentMsgTab === 'deleted' && countDeleted > 0) {
@@ -1360,6 +1388,7 @@ function editProgrammatoAppJs(index) {
     
     document.getElementById('editItemIndex').value = index;
     document.getElementById('editPaziente').value = p.paziente || "";
+    if (document.getElementById('editTecnicoAssegnato')) document.getElementById('editTecnicoAssegnato').value = p.tecnicoAssegnato || "";
     document.getElementById('editLocalita').value = p.localita || p.destinazione || "";
     document.getElementById('editIndirizzo').value = p.indirizzo || "";
     document.getElementById('editTelefono').value = p.telefono || "";
@@ -1384,6 +1413,7 @@ if(btnSaveEdit) {
         btnSaveEdit.disabled = true;
         
         p.paziente = document.getElementById('editPaziente').value;
+        if (document.getElementById('editTecnicoAssegnato')) p.tecnicoAssegnato = document.getElementById('editTecnicoAssegnato').value;
         p.localita = document.getElementById('editLocalita').value;
         p.indirizzo = document.getElementById('editIndirizzo').value;
         p.telefono = document.getElementById('editTelefono').value;
@@ -1752,13 +1782,34 @@ async function updateInterventiCount() {
 if(filterTecnicoOggi) {
     // 1. Aggiungiamo i nomi di tutti i dipendenti al dropdown
     if (window.anagrafiche && window.anagrafiche.length > 0) {
-        const dipendenti = window.anagrafiche.filter(d => d.qualifica === "Dipendente").map(d => d.ragioneSociale).sort();
+        const dipendenti = window.anagrafiche.filter(d => d.qualifica === "Dipendente").map(d => d.ragioneSociale || (d.nome + " " + (d.cognome || ""))).sort();
+        /* Popoliamo filterTecnicoOggi */
         dipendenti.forEach(nome => {
             const opt = document.createElement('option');
             opt.value = nome;
             opt.style.color = "black";
             opt.textContent = `👤 Solo: ${nome}`;
             filterTecnicoOggi.appendChild(opt);
+        });
+
+        /* Popoliamo tecnicoAssegnato */
+        const dropdownsAss = [document.getElementById('tecnicoAssegnato'), document.getElementById('editTecnicoAssegnato')];
+        dropdownsAss.forEach(dd => {
+            if(dd && dd.options.length <= 1) { // EVITA DOPPIONI AL RELOAD
+                dipendenti.forEach(nome => {
+                    const opt = document.createElement('option');
+                    opt.value = nome;
+                    opt.textContent = nome;
+                    dd.appendChild(opt);
+                });
+                
+                if(localStorage.getItem('antimo_user_name')) {
+                    const myName = localStorage.getItem('antimo_user_name');
+                    if(Array.from(dd.options).some(o => o.value === myName)) {
+                        dd.value = myName; // DEFAULT a me
+                    }
+                }
+            }
         });
     }
 
@@ -2519,6 +2570,7 @@ btnPlanIntervention.addEventListener('click', async () => {
         operatoreValutazione: blocksData.operatoreValutazioneStr,
         esito: blocksData.esitoStr,
         statoValutazione: blocksData.statoValutazioneStr,
+        tecnicoAssegnato: document.getElementById('tecnicoAssegnato') ? document.getElementById('tecnicoAssegnato').value : "",
         interventiList: blocksData.array, // Nuovo payload strutturato
         note: iNote.value,
         dataPrevista: dProgrammata,
@@ -2608,6 +2660,7 @@ newInterventionForm.addEventListener('submit', async (e) => {
         operatoreValutazione: blocksData.operatoreValutazioneStr,
         esito: blocksData.esitoStr,
         statoValutazione: blocksData.statoValutazioneStr,
+        tecnicoAssegnato: document.getElementById('tecnicoAssegnato') ? document.getElementById('tecnicoAssegnato').value : (localStorage.getItem('antimo_user_name') || "Sconosciuto"),
         interventiList: blocksData.array,
         note: iNote.value,
         operatore: localStorage.getItem('antimo_user_name') || "Sconosciuto",
@@ -2883,8 +2936,18 @@ function renderActivitiesList() {
     const endOfToday = startOfToday + 24 * 60 * 60 * 1000 - 1;
 
     // 1. Interventi Programmati (Da fare oggi) - Rossi
+    const targetFilter = filterTecnicoOggi ? filterTecnicoOggi.value : "MIO";
+    const myName = localStorage.getItem('antimo_user_name') || "";
+    const filterName = targetFilter === "MIO" ? myName : targetFilter;
+
     const toDO = plannedInterventions.filter(inv => {
         if (inv.status !== 'planned') return false;
+        
+        if (targetFilter !== "TUTTI") {
+            if (inv.tecnicoAssegnato && inv.tecnicoAssegnato !== filterName) return false;
+            if (!inv.tecnicoAssegnato) return false; // Nascondi quelli non assegnati se il filtro MIO è attivo
+        }
+
         if (inv.dataPrevista) {
             const dpString = inv.dataPrevista; // "YYYY-MM-DD"
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -2900,8 +2963,6 @@ function renderActivitiesList() {
     });
 
     // 2. Interventi Completati (Eseguiti oggi) - Verdi
-    const targetFilter = filterTecnicoOggi ? filterTecnicoOggi.value : "MIO";
-    const myName = localStorage.getItem('antimo_user_name') || "";
     
     let done = [];
     if (!isNesegVisible) {
@@ -3170,11 +3231,23 @@ async function renderAppUsersList() {
         let usersHtml = '';
         snap.forEach(doc => {
             const data = doc.data();
+            const currentRole = data.ruolo || "";
+            const rolesOptions = (window.antimoDropdownLists && window.antimoDropdownLists.ruoli) 
+                ? window.antimoDropdownLists.ruoli.map(r => `<option value="${r.id}" ${currentRole === r.id ? "selected" : ""}>${r.desc}</option>`).join('')
+                : '';
+                
             usersHtml += `
             <div style="padding: 10px; border-bottom: 1px solid #eee; background: #f9fafb; border-radius: 6px; display:flex; flex-direction:column; gap:4px;">
                 <strong style="color: var(--blue-dark); font-size: 1rem;">${data.nome} ${data.cognome}</strong>
                 <a href="mailto:${data.email}" style="font-size: 0.85rem; color: var(--blue-primary); text-decoration: none;">📧 ${data.email}</a>
                 <a href="tel:${data.telefono1 || ''}" style="font-size: 0.85rem; color: #555; text-decoration: none;">📞 ${data.telefono1 || 'Nessun Telefono'}</a>
+                <div style="margin-top: 5px; font-size: 0.85rem;">
+                    <label>Ruolo:</label>
+                    <select onchange="window.updateUserRole('${doc.id}', this.value)" style="padding: 4px; border-radius: 4px; border: 1px solid #ccc; background: white; margin-left: 5px;">
+                        <option value="" ${currentRole === "" ? "selected" : ""}>Nessun Ruolo</option>
+                        ${rolesOptions}
+                    </select>
+                </div>
             </div>
             `;
         });
@@ -3189,6 +3262,16 @@ async function renderAppUsersList() {
         appUsersList.innerHTML = '<div style="text-align: center; color: red; font-size: 0.9rem;">Errore caricamento.</div>';
     }
 }
+
+window.updateUserRole = async function(docId, newRole) {
+    try {
+        const { doc: fsDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        await updateDoc(fsDoc(db, "anagrafiche", docId), { ruolo: newRole });
+    } catch(err) {
+        console.error("Errore salvataggio ruolo", err);
+        alert("Errore salvataggio ruolo.");
+    }
+};
 
 if(btnOpenUsersList) {
     btnOpenUsersList.addEventListener('click', () => {
@@ -3490,7 +3573,24 @@ const newListItemDesc = document.getElementById('newListItemDesc');
 const btnAddListItem = document.getElementById('btnAddListItem');
 const btnSaveFirebaseLists = document.getElementById('btnSaveFirebaseLists');
 
-let currentListTab = 'interventi'; // 'interventi' o 'dispositivi'
+let currentListTab = 'interventi'; // 'interventi', 'dispositivi' o 'ruoli'
+
+function updateListsTabUI() {
+    if(btnTabInterventi) {
+        btnTabInterventi.className = currentListTab === 'interventi' ? 'btn btn-primary' : 'btn btn-secondary';
+        btnTabInterventi.style.background = currentListTab === 'interventi' ? 'var(--blue-primary)' : '';
+    }
+    if(btnTabDispositivi) {
+        btnTabDispositivi.className = currentListTab === 'dispositivi' ? 'btn btn-primary' : 'btn btn-secondary';
+        btnTabDispositivi.style.background = currentListTab === 'dispositivi' ? 'var(--blue-primary)' : '';
+    }
+    const btnTabRuoli = document.getElementById('btnTabRuoli');
+    if(btnTabRuoli) {
+        btnTabRuoli.className = currentListTab === 'ruoli' ? 'btn btn-primary' : 'btn btn-secondary';
+        btnTabRuoli.style.background = currentListTab === 'ruoli' ? 'var(--blue-primary)' : '';
+    }
+    renderListsSetupTable();
+}
 
 if(btnOpenListsSetup) {
     btnOpenListsSetup.addEventListener('click', () => {
@@ -3508,22 +3608,22 @@ if(btnCloseListsSetup) {
 if(btnTabInterventi) {
     btnTabInterventi.addEventListener('click', () => {
         currentListTab = 'interventi';
-        btnTabInterventi.className = 'btn btn-primary';
-        btnTabInterventi.style.background = 'var(--blue-primary)';
-        btnTabDispositivi.className = 'btn btn-secondary';
-        btnTabDispositivi.style.background = '';
-        renderListsSetupTable();
+        updateListsTabUI();
     });
 }
 
 if(btnTabDispositivi) {
     btnTabDispositivi.addEventListener('click', () => {
         currentListTab = 'dispositivi';
-        btnTabDispositivi.className = 'btn btn-primary';
-        btnTabDispositivi.style.background = 'var(--blue-primary)';
-        btnTabInterventi.className = 'btn btn-secondary';
-        btnTabInterventi.style.background = '';
-        renderListsSetupTable();
+        updateListsTabUI();
+    });
+}
+
+const btnTabRuoli = document.getElementById('btnTabRuoli');
+if(btnTabRuoli) {
+    btnTabRuoli.addEventListener('click', () => {
+        currentListTab = 'ruoli';
+        updateListsTabUI();
     });
 }
 
@@ -3585,7 +3685,10 @@ if(btnAddListItem) {
         const desc = newListItemDesc.value.trim();
         if(!desc) return alert("Inserisci una descrizione valida.");
         
-        const prefix = currentListTab === 'interventi' ? 'INT_' : 'DEV_';
+        let prefix = 'ID_';
+        if (currentListTab === 'interventi') prefix = 'INT_';
+        else if (currentListTab === 'dispositivi') prefix = 'DEV_';
+        else if (currentListTab === 'ruoli') prefix = 'RUO_';
         const newId = prefix + Date.now().toString();
         
         window.antimoDropdownLists[currentListTab].push({ id: newId, desc: desc });

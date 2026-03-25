@@ -27,12 +27,12 @@ let waitingInterventions = [];
 let calendar;
 
 // Liste Dinamiche Dropdown
-window.antimoDropdownLists = { interventi: [], dispositivi: [] };
+window.antimoDropdownLists = { interventi: [], dispositivi: [], ruoli: [] };
 window.decodeCodeToLabel = function(codeRaw, type = 'interventi') {
     if(!codeRaw) return "";
     let codes = codeRaw.split(',').map(c => c.trim());
     return codes.map(c => {
-        let listStr = type === 'interventi' ? 'interventi' : 'dispositivi';
+        let listStr = type === 'interventi' ? 'interventi' : (type === 'ruoli' ? 'ruoli' : 'dispositivi');
         let found = window.antimoDropdownLists[listStr].find(item => item.id === c);
         return found ? found.desc : c;
     }).join(', ');
@@ -43,10 +43,12 @@ window.decodeCodeToLabel = function(codeRaw, type = 'interventi') {
 async function loadDropdownLists() {
     const defaultTypes = ['Visita', 'Sostituzione', 'Ritiro', 'Consegna', 'Manutenzione', 'Installazione', 'Riparazione'];
     const defaultDevices = ['Concentratore', 'Ventilatore', 'Aspiratore', 'D3', 'Stativo', 'Cpap', 'AutoCpap', 'Saturimetro'];
+    const defaultRoles = ["TECNICO", "TRASPORTATORE", "AMMINISTRATIVO", "MAGAZZINO", "LOGISTICA", "DIREZIONE", "PRODUZIONE O2", "CONSULENTE E", "CONSULENTE D", "CONSULENTE M"];
     
     window.antimoDropdownLists = {
         interventi: defaultTypes.map(t => ({ id: t, desc: t })),
-        dispositivi: defaultDevices.map(d => ({ id: d, desc: d }))
+        dispositivi: defaultDevices.map(d => ({ id: d, desc: d })),
+        ruoli: defaultRoles.map(r => ({ id: r, desc: r }))
     };
 
     if(db) {
@@ -69,6 +71,33 @@ async function loadDropdownLists() {
             opsSnap.forEach(d => {
                 const data = d.data();
                 window.operatoriSanitari.push({id: d.id, nome: (data.nome + " " + (data.cognome||"")).trim()});
+            });
+            
+            // Popoliamo tecnicoAssegnato
+            window.tecniciAssegnati = [];
+            const qTecnici = query(collection(db, "anagrafiche"), where("localita", "==", "App (Dipendente)"));
+            const tecniciSnap = await getDocs(qTecnici);
+            tecniciSnap.forEach(d => {
+                const data = d.data();
+                window.tecniciAssegnati.push({id: d.id, nome: (data.ragioneSociale || (data.nome + " " + (data.cognome||""))).trim()});
+            });
+            
+            const dropdownsAss = [document.getElementById('progTecnicoAssegnato'), document.getElementById('editProgTecnicoAssegnato')];
+            dropdownsAss.forEach(dd => {
+                if(dd && dd.options.length <= 1) {
+                    window.tecniciAssegnati.forEach(t => {
+                        const opt = document.createElement('option');
+                        opt.value = t.nome;
+                        opt.textContent = t.nome;
+                        dd.appendChild(opt);
+                    });
+                    if(localStorage.getItem('antimo_user_name')) {
+                        const myName = localStorage.getItem('antimo_user_name');
+                        if(Array.from(dd.options).some(o => o.value === myName)) {
+                            dd.value = myName; // DEFAULT a me
+                        }
+                    }
+                }
             });
             
         } catch(e) {
@@ -432,6 +461,7 @@ form.addEventListener('submit', async (e) => {
         interventiList: blocksData.array,
         dataPrevista: iData.value,
         oraPrevista: document.getElementById('oraProgrammata') ? document.getElementById('oraProgrammata').value : "",
+        tecnicoAssegnato: document.getElementById('progTecnicoAssegnato') ? document.getElementById('progTecnicoAssegnato').value : "",
         status: 'planned',
         timestamp: new Date().getTime()
     };
@@ -493,6 +523,7 @@ btnSaveWaiting.addEventListener('click', async () => {
         esito: blocksData.esitoStr,
         statoValutazione: blocksData.statoValutazioneStr,
         interventiList: blocksData.array,
+        tecnicoAssegnato: document.getElementById('progTecnicoAssegnato') ? document.getElementById('progTecnicoAssegnato').value : "",
         status: 'in_attesa',
         timestamp: new Date().getTime()
     };
@@ -557,6 +588,7 @@ window.editProgrammato = function(idFb) {
     document.getElementById('editProgMatricola').value = p.matricola || "";
     document.getElementById('editProgData').value = p.dataPrevista || "";
     document.getElementById('editProgOra').value = p.oraPrevista || "";
+    if (document.getElementById('editProgTecnicoAssegnato')) document.getElementById('editProgTecnicoAssegnato').value = p.tecnicoAssegnato || "";
     
     let opSel = document.getElementById('editProgOperatoreValutazione');
     if(opSel) {
@@ -597,6 +629,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 statoValutazione: document.getElementById('editProgStatoValutazione').value,
                 dataPrevista: newD,
                 oraPrevista: document.getElementById('editProgOra').value,
+                tecnicoAssegnato: document.getElementById('editProgTecnicoAssegnato') ? document.getElementById('editProgTecnicoAssegnato').value : "",
                 status: newD ? 'planned' : 'in_attesa' // revaluta status in base a se c'è data o no
             });
             modal.classList.add('hidden');

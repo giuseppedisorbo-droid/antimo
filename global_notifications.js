@@ -21,8 +21,22 @@ if(db) {
     const q = query(collection(db, "messaggi"));
     onSnapshot(q, (snapshot) => {
         let activeNotes = [];
+        const currentUser = localStorage.getItem('antimo_user_name') || "Sconosciuto";
+        const filterTecnico = localStorage.getItem('antimo_filterTecnicoOggi') || "MIO";
+        const filterName = filterTecnico === "MIO" ? currentUser : filterTecnico;
+
         snapshot.forEach(docSnap => {
             const data = docSnap.data();
+            
+            let sN = data.sender || "Sconosciuto";
+            let rN = data.recipients || "Bacheca (Tutti)";
+            if (Array.isArray(rN)) rN = rN.join(', ');
+
+            if (filterTecnico !== "TUTTI") {
+                const isRelevantForFilter = (sN === filterName) || (rN.includes(filterName)) || (rN === "Bacheca (Tutti)");
+                if (!isRelevantForFilter) return; // ignore this message for notification
+            }
+
             if(data.isNotification && !data.eliminato && !data.letto && !data.presoInCarico) {
                 activeNotes.push(data.text);
             }
