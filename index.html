@@ -2,611 +2,890 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Raw Data Entry | EUBIOTECH</title>
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- SheetJS -->
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-    <!-- Firebase SDK (Compat Version for simpler integration) -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-storage-compat.js"></script>
-    <link rel="stylesheet" href="style.css?v=2">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <title>Gestione Attività Esterne</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <header style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 20px;">
-            <div>
-                <h1 style="margin: 0;">EUBIOTECH</h1>
-                <p style="margin: 0; color: #64748b;">ver 1.0</p>
+    <header class="top-nav">
+        <!-- Lato Sinistro: Bottoni Impostazioni, Versione, PC Mode -->
+        <div class="header-left">
+            <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                <button id="btnSettings" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: white;" title="Impostazioni">⚙️</button>
+                <button id="btnTogglePC" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; cursor: pointer; font-weight: bold; font-size: 0.8rem;">PC</button>
+                <a href="admin.html" id="btnOpenDashboard" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; cursor: pointer; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: flex; align-items: center;">💻 Dashboard</a>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 8px; align-items: stretch;">
-                <button type="button" class="btn" id="open-fattura-btn" style="background-color: #10b981; font-weight: bold; font-size: 1.1em; width: 100%;">📝 Genera Fattura</button>
-                <button type="button" class="btn" id="open-anagrafica-general-btn" style="font-size: 0.9em; padding: 6px 12px; background-color: #3b82f6; border: none; color: white; width: 100%; display: flex; align-items: center; justify-content: center; gap: 5px;">
-                    👥 Scheda Anagrafica
-                </button>
-                <button type="button" class="btn" onclick="window.location.href='import_ai.html'" style="font-size: 0.9em; padding: 6px 12px; background-color: #f59e0b; border: none; color: white; width: 100%; display: flex; align-items: center; justify-content: center; gap: 5px; font-weight: bold;">
-                    📥 Importa Fatture (AI)
-                </button>
-            </div>
-        </header>
+            <div style="font-size: 0.75rem; color: rgba(255,255,255,0.9); margin-top: 8px; cursor: pointer; font-weight: 600;" id="appVersionStamp" onclick="nukeCache()">v26.0 - Mass Delete & AutoSync v58</div>
+            <div id="loggedInUserDisplay" style="font-size: 0.8rem; color: #fcd34d; font-weight: bold; margin-top: 4px;"></div>
+            <button id="btnTopNotification" class="hidden" style="margin-top: 5px; background: #e11d48; color: white; border-radius: 6px; padding: 4px 8px; border: 1px solid rgba(255,255,255,0.5); cursor: pointer; font-weight: 600; font-size: 0.75rem; display: flex; align-items: center; max-width: 250px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                🔔 <span id="topNotificationText" style="margin-left: 5px; overflow:hidden; text-overflow:ellipsis; white-space: nowrap;"></span>
+            </button>
+        </div>
 
-        <section class="form-section">
-            <h2>Aggiungi Nuovo Record</h2>
-            <form id="data-entry-form">
+        <!-- Selettore Multi-Tenant (Visualizzazione Eseguiti e Programmati) -->
+        <div style="margin-top: 5px; margin-bottom: 5px; text-align: center;">
+            <select id="filterTecnicoOggi" style="width: 100%; max-width: 400px; padding: 6px 15px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.5); background: rgba(0,0,0,0.2); color: white; font-weight: bold; font-size: 0.85rem; outline: none; cursor: pointer; text-align: center;">
+                <option value="" style="color: black;">Mostra Interventi in base a...</option>
+                <option value="MIO" style="color: black;" selected>👨‍🔧 Solo miei</option>
+                <option value="TUTTI" style="color: black;">🌍 Tutti</option>
+            </select>
+        </div>
+
+        <!-- Lato Destro: Griglia Badge Statistici -->
+        <div class="header-stats-grid">
+            <div style="display: flex; gap: 4px;">
+                <div id="btnMostraP" class="header-stat-box" style="cursor: pointer; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px;">
+                    <div style="font-size: 0.65rem; text-transform: uppercase;">PT</div>
+                    <div style="font-size: 1.1rem; font-weight: 700;"><strong id="programmatiCount">0</strong></div>
+                </div>
+                <a href="programmati.html" id="btnCalendarLink" class="header-stat-box" style="cursor: pointer; flex: 1; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; text-decoration: none; color: inherit;">
+                    📅
+                </a>
+            </div>
+            <div id="btnMostraOggi" class="header-stat-box" style="cursor: pointer;">
+                <div style="font-size: 0.65rem; text-transform: uppercase;">Oggi</div>
+                <div style="font-size: 1.1rem; font-weight: 700;"><strong id="oggiCount">0</strong></div>
+            </div>
+            <div id="btnMostraDomani" class="header-stat-box" style="cursor: pointer;">
+                <div style="font-size: 0.65rem; text-transform: uppercase;">Domani</div>
+                <div style="font-size: 1.1rem; font-weight: 700;"><strong id="domaniCount">0</strong></div>
+            </div>
+            <div id="btnMostraNP" class="header-stat-box" style="cursor: pointer;">
+                <div style="font-size: 0.65rem; text-transform: uppercase;">NP</div>
+                <div style="font-size: 1.1rem; font-weight: 700;"><strong id="npCount">0</strong></div>
+            </div>
+            <div id="btnMostraNeseguiti" class="header-stat-box" style="cursor: pointer;">
+                <div style="font-size: 0.65rem; text-transform: uppercase; color: #e11d48;">N. Eseg.</div>
+                <div style="font-size: 1.1rem; font-weight: 700; color: #e11d48;"><strong id="nesegCount">0</strong></div>
+            </div>
+            <div id="btnMostraEseguiti" class="header-stat-box" style="cursor: pointer;">
+                <div style="font-size: 0.65rem; text-transform: uppercase;">Eseg.</div>
+                <div style="font-size: 1.1rem; font-weight: 700;"><strong id="interventiCount">0</strong></div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Datalist Autocomplete -->
+        <datalist id="assistitiDatalist"></datalist>
+        <!-- GLOBAL TOGGLE FOR LISTS -->
+        <div id="globalToggleCardContainer" style="text-align: right; width: 100%;">
+            <button id="btnToggleAllCollapse" class="btn btn-secondary btn-sm" style="width: 100%; font-size: 0.95rem; padding: 12px; margin-bottom: 0px;">
+                <span class="btn-icon">⏬</span> APRI TUTTE LE SCHEDE
+            </button>
+        </div>
+
+        <!-- BACHECA MESSAGGI / NOTIFICHE -->
+        <section class="card glass-card" id="messagesSection" style="margin-bottom: 20px; border-left: 4px solid var(--orange);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="color: var(--blue-primary); margin:0;"><span class="btn-icon">💬</span> Bacheca & Notifiche</h2>
+                <div style="display: flex; gap: 5px;">
+                    <button id="btnOpenRubrica" class="btn btn-secondary" style="width: auto; padding: 5px 10px; font-size: 0.8rem; margin: 0; background: var(--orange); color: white; border: none;">📱 Rubrica SMS</button>
+                    <button id="btnToggleMessages" class="btn btn-secondary" style="width: auto; padding: 5px 10px; font-size: 0.8rem; margin: 0;">Mostra</button>
+                </div>
+            </div>
+            
+            <div id="messagesContainer" class="hidden" style="margin-top: 15px;">
+                <!-- Filtri e Ricerca Bacheca -->
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; align-items: center;">
+                    <div style="display: flex; gap: 5px; flex: 1; min-width: 250px;">
+                        <input type="text" id="msgSearchText" placeholder="Cerca testo..." style="flex: 1; font-size: 0.85rem; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px;">
+                        <select id="msgSearchUser" style="flex: 1; font-size: 0.85rem; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px;">
+                            <option value="">Utente (Tutti)</option>
+                        </select>
+                        <input type="date" id="msgSearchDate" style="font-size: 0.85rem; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; max-width: 40px;">
+                    </div>
+                    <div style="display: flex; gap: 8px; justify-content: flex-start; width: 100%; flex-wrap: wrap; padding-bottom: 5px; align-items: center;">
+                        <button id="btnMsgTabAll" class="btn btn-sm btn-primary btn-blue" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Tutti</button>
+                        <button id="btnMsgTabUnread" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Non Letti</button>
+                        <button id="btnMsgTabReceived" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Ricevuti</button>
+                        <button id="btnMsgTabSent" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Inviati</button>
+                        <button id="btnMsgTabInCharge" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">👷 Presi in Carico</button>
+                        <button id="btnMsgTabReplied" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">↩️ Risposti</button>
+                        <button id="btnMsgTabResolved" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">✅ Risolti</button>
+                        <button id="btnMsgTabDeleted" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Cestino</button>
+                        <button id="btnEmptyTrash" class="btn btn-sm btn-danger hidden" style="padding: 6px 14px; margin: 0; margin-left: auto; font-size: 0.75rem; white-space: nowrap; background-color: #ef4444; color: white; border: none; font-weight: bold; border-radius: 20px;">🔥 Svuota</button>
+                    </div>
+                </div>
+
+                <div id="messagesList" style="max-height: 50vh; min-height: 350px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px; margin-bottom: 10px;">
+                    <div style="text-align: center; font-size: 0.9rem; color: #666;">Caricamento messaggi...</div>
+                </div>
+                <hr style="border: 0; border-top: 1px dotted #ccc; margin: 10px 0;">
+                <form id="newMessageForm" style="display: flex; flex-direction: column; gap: 8px;">
+                    <textarea id="msgText" rows="2" placeholder="Scrivi un nuovo messaggio o comunicazione..." style="width: 100%; border-radius: 8px; border: 1px solid #ccc; padding: 10px; font-family: inherit; font-size: 0.9rem;" required></textarea>
+                    
+                    <div class="form-group" style="background: rgba(59,130,246,0.05); padding: 10px; border-radius: 8px; border: 1px dashed var(--blue-primary); margin-bottom: 0;">
+                        <label for="msgAttachments" style="font-size: 0.85rem; font-weight: bold; color: var(--blue-dark);">📎 Allega File (Foto, PDF, Video)</label>
+                        <input type="file" id="msgAttachments" multiple accept="image/*,video/*,application/pdf" style="font-size: 0.85rem; margin-top: 5px; width: 100%;">
+                        <div id="msgPreviewContainer" class="hidden" style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: start; background: rgba(255,255,255,0.5); padding: 5px; border-radius: 8px;">
+                        </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <label style="display: flex; align-items: center; gap: 5px; font-size: 0.85rem; color: var(--blue-dark); cursor: pointer; font-weight: 600;">
+                            <input type="checkbox" id="msgIsNotification" checked style="width: 18px; height: 18px; accent-color: var(--orange);"> 
+                            📌 Fissa come Notifica
+                        </label>
+                        <button type="submit" class="btn btn-primary btn-orange btn-sm" style="width: auto; margin: 0; padding: 8px 15px;" id="btnSendMsg">Invia</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+        <!-- SEZIONE INTERVENTI OGGI -->
+        <section class="card glass-card hidden" id="oggiInterventionsSection" style="margin-bottom: 20px; border-left: 4px solid #3b82f6;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="color: #3b82f6; margin:0;"><span class="btn-icon">📅</span> Interventi Oggi</h2>
+            </div>
+            <div id="oggiList" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+            </div>
+        </section>
+
+        <!-- SEZIONE INTERVENTI DOMANI -->
+        <section class="card glass-card hidden" id="domaniInterventionsSection" style="margin-bottom: 20px; border-left: 4px solid #a855f7;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="color: #a855f7; margin:0;"><span class="btn-icon">📅</span> Interventi Domani</h2>
+            </div>
+            <div id="domaniList" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+            </div>
+        </section>
+
+        <!-- SEZIONE INTERVENTI PROGRAMMATI (TUTTI) -->
+        <section class="card glass-card hidden" id="plannedInterventionsSection" style="margin-bottom: 20px; border-left: 4px solid var(--orange);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="color: var(--orange); margin:0;"><span class="btn-icon">📅</span> Tutti i Programmati</h2>
+                <a href="programmati.html" style="font-size: 0.8rem; text-decoration: underline; color: var(--blue-primary); font-weight: 600;">Gestisci &rarr;</a>
+            </div>
+            <div id="plannedList" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+                <!-- Gli interventi programmati verranno creati qui da app.js -->
+            </div>
+        </section>
+
+        <!-- SEZIONE INTERVENTI NP - NON PROGRAMMATI (Nascondibile a Piacere) -->
+        <section class="card glass-card hidden" id="npInterventionsSection" style="margin-bottom: 20px; border-left: 4px solid #ef4444;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="color: #ef4444; margin:0;"><span class="btn-icon">⏳</span> Non Programmati (NP)</h2>
+                <a href="programmati.html" style="font-size: 0.8rem; text-decoration: underline; color: var(--blue-primary); font-weight: 600;">Gestisci &rarr;</a>
+            </div>
+            <div id="npList" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+                <!-- Gli interventi in attesa verranno creati qui da app.js -->
+            </div>
+        </section>
+
+        <!-- PULSANTE ANAGRAFICHE & NUOVO INTERVENTO -->
+        <div style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
+            <a href="anagrafiche.html" class="btn btn-primary btn-blue btn-large" style="width: 100%; text-decoration: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(30,58,138,0.2); display: flex; align-items: center; justify-content: center; gap: 8px; color: white;">
+                <span style="font-size: 1.4rem;">📇</span> GESTIONE ANAGRAFICHE
+            </a>
+            <button id="btnToggleNuovoIntervento" class="btn btn-primary btn-blue btn-large" style="width: 100%; border: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(30,58,138,0.2); display: flex; align-items: center; justify-content: center; gap: 8px; color: white; margin: 0; cursor: pointer;">
+                <span style="font-size: 1.4rem;">📝</span> NUOVO INTERVENTO
+            </button>
+            <button id="btnOpenValuation" class="btn btn-primary btn-large" style="width: 100%; border: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(34,197,94,0.2); background: #22c55e; display: flex; align-items: center; justify-content: center; gap: 8px; color: white; margin: 0; cursor: pointer;">
+                <span style="font-size: 1.4rem;">💰</span> VALORIZZAZIONE ATTIVITÀ
+            </button>
+        </div>
+
+        <!-- SEZIONE INSERIMENTO INTERVENTO -->
+        <section class="card glass-card hidden" id="interventionSection">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="margin: 0; padding: 0;">Nuovo Intervento</h2>
+                <button id="btnCloseInterventionSection" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #666;">&times;</button>
+            </div>
+            <form id="newInterventionForm">
                 <div class="form-group">
-                    <label for="date-input">Data</label>
-                    <input type="date" id="date-input" required>
+                    <label for="paziente">Paziente / Ente *</label>
+                    <input type="text" id="paziente" placeholder="Nominativo" list="assistitiDatalist" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="tecnicoAssegnato">Tecnico Assegnato *</label>
+                    <select id="tecnicoAssegnato" required style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.9rem; font-family: inherit;">
+                        <option value="">Seleziona Tecnico...</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <div class="form-group" style="flex: 1; min-width: 140px;">
+                        <label for="localita">Località (Città) *</label>
+                        <input type="text" id="localita" placeholder="Es. Napoli" required>
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 140px;">
+                        <label for="indirizzo">Indirizzo *</label>
+                        <input type="text" id="indirizzo" placeholder="Es. Via Roma 1" required>
+                    </div>
                 </div>
                 
                 <div class="form-group">
-                    <label for="type-input">Tipo (Sezione)</label>
-                    <select id="type-input" required>
-                        <option value="REVENUE_EUBIOS">RICAVI EUBIOS</option>
-                        <option value="COSTS_EUBIOS">COSTI EUBIOS</option>
-                        <option value="REVENUE_EUBIOTECH">RICAVI EUBIOTECH</option>
-                        <option value="COSTS_EUBIOTECH">COSTI EUBIOTECH</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="category-input">Categoria</label>
-                    <select id="category-input" required>
-                        <option value="" disabled selected>Caricamento categorie in corso...</option>
-                        <option value="altro">+ Aggiungi nuova voce...</option>
-                    </select>
-                    <input type="text" id="custom-category-input" placeholder="Specifica nuova categoria..." style="display:none; margin-top: 5px;">
-                </div>
-
-                <div class="form-group">
-                    <label for="description-input">Descrizione (Opzionale)</label>
-                    <select id="description-input">
-                        <option value="" selected>Nessuna descrizione</option>
-                        <option value="altro">+ Aggiungi nuova voce...</option>
-                    </select>
-                    <input type="text" id="custom-description-input" placeholder="Dettaglio aggiuntivo" style="display:none; margin-top: 5px;">
-                </div>
-
-                <div class="form-group">
-                    <label for="dettaglio-input">Dettaglio (da XML/Oggetto - Opzionale)</label>
-                    <input type="text" id="dettaglio-input" placeholder="Servizio o Prodotto venduto">
-                </div>
-
-                <div class="form-group">
-                    <label for="cliente-input">Cliente (Opzionale)</label>
-                    <select id="cliente-input" style="width: 100%;">
-                        <option value="" selected>Nessun cliente</option>
-                    </select>
+                    <label for="telefono">Recapito Telefonico (Opzionale ma Consigliato)</label>
+                    <input type="tel" id="telefono" placeholder="Es. 3331234567">
                 </div>
                 
                 <div class="form-group">
-                    <label for="fornitore-input">Fornitore (Opzionale)</label>
-                    <select id="fornitore-input" style="width: 100%;">
-                        <option value="" selected>Nessun fornitore</option>
-                    </select>
+                    <label for="allegatoFile">Allegato/i (Foto, PDF, o Video) - Operatore Campo</label>
+                    <input type="file" id="allegatoFile" accept="image/*,video/*,application/pdf" multiple>
+                    <div id="filePreviewContainer" class="hidden" style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: start; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px;">
+                        <!-- Le anteprime verranno inserite qui dinamicamente -->
+                    </div>
                 </div>
+
+                <!-- Dynamic Interventions Array Block -->
+                <div id="dynamicInterventionsContainer">
+                    <!-- Dynamic Blocks injected by app.js -->
+                </div>
+                <button type="button" id="btnAddInterventionBlock" class="btn btn-secondary" style="margin-bottom: 15px; width: 100%; background: #e0f2fe; color: var(--blue-dark); border: 1px dashed var(--blue-primary); padding: 10px; border-radius: 8px; font-weight: bold;">
+                    ➕ Aggiungi Dispositivo / Intervento
+                </button>
+
 
                 <div class="form-group">
-                    <label for="amount-input">Importo (€)</label>
-                    <input type="number" id="amount-input" step="0.01" required>
+                    <label for="note">Eventuali Note</label>
+                    <textarea id="note" rows="2" placeholder="Note sull'intervento..."></textarea>
+                </div>
+                
+                <div class="form-group" style="background: rgba(234, 88, 12, 0.05); padding: 10px; border-radius: 8px; border: 1px dashed var(--orange-accent);">
+                    <label for="allegatoProgrammazione">Allegati Extra (Programmazione / Sede)</label>
+                    <input type="file" id="allegatoProgrammazione" accept="image/*,video/*,application/pdf" multiple>
+                    <div id="progPreviewContainer" class="hidden" style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: start; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px;">
+                        <!-- Le anteprime extra verranno inserite qui dinamicamente -->
+                    </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="attachment-input">Allegato (PDF/Immagine - Opzionale)</label>
-                    <input type="file" id="attachment-input" accept="image/*,.pdf">
-                    <div id="upload-progress" style="display: none; font-size: 0.85em; color: #3b82f6; margin-top: 5px;">Caricamento in corso: <span id="upload-percent">0</span>%</div>
+                <div id="kmContainer" class="form-group mt-15 hidden">
+                    <label for="kmPercorsi">Km A/R Percorsi per questo intervento (Obbligatorio se in Impostazioni)</label>
+                    <input type="number" id="kmPercorsi" placeholder="Es. 35">
                 </div>
 
-                <div style="display: flex; gap: 10px;">
-                    <button type="submit" id="submit-btn" class="btn">Salva Record</button>
-                    <button type="button" id="cancel-edit-btn" class="btn btn-outline" style="display: none; border-color: var(--danger); color: var(--danger);">Annulla Modifica</button>
+                <div style="display: flex; gap: 10px; flex-direction: column;">
+                    <button type="submit" class="btn btn-primary btn-orange btn-large" id="btnStartIntervention">
+                        <span class="btn-icon">⚡</span> TERMINA ATTIVITA'
+                    </button>
+                    <button type="button" class="btn btn-success btn-large" id="btnWhatsappNuovoIntervento" style="background-color: #25D366; color: white; border: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.2); display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
+                        <span class="btn-icon" style="font-size: 1.4rem;">💬</span> WHATSAPP "NUOVO INTERVENTO"
+                    </button>
+                    
+                    <div style="border-top: 1px dashed #ccc; margin-top: 10px; padding-top: 10px;">
+                        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                            <div style="flex: 1;">
+                                <label for="dataProgrammata"><strong>Data Prevista</strong></label>
+                                <input type="date" id="dataProgrammata" style="width: 100%;">
+                            </div>
+                            <div style="flex: 1;">
+                                <label for="oraProgrammata"><strong>Ora Prevista</strong></label>
+                                <input type="time" id="oraProgrammata" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
+                            </div>
+                        </div>
+                        <button type="button" class="btn" id="btnPlanIntervention" style="background-color: #e2e8f0; color: var(--blue-dark); font-weight: 600; padding: 12px; border: 1px solid #cbd5e1; width: 100%;">
+                             <span class="btn-icon">📅</span> SALVA IN PROGRAMMATI
+                        </button>
+                    </div>
                 </div>
             </form>
         </section>
 
-        <section class="filters-section">
-            <div style="border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem; padding-bottom: 0.5rem;">
-                <h2 style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">Analisi e Filtri</h2>
+        <!-- SEZIONE INTERVENTO IN CORSO RIMOSSA IN FAVORE DELLA COMPILAZIONE DIRETTA A FASE SINGOLA -->
+        <!-- SEZIONE RIEPILOGO & EXPORT -->
+        <section class="card glass-card" id="exportSection">
+            <h2>Gestione Dati</h2>
+            <div class="button-group">
+                <button class="btn btn-primary" id="btnViewActivities">
+                     <span class="btn-icon">📅</span> INTERVENTI DELLA GIORNATA
+                </button>
+                <button class="btn btn-primary btn-blue hidden" id="btnShareCSV" style="width: 100%; margin-top: 10px;">
+                     <span class="btn-icon">📤</span> ESTRAI & CONDIVIDI
+                </button>
             </div>
             
-            <div id="filter-grid-container" class="filter-grid" style="display: none;">
-                <div class="filter-box">
-                    <label>Filtra per Anno</label>
-                    <div id="year-filters" class="checkbox-group">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-                <div class="filter-box">
-                    <label>Filtra per Mese / Trimestre</label>
-                    <div class="quick-selects">
-                        <button type="button" class="btn-small" data-q="1">Q1</button>
-                        <button type="button" class="btn-small" data-q="2">Q2</button>
-                        <button type="button" class="btn-small" data-q="3">Q3</button>
-                        <button type="button" class="btn-small" data-q="4">Q4</button>
-                        <button type="button" class="btn-small btn-outline" id="sel-all-months">Tutti</button>
-                    </div>
-                    <div id="month-filters" class="checkbox-group grid-months">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-                <div class="filter-box">
-                    <label>Filtra per Tipo</label>
-                    <div id="type-filters" class="checkbox-group">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-                <div class="filter-box" style="grid-column: 1 / -1;">
-                    <label>Filtra per Categoria</label>
-                    <div class="quick-selects">
-                        <button type="button" class="btn-small btn-outline" id="sel-all-categories">Tutte</button>
-                        <button type="button" class="btn-small btn-outline" id="desel-all-categories">Nessuna</button>
-                    </div>
-                    <div id="category-filters" class="checkbox-group" style="display: flex; flex-wrap: wrap; gap: 10px;">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-            </div>
-
-            <div class="summary-container" style="display: flex; flex-direction: column; gap: 1.5rem;">
-                <!-- EUBIOS ROW -->
-                <div>
-                    <h3 style="margin-bottom: 0.5rem; color: #3b82f6; font-size: 1.1rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.25rem;">Riepilogo Eubios</h3>
-                    <div class="summary-cards">
-                        <div class="summary-card card-revenue">
-                            <div class="card-title" id="title-revenue-eubios">Ricavi Eubios</div>
-                            <div class="card-value" id="sum-revenue-eubios">€ 0,00</div>
-                        </div>
-                        <div class="summary-card" style="background-color: #fef2f2; border: 1px solid #fecdd3;">
-                            <div class="card-title" id="title-costs-eubios" style="color: #be123c;">Costi Eubios</div>
-                            <div class="card-value" id="sum-costs-eubios" style="color: #9f1239;">€ 0,00</div>
-                        </div>
-                        <div class="summary-card card-profit-eubios">
-                            <div class="card-title" id="title-profit-eubios">Utile Eubios</div>
-                            <div class="card-value" id="sum-profit-eubios">€ 0,00</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- EUBIOTECH ROW -->
-                <div>
-                    <h3 style="margin-bottom: 0.5rem; color: #8b5cf6; font-size: 1.1rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.25rem;">Riepilogo Eubiotech</h3>
-                    <div class="summary-cards">
-                        <div class="summary-card card-revenue-tech">
-                            <div class="card-title" id="title-revenue-tech">Ricavi Eubiotech</div>
-                            <div class="card-value" id="sum-revenue-tech">€ 0,00</div>
-                        </div>
-                        <div class="summary-card card-cogs">
-                            <div class="card-title" id="title-cogs">Costi risorse umane</div>
-                            <div class="card-value" id="sum-cogs">€ 0,00</div>
-                        </div>
-                        <div class="summary-card card-opex">
-                            <div class="card-title" id="title-opex">Costi altri</div>
-                            <div class="card-value" id="sum-opex">€ 0,00</div>
-                        </div>
-                        <div class="summary-card card-profit-tech">
-                            <div class="card-title" id="title-profit-tech">Utile Eubiotech</div>
-                            <div class="card-value" id="sum-profit-tech">€ 0,00</div>
-                        </div>
-                    </div>
+            <div id="activitiesListContainer" class="hidden" style="margin-top: 20px; text-align: left;">
+                <h3 style="margin-bottom: 10px; color: var(--blue-primary); border-bottom: 1px solid var(--blue-light); padding-bottom: 5px;">Riepilogo Odierno</h3>
+                <div id="activitiesList" style="max-height: 400px; overflow-y: auto; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px;">
+                    <!-- I task vengono inseriti qui da app.js (Rossi/Verdi) -->
                 </div>
             </div>
         </section>
 
-        <section class="data-section">
-            <div class="data-header">
-                <div style="flex-grow: 1; display: flex; align-items: center; justify-content: flex-start; margin-right: 20px;">
-                    <label style="margin-bottom: 0; margin-right: 10px; font-weight: bold; white-space: nowrap;">Vedi tabella:</label>
-                    <div style="display: flex; flex-direction: column; gap: 5px; margin-right: 20px;">
-                        <select id="group-by-select" style="padding: 8px; border-radius: 4px; border: 1px solid #cbd5e1; max-width: 250px;">
-                            <option value="none">Dettaglio Singoli Record</option>
-                            <option value="year" selected>Per Anno (Confronto Totali)</option>
-                            <option value="quarter">Per Trimestre</option>
-                            <option value="month">Per Mese</option>
-                            <option value="week">Per Settimana</option>
-                            <option value="day">Per Giorno</option>
-                            <option value="type">Per Tipo (Ricavi vs Costi)</option>
-                            <option value="category">Per Categoria</option>
-                            <option value="description">Per Descrizione</option>
-                            <option value="custom_group">Per Raggruppamento Causale</option>
+        <!-- MODAL MOTIVAZIONE NON ESEGUITO -->
+        <div id="justifyModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px;">
+                <h3 style="color: var(--blue-dark); margin-bottom: 10px;">Intervento Non Eseguito</h3>
+                <p style="font-size: 0.9rem; margin-bottom: 15px;">Inserisci una motivazione obbligatoria per segnalare questo intervento come NON eseguito.</p>
+                <textarea id="justifyReason" rows="3" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-family: inherit;" placeholder="Es. Paziente non in casa, strumento rotto..."></textarea>
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button id="btnCancelJustify" class="btn" style="background: #e2e8f0; color: #333; padding: 10px; flex: 1;">Annulla</button>
+                    <button id="btnConfirmJustify" class="btn btn-danger" style="padding: 10px; flex: 1;">Conferma</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL IMPOSTAZIONI -->
+        <div id="settingsModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; display: flex; align-items: center; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
+                    <span><span class="btn-icon">⚙️</span> Impostazioni App</span>
+                    <button id="btnCloseSettings" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                </h3>
+                
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee;">
+                    <div>
+                        <strong style="display: block; color: var(--blue-dark);">Richiedi Km Fine Intervento</strong>
+                        <span style="font-size: 0.8rem; color: #666;">Se disattivato, il campo km viene nascosto.</span>
+                    </div>
+                    <label style="position: relative; display: inline-block; width: 50px; height: 28px;">
+                        <input type="checkbox" id="toggleRequireKm" style="opacity: 0; width: 0; height: 0;">
+                        <span class="slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px;"></span>
+                        <style>
+                            .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+                            input:checked + .slider { background-color: #22c55e; }
+                            input:checked + .slider:before { transform: translateX(22px); }
+                        </style>
+                    </label>
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-primary btn-blue" id="btnOpenUsersList" style="width: 100%; padding: 12px; margin-bottom: 10px; font-weight: bold;">
+                        <span class="btn-icon">👥</span> GESTIONE DIPENDENTI
+                    </button>
+                    <button class="btn btn-primary btn-blue" id="btnOpenListsSetup" style="width: 100%; padding: 12px; margin-bottom: 10px; font-weight: bold; background: #6366f1; border-color: #4f46e5;">
+                        <span class="btn-icon">📋</span> GESTIONE VOCI (DISP/INT)
+                    </button>
+                    <button class="btn btn-primary btn-orange" id="btnManualSyncMobile" style="width: 100%; padding: 12px;">
+                        <span class="btn-icon">🔄</span> SINCRONIZZA CON CLOUD
+                    </button>
+                    <button class="btn btn-primary" id="btnLaunchAiChatDirectly" style="width: 100%; padding: 12px; margin-top: 10px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; font-weight: bold; box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);">
+                        <span class="btn-icon">💬</span> ASSISTENTE IA (GEMINI)
+                    </button>
+                    <button class="btn btn-primary btn-blue" id="btnOpenBackup" style="width: 100%; padding: 12px; margin-top: 10px;">
+                        <span class="btn-icon">💾</span> BACKUP VERSIONI
+                    </button>
+                    <button class="btn btn-primary btn-orange" id="btnOpenDataBackup" style="width: 100%; padding: 12px; margin-top: 10px;">
+                        <span class="btn-icon">🗄️</span> BACKUP DATI & RIPRISTINO
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL GESTIONE VOCI (DISP/INT) -->
+        <div id="listsSetupModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2200; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 600px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
+                    <span><span class="btn-icon">📋</span> Gestione Voci</span>
+                    <button id="btnCloseListsSetup" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                </h3>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button id="btnTabInterventi" class="btn btn-primary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal; background: var(--blue-primary);">Interventi</button>
+                    <button id="btnTabDispositivi" class="btn btn-secondary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal;">Dispositivi</button>
+                    <button id="btnTabRuoli" class="btn btn-secondary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal;">Ruoli</button>
+                </div>
+
+                <div id="listsContentContainer" style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1;">
+                    <div style="display:flex; gap: 10px; margin-bottom: 15px; align-items: center;">
+                        <input type="text" id="newListItemDesc" placeholder="Es. Visita..." style="flex: 2; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                        <input type="number" id="newListItemVal" placeholder="Valore €" step="0.01" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; min-width: 80px;" title="Valore in Euro (lasciare vuoto se non applicabile)">
+                        <button id="btnAddListItem" class="btn btn-primary btn-orange" style="margin: 0; padding: 8px 15px;"><span class="btn-icon">➕</span> Agg.</button>
+                    </div>
+
+                    <div style="max-height: 300px; overflow-y: auto;">
+                        <table id="listsSetupTable" style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                            <!-- Le voci verranno popolate da JS -->
+                        </table>
+                    </div>
+                    <button id="btnSaveFirebaseLists" class="btn btn-primary" style="width: 100%; margin: 15px 0 0 0;"><span class="btn-icon">💾</span> SALVA MODIFICHE E CHIUDI</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL DATA BACKUP -->
+        <div id="dataBackupModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2100; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 600px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
+                    <span><span class="btn-icon">💾</span> Gestione Dati (Server)</span>
+                    <button id="btnCloseDataBackup" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                </h3>
+
+                <div style="background: #eff6ff; padding: 15px; border-radius: 8px; border: 1px solid #bfdbfe; margin-bottom: 20px;">
+                    <h4 style="margin:0 0 10px; color: #1e40af;">🤖 Backup Automatico Firebase</h4>
+                    <p style="font-size: 0.85rem; color: #1e3a8a; margin-bottom: 5px;">
+                        L'app esegue un <strong>salvataggio giornaliero invisibile</strong> di tutti i dati ogni volta che un Amministratore apre la pagina <em>Dashboard</em> nel browser.
+                    </p>
+                    <!-- Versione App -->
+                    <div style="font-size: 0.85rem; color: #1e3a8a; font-weight: bold; margin-bottom: 5px;">
+                        v26.0 - Mass Delete & SyncFix
+                    </div>
+                    <p style="font-size: 0.85rem; color: #1e3a8a; margin-bottom: 0;">
+                        <strong>In caso di disastro grave</strong>: Entra sul sito Firebase &gt; vai in <strong>Storage</strong> &gt; apri la cartellina <code>backups_giornalieri</code>, scarica sul PC il file .json del giorno sano precedente ed importalo qui sotto.
+                    </p>
+                </div>
+                
+                <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 20px;">
+                    <h4 style="margin:0 0 10px; color: #b45309;">Esporta Database</h4>
+                    <p style="font-size: 0.85rem; color: #555; margin-bottom: 10px;">Crea una copia locale di tutti gli Interventi, Programmati, Messaggi e Anagrafiche estraendoli dal Cloud in un formidabile file JSON.</p>
+                    <button id="btnExportDataJson" class="btn btn-primary btn-orange" style="margin: 0; width: 100%;"><span class="btn-icon">⬇️</span> Scarica Database (.json)</button>
+                </div>
+
+                <div style="background: #fef2f2; padding: 15px; border-radius: 8px; border: 1px solid #fecaca;">
+                    <h4 style="margin:0 0 10px; color: #dc2626;">Ripristina Database</h4>
+                    <p style="font-size: 0.85rem; color: #7f1d1d; margin-bottom: 10px;">Questa operazione caricherà un file JSON esportato e andrà a re-inserire o aggiornare i record sul Server. Consigliato solo in caso di emergenza o migrazione.</p>
+                    <input type="file" id="importDataFile" accept=".json" style="width: 100%; padding: 8px; font-size: 0.85rem; border: 1px solid #ccc; border-radius: 4px; background: white; margin-bottom: 10px;">
+                    <button id="btnImportDataJson" class="btn btn-danger" style="margin: 0; width: 100%;"><span class="btn-icon">⬆️</span> Ripristina da File .json</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL MODIFICA ATTIVITA PROGRAMMATA -->
+        <div id="editInterventionModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
+                    <span><span class="btn-icon">✏️</span> Modifica Attività</span>
+                    <button id="btnCancelEdit" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                </h3>
+                <form id="editInterventionForm">
+                    <input type="hidden" id="editItemIndex">
+                    <div class="form-group">
+                        <label>Paziente / Ente</label>
+                        <input type="text" id="editPaziente" list="assistitiDatalist" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Tecnico Assegnato</label>
+                        <select id="editTecnicoAssegnato" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.9rem; font-family: inherit;">
+                            <option value="">Seleziona Tecnico...</option>
                         </select>
-                        <div style="display: flex; gap: 10px; margin-top: 2px;">
-                            <button id="iphone-view-btn" class="btn-small btn-outline" style="align-self: flex-start;">📱 iPhone</button>
-                            <button id="show-raw-xml-btn" class="btn-small" style="background-color: #3b82f6; color: white;"><i class="fas fa-file-invoice"></i> Mostra Fatture/XML</button>
+                    </div>
+                    <div class="form-group">
+                        <label>Località</label>
+                        <input type="text" id="editLocalita" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Indirizzo</label>
+                        <input type="text" id="editIndirizzo" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Telefono</label>
+                        <input type="tel" id="editTelefono">
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo Intervento</label>
+                        <textarea id="editTipo" rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Dispositivi</label>
+                        <textarea id="editDispositivi" rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Matricole</label>
+                        <textarea id="editMatricola" rows="2"></textarea>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <div style="flex: 1;">
+                            <label>Data Prevista</label>
+                            <input type="date" id="editDataPrevista" style="width: 100%;">
+                        </div>
+                        <div style="flex: 1;">
+                            <label>Ora Prevista</label>
+                            <input type="time" id="editOraPrevista" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
                         </div>
                     </div>
-                    <div style="position: relative; display: flex; align-items: center; max-width: 300px; min-width: 200px; width: 100%; margin-right: 15px;">
-                        <span style="position: absolute; left: 10px; font-size: 1.2em; color: #94a3b8; pointer-events: none;">🔍</span>
-                        <input type="text" id="global-search-input" placeholder="Cerca voci (usa AND / OR)..." style="padding: 8px 8px 8px 35px; border-radius: 4px; border: 1px solid #cbd5e1; width: 100%;">
+                    <div class="form-group">
+                        <label>Note</label>
+                        <textarea id="editNote" rows="2"></textarea>
+                    </div>
+                    <button type="button" id="btnSaveEdit" class="btn btn-primary btn-large" style="width: 100%; margin-top: 10px;">SALVA MODIFICHE</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- MODAL DATA BACKUP -->
+        <div id="dataBackupModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2100; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 600px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
+                    <span><span class="btn-icon">💾</span> Gestione Dati (Server)</span>
+                    <button id="btnCloseDataBackup" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                </h3>
+                
+                <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 20px;">
+                    <h4 style="margin:0 0 10px; color: #b45309;">Esporta Database</h4>
+                    <p style="font-size: 0.85rem; color: #555; margin-bottom: 10px;">Crea una copia in cassaforte di tutti gli Interventi, Programmati, Messaggi e Anagrafiche estraendoli dal Cloud in un file JSON.</p>
+                    <button id="btnExportDataJson" class="btn btn-primary btn-orange" style="margin: 0; width: 100%;"><span class="btn-icon">⬇️</span> Scarica Database (.json)</button>
+                </div>
+
+                <div style="background: #fef2f2; padding: 15px; border-radius: 8px; border: 1px solid #fecaca;">
+                    <h4 style="margin:0 0 10px; color: #dc2626;">Ripristina Database</h4>
+                    <p style="font-size: 0.85rem; color: #7f1d1d; margin-bottom: 10px;">Questa operazione caricherà un file JSON esportato e andrà a re-inserire o aggiornare i record sul Server. Consigliato solo in caso di emergenza o migrazione.</p>
+                    <input type="file" id="importDataFile" accept=".json" style="width: 100%; padding: 8px; font-size: 0.85rem; border: 1px solid #ccc; border-radius: 4px; background: white; margin-bottom: 10px;">
+                    <button id="btnImportDataJson" class="btn btn-danger" style="margin: 0; width: 100%;"><span class="btn-icon">⬆️</span> Ripristina da File .json</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL BACKUP VERSIONI -->
+        <div id="backupModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 600px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
+                    <span><span class="btn-icon">💾</span> Riepilogo Versioni</span>
+                    <button id="btnCloseBackup" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                </h3>
+                
+                <div style="margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px;">
+                        <label style="font-weight: 600; font-size: 0.9rem; color: var(--blue-dark);">Assistente IA Antimo</label>
+                        <button id="btnSaveManualBackup" class="btn btn-primary" style="background: #15803d; border: none; padding: 8px 12px; font-size: 0.85rem; margin: 0;"><span class="btn-icon">💾</span> Salva Vers. Manuale</button>
+                    </div>
+                    <button id="btnOpenTrueAiChat" class="btn btn-primary" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; width: 100%; padding: 12px; font-size: 1rem; font-weight: bold; margin: 0; border-radius: 8px; box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);">
+                        💬 Apri Assistente Antimo (Gemini)
+                    </button>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                        <thead>
+                            <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
+                                <th style="padding: 10px; font-size: 0.85rem;">Data / Periodo</th>
+                                <th style="padding: 10px; font-size: 0.85rem;">Versione</th>
+                                <th style="padding: 10px; font-size: 0.85rem;">Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody id="backupTableBody">
+                            <tr style="border-bottom: 1px solid #eee; background-color: #f0fdf4;">
+                                <td style="padding: 10px; font-size: 0.9rem;" id="backupManualeDate">Oggi (Manuale) - --:--</td>
+                                <td style="padding: 10px; font-weight: bold; color: #15803d; font-size: 0.9rem;" id="backupManualeVersionTxt">v24.3 (Custom)</td>
+                                <td style="padding: 10px;">
+                                    <button class="btn btn-sm btn-desc-version" data-version="v24.3-manual" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
+                                    <button class="btn btn-sm btn-reinstall-version" data-version="v24.3-manual" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
+                                </td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #eee;">
+                                <td style="padding: 10px; font-size: 0.9rem;" id="backupOggiDate">Oggi (Automatica)</td>
+                                <td style="padding: 10px; font-weight: bold; color: #166534; font-size: 0.9rem;" id="backupOggiVersionTxt">v24.3 (Attuale)</td>
+                                <td style="padding: 10px;">
+                                    <button class="btn btn-sm btn-desc-version" data-version="v24.3" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
+                                    <button class="btn btn-sm btn-reinstall-version" data-version="v24.3" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
+                                </td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #eee;">
+                                <td style="padding: 10px; font-size: 0.9rem;" id="backup2giorniDate">2 Giorni Fa</td>
+                                <td style="padding: 10px; font-size: 0.9rem;">v24.2</td>
+                                <td style="padding: 10px;">
+                                    <button class="btn btn-sm btn-desc-version" data-version="v24.2" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
+                                    <button class="btn btn-sm btn-reinstall-version" data-version="v24.2" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
+                                </td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #eee;">
+                                <td style="padding: 10px; font-size: 0.9rem;" id="backup7giorniDate">1 Settimana Fa</td>
+                                <td style="padding: 10px; font-size: 0.9rem;">v24.0</td>
+                                <td style="padding: 10px;">
+                                    <button class="btn btn-sm btn-desc-version" data-version="v24.0" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
+                                    <button class="btn btn-sm btn-reinstall-version" data-version="v24.0" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="margin-top: 15px; text-align: center;">
+                    <button id="btnAllVersions" class="btn btn-primary btn-blue" style="width: 100%; padding: 12px; font-weight: bold;">
+                        <span class="btn-icon">📋</span> TUTTE LE VERSIONI
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL DESCRIZIONE VERSIONE -->
+        <div id="versionDescModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2500; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 600px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+                    <span><span class="btn-icon">📄</span> Versione <span id="verTitleDesc" style="color: #ea580c;"></span></span>
+                    <button id="btnCloseVersionDesc" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                </h3>
+                
+                <div id="versionDescContent" style="font-size: 0.9rem; line-height: 1.5; color: #333;">
+                    <!-- Content generated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL RUBRICA IPHONE/SMS -->
+        <div id="rubricaModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2500; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
+                    <span><span class="btn-icon">📱</span> Rubrica SMS</span>
+                    <button id="btnCloseRubrica" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                </h3>
+                
+                <form id="newRubricaForm" style="display: flex; gap: 10px; border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 15px;">
+                    <input type="text" id="rubricaNome" placeholder="Nome..." required style="flex: 1;" autocomplete="off">
+                    <input type="tel" id="rubricaTelefono" placeholder="Numero..." required style="flex: 1;" autocomplete="off">
+                    <button type="submit" class="btn btn-primary" style="margin: 0; padding: 10px;">➕</button>
+                </form>
+
+                <div id="rubricaList" style="display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto;">
+                    <div style="text-align: center; color: #666; font-size: 0.9rem;">Caricamento rubrica...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL SELEZIONE DESTINATARI WHATSAPP -->
+        <div id="waSelectModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: var(--blue-dark); margin-bottom: 10px; display:flex; justify-content: space-between; align-items:center;">
+                    <span><span class="btn-icon">💬</span> Invia anche via WhatsApp</span>
+                    <button id="btnCloseWaSelect" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#666;">&times;</button>
+                </h3>                <p style="font-size: 0.9rem; color: #555; margin-bottom: 15px;">Seleziona i dipendenti da notificare via WhatsApp.</p>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-weight: bold; cursor: pointer;">
+                        <input type="checkbox" id="waSelectAll"> Seleziona Tutti
+                    </label>
+                </div>
+                
+                <div id="waContactsList" style="display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; margin-bottom: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+                    <!-- Checkbox iniettati da JS -->
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button id="btnWaSkip" class="btn btn-secondary" style="flex: 1; padding: 10px;">Solo Bacheca</button>
+                    <button id="btnWaSend" class="btn btn-primary" style="flex: 2; padding: 10px; background: #25D366; border: none;">Procedi su WA</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL INVIO SEQUENZIALE WHATSAPP -->
+        <div id="waQueueModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3100; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; margin: 40px auto; text-align: center;">
+                <h3 style="color: #25D366; margin-bottom: 15px;">Messaggio Salvato!</h3>
+                <p style="font-size: 0.9rem; color: #555; margin-bottom: 20px;">Clicca sui pulsanti per inviare il messaggio WhatsApp ai destinatari selezionati.</p>
+                
+                <div id="waQueueList" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                    <!-- Bottoni iniettati da JS -->
+                </div>
+                
+                <button id="btnCloseWaQueue" class="btn btn-secondary" style="width: 100%; padding: 10px;">Chiudi Terminata l'Operazione</button>
+            </div>
+        </div>
+
+        <!-- MODAL LOGIN (OBBLIGATORIO) -->
+        <div id="loginModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
+            <div style="background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.15); border: 2px solid var(--blue-light);">
+                <div style="font-size: 3rem; margin-bottom: 10px;">🔐</div>
+                <h2 style="color: var(--blue-primary); margin-bottom: 15px;">Accesso Riservato</h2>
+                <p style="font-size: 0.9rem; color: #555; margin-bottom: 25px;">Inserisci le tue credenziali aziendali per accedere. L'accesso è consentito solo con email <strong>@eubios.it</strong>.</p>
+                <form id="loginForm" style="display: flex; flex-direction: column; gap: 15px;">
+                    <div style="text-align: left;">
+                        <label for="loginEmail" style="font-weight: bold; font-size: 0.85rem; color: var(--blue-dark);">Email Aziendale *</label>
+                        <input type="email" id="loginEmail" placeholder="nome.cognome@eubios.it" required style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; margin-top: 5px; font-size: 1rem;">
+                    </div>
+                    <div style="text-align: left;">
+                        <label for="loginPhone" style="font-weight: bold; font-size: 0.85rem; color: var(--blue-dark);">Cellulare (per Anagrafica) *</label>
+                        <input type="tel" id="loginPhone" placeholder="Es. 3331234567" required style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; margin-top: 5px; font-size: 1rem;">
+                    </div>
+                    <div id="loginError" style="color: #dc2626; font-size: 0.85rem; font-weight: bold; display: none; background: #fee2e2; padding: 10px; border-radius: 6px;">Errore: formato email non valido.</div>
+                    <button type="submit" class="btn btn-primary btn-blue" style="width: 100%; padding: 15px; font-size: 1.1rem; font-weight: bold; margin-top: 10px; margin-bottom: 0;" id="btnLoginSubmit">
+                        AUTENTICATI
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- MODAL UTENTI APP -->
+        <div id="appUsersModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2500; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
+                    <span><span class="btn-icon">👥</span> Dipendenti Registrati</span>
+                    <button id="btnCloseUsersList" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                </h3>
+                <div id="appUsersList" style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto;">
+                    <div style="text-align: center; color: #666; font-size: 0.9rem;">Caricamento dipendenti...</div>
+                </div>
+            </div>
+        </div>
+        <!-- MODAL VERA CHAT AI -->
+        <div id="aiChatModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; display: flex; align-items: flex-start; justify-content: center; overflow-y: hidden;">
+            <div style="background: #f8fafc; border-radius: 12px; width: 95%; max-width: 600px; height: 90vh; margin: 20px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.3); display: flex; flex-direction: column; overflow: hidden;">
+                <!-- Header Chat -->
+                <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 12px 20px; display: flex; flex-direction: column; gap: 8px; color: white;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="font-size: 1.5rem;">🤖</div>
+                            <div>
+                                <h3 style="margin: 0; font-size: 1.1rem; color: white;">Antimo Assistant</h3>
+                                <p style="margin: 0; font-size: 0.75rem; color: #e0e7ff;">Powered by Google Gemini</p>
+                            </div>
+                        </div>
+                        <button id="btnCloseAiChat" style="background: none; border: none; color: white; font-size: 1.8rem; cursor: pointer; line-height: 1;">&times;</button>
+                    </div>
+                    <!-- Stile Risposta -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: #e0e7ff;">
+                        <span>Densità Risposta:</span>
+                        <select id="aiResponseStyle" style="padding: 2px 4px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.4); background: rgba(0,0,0,0.1); color: white; cursor: pointer; font-size: 0.8rem; outline: none;">
+                            <option value="standard" style="color: black;" selected>Normale</option>
+                            <option value="breve" style="color: black;">Breve (Riassuntiva)</option>
+                            <option value="lunga" style="color: black;">Dettagliata (Analitica)</option>
+                        </select>
                     </div>
                 </div>
-                <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 10px;">
-                    <!-- Hidden file input for "Costi Extra" import -->
-                    <input type="file" id="import-extra-file" accept=".xlsx, .xls" style="display: none;" />
-                    <!-- Hidden file input for full JSON backup -->
-                    <input type="file" id="import-backup-file" accept=".json" style="display: none;" />
-                    
-                    <div class="action-dropdown" style="position: relative; display: inline-block;">
-                        <button id="actions-menu-btn" class="btn" style="background-color: #475569; display: flex; align-items: center; gap: 8px;">
-                            ⚙️ Azioni Dati Dbase <span style="font-size: 0.8em;">▼</span>
-                        </button>
-                        <div id="actions-dropdown-content" class="action-dropdown-content" style="padding: 0; gap: 0; overflow: hidden; border: 1px solid #cbd5e1;">
-                            <button type="button" id="toggle-filters-btn" class="btn-tight" style="background-color: #64748b; color: white;">👁️ Mostra/Nascondi Filtri</button>
-                            <button id="clear-filters-btn" class="btn-tight" style="background-color: #f43f5e; color: white;">✖ Cancella Filtri Attivi</button>
-                            
-                            <hr style="border: 0; height: 1px; background: white; margin: 0;">
-                            <button id="settings-btn" class="btn-tight" style="background-color: #0f172a; color: white;">⚙️ Impostazioni Causali</button>
-                            <button id="classify-tool-btn" class="btn-tight" style="background-color: #d946ef; color: white;" onclick="window.location.href='classificazione.html'">🛠️ Strumento Riclassificazione</button>
-                            
-                            <hr style="border: 0; height: 1px; background: white; margin: 0;">
-                            
-                            <button id="import-extra-btn" class="btn-tight" style="background-color: #8b5cf6; color: white;">✚ Importa Costi Extra (Excel)</button>
-                            <button id="export-backup-btn" class="btn-tight" style="background-color: #3b82f6; color: white;">⬇️ Esporta Backup</button>
-                            <button id="import-backup-btn" class="btn-tight" style="background-color: #10b981; color: white;">⬆️ Importa Backup</button>
-                            
-                            <hr style="border: 0; height: 1px; background: white; margin: 0;">
-                            
-                            <button id="load-backup-btn" class="btn-tight" style="background-color: #f59e0b; color: white;">Carica Dati Base Excel</button>
-                            <button id="clear-all-btn" class="btn-tight" style="background-color: #ef4444; color: white;">Cancella Tutto</button>
+                
+                <!-- Area Messaggi -->
+                <div id="aiChatMessages" style="flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px;">
+                    <!-- Messaggio Iniziale -->
+                    <div style="display: flex; gap: 10px; align-items: flex-start;">
+                        <div style="background: white; border: 1px solid #e2e8f0; padding: 12px 15px; border-radius: 12px; border-bottom-left-radius: 2px; max-width: 85%; font-size: 0.9rem; color: #334155; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            Ciao! Sono l'assistente IA di Antimo. Conosco perfettamente le regole di questa applicazione. Chiedimi come gestire le Valutazioni D3, i programmati, le statistiche o qualsiasi altra funzionalità dell'app!
                         </div>
                     </div>
                 </div>
                 
-                <div id="active-filters-container" style="width: 100%; display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 15px; padding: 12px 15px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                    <span style="font-size: 0.85em; color: #475569; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Filtri Attivi:</span>
-                    <div id="active-filters-list" style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-                        <span style="font-size: 0.85em; color: #94a3b8; font-style: italic;">Nessun filtro applicato. Verranno mostrati tutti i dati non raggruppati.</span>
+                <!-- Previews -->
+                <div id="aiChatPreviewContainer" class="hidden" style="background: white; padding: 10px 15px 0; display: flex; gap: 10px; overflow-x: auto; min-height: 80px; align-items: center;"></div>
+                
+                <!-- Input Box -->
+                <div style="background: white; padding: 15px; border-top: 1px solid #e2e8f0; display: flex; gap: 10px; align-items: flex-end;">
+                    <div style="position: relative;">
+                        <input type="file" id="aiChatFile" accept="image/*" style="display: none;">
+                        <button type="button" id="btnBrowseAiFile" style="background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); color: #6366f1; border-radius: 50%; font-size: 1.2rem; cursor: pointer; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" title="Allega immagine">📎</button>
                     </div>
+                    <textarea id="aiChatInput" placeholder="Scrivi il tuo messaggio o carica un'immagine..." style="flex: 1; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-family: inherit; font-size: 0.9rem; resize: none; min-height: 44px; max-height: 120px;" rows="1"></textarea>
+                    <button id="btnSendAiChat" style="background: #6366f1; color: white; border: none; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    </button>
                 </div>
             </div>
+        </div>
+
+    </main>
+
+    <!-- MODAL VALORIZZAZIONE ATTIVITÀ -->
+    <div id="valorizzazioneModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2300; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+        <div style="background: white; padding: 20px; border-radius: 12px; width: 95%; max-width: 900px; margin: 20px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2); display: flex; flex-direction: column;">
+            <h3 style="color: #15803d; margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center; border-bottom: 2px solid #bbf7d0; padding-bottom: 10px;">
+                <span><span class="btn-icon">💰</span> Valorizzazione Attività</span>
+                <button id="btnCloseValuation" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+            </h3>
             
-            <div class="table-container">
-                <table id="data-table">
-                    <thead>
+            <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; background: #f0fdf4; padding: 15px; border-radius: 8px; border: 1px solid #bbf7d0;">
+                <div style="flex: 1; min-width: 150px;">
+                    <label style="font-size: 0.8rem; font-weight: bold; color: #166534;">Periodo / Modus</label>
+                    <select id="valPeriod" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px;">
+                        <option value="oggi">Oggi</option>
+                        <option value="ieri">Ieri</option>
+                        <option value="mese_corrente" selected>Questo Mese</option>
+                        <option value="mese_scorso">Mese Scorso</option>
+                        <option value="trimestre">Questo Trimestre</option>
+                        <option value="anno">Quest'Anno</option>
+                        <option value="custom">Date Personalizzate...</option>
+                    </select>
+                </div>
+                <div id="valCustomDates" class="hidden" style="flex: 2; display: flex; gap: 10px; min-width: 250px;">
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.8rem; font-weight: bold; color: #166534;">Dal</label>
+                        <input type="date" id="valDateFrom" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.8rem; font-weight: bold; color: #166534;">Al</label>
+                        <input type="date" id="valDateTo" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px;">
+                    </div>
+                </div>
+                <div style="flex: 1; min-width: 150px;">
+                    <label style="font-size: 0.8rem; font-weight: bold; color: #166534;">Ruolo</label>
+                    <select id="valRole" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px;">
+                        <option value="">Tutti i Ruoli</option>
+                        <!-- Popolato dinamicamente -->
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 150px;">
+                    <label style="font-size: 0.8rem; font-weight: bold; color: #166534;">Operatore/Tecnico</label>
+                    <select id="valOperator" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px;">
+                        <option value="">Tutti gli Operatori</option>
+                        <!-- Popolato dinamicamente -->
+                    </select>
+                </div>
+
+                <div style="display: flex; align-items: flex-end;">
+                    <button id="btnCalculateValuation" class="btn btn-primary" style="margin: 0; padding: 8px 15px; background: #22c55e; border-color: #16a34a;"><span class="btn-icon">🧮</span> CALCOLA</button>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                <div style="flex: 1; background: #f8fafc; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #e2e8f0;">
+                    <div style="font-size: 0.85rem; color: #64748b; font-weight: bold; text-transform: uppercase;">Totale Interventi Validi</div>
+                    <div id="valTotalCount" style="font-size: 1.8rem; font-weight: bold; color: #0f172a;">0</div>
+                </div>
+                <div style="flex: 1; background: #ecfdf5; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #6ee7b7;">
+                    <div style="font-size: 0.85rem; color: #047857; font-weight: bold; text-transform: uppercase;">Valore Economico Totale</div>
+                    <div id="valTotalAmount" style="font-size: 1.8rem; font-weight: bold; color: #059669;">€ 0.00</div>
+                </div>
+            </div>
+
+            <h4 style="color: #334155; margin-bottom: 10px; font-size: 1rem;">Dettaglio Attività Valutate</h4>
+            <div style="overflow-x: auto; max-height: 400px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                <table id="valDetailsTable" style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
+                    <thead style="background: #f1f5f9; position: sticky; top: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                         <tr>
-                            <th>Data</th>
-                            <th>Tipo</th>
-                            <th>Categoria</th>
-                            <th>Descrizione</th>
-                            <th>Dettaglio</th>
-                            <th>Importo (€)</th>
-                            <th>Cliente</th>
-                            <th>Fornitore</th>
-                            <th>Allegato</th>
-                            <th>Azioni</th>
+                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155;">Data</th>
+                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155;">Operatore</th>
+                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155;">Ruolo / Paziente</th>
+                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155;">Tipo Intervento</th>
+                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155; text-align: right;">Valore Unit.</th>
+                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155; text-align: right;">Valore Tot.</th>
+                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155; text-align: center; width: 40px;"></th>
                         </tr>
                     </thead>
-                    <tbody id="data-body">
-                        <!-- Entries will be loaded here -->
+                    <tbody id="valDetailsTableBody">
+                        <tr><td colspan="7" style="padding: 20px; text-align: center; color: #94a3b8;">Imposta i filtri e clicca su Calcola per visualizzare la valorizzazione economica.</td></tr>
                     </tbody>
                 </table>
             </div>
-        </section>
-    </div>
-
-    <div id="category-popover" class="popover hidden">
-        <div class="popover-header">
-            <h4>Filtra Causali</h4>
-            <button id="close-popover" class="close-btn">&times;</button>
-        </div>
-        <div class="popover-actions">
-            <button id="popover-sel-all" class="btn-small btn-outline">Seleziona tutte</button>
-            <button id="popover-desel-all" class="btn-small btn-outline">Deseleziona tutte</button>
-        </div>
-        <div id="popover-content" class="checkbox-group popover-checkboxes">
-            <!-- Checkboxes injected here -->
-        </div>
-    </div>
-
-    <!-- Custom Context Menu for table rows -->
-    <div id="row-context-menu" class="context-menu" style="display: none;">
-        <ul>
-            <li id="ctx-edit">✏️ Modifica</li>
-            <li id="ctx-delete" style="color: var(--danger);">🗑️ Elimina</li>
-        </ul>
-    </div>
-
-    <!-- Anagrafica Modal -->
-    <div id="anagrafica-modal" class="modal-overlay hidden">
-        <div class="modal-content" style="max-width: 600px;">
-            <div class="modal-header">
-                <h3 id="anagrafica-modal-title">Gestione Anagrafica</h3>
-                <button id="close-anagrafica-modal" class="close-btn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="anagrafica-form">
-                    <input type="hidden" id="anagrafica-id">
-                    
-                    <div class="form-group">
-                        <label for="anagrafica-type">Qualifica Anagrafica *</label>
-                        <select id="anagrafica-type" required style="border-color: #6366f1; width: 100%;">
-                            <option value="cliente">Cliente</option>
-                            <option value="fornitore">Fornitore</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="ana-ragione-sociale">Ragione Sociale / Nome *</label>
-                        <input type="text" id="ana-ragione-sociale" required>
-                    </div>
-                    
-                    <div style="display: flex; gap: 15px;">
-                        <div class="form-group" style="flex: 1;">
-                            <label for="ana-piva">Partita IVA</label>
-                            <input type="text" id="ana-piva">
-                        </div>
-                        <div class="form-group" style="flex: 1;">
-                            <label for="ana-cf">Codice Fiscale</label>
-                            <input type="text" id="ana-cf">
-                        </div>
-                    </div>
-                    
-                    <div style="display: flex; gap: 15px;">
-                        <div class="form-group" style="flex: 1;">
-                            <label for="ana-sdi">Codice Univoco (SDI)</label>
-                            <input type="text" id="ana-sdi" maxlength="7">
-                        </div>
-                        <div class="form-group" style="flex: 1;">
-                            <label for="ana-pec">Indirizzo PEC</label>
-                            <input type="email" id="ana-pec">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="ana-indirizzo">Indirizzo Sede Legale</label>
-                        <input type="text" id="ana-indirizzo" placeholder="Via/Piazza, CAP, Città, PR">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="ana-email">Email di contatto (non PEC)</label>
-                        <input type="email" id="ana-email">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="ana-telefono">Telefono</label>
-                        <input type="text" id="ana-telefono">
-                    </div>
-                    
-                    <div style="display: flex; gap: 10px; margin-top: 20px;">
-                        <button type="submit" class="btn" id="save-anagrafica-btn">Salva Anagrafica</button>
-                        <button type="button" class="btn btn-outline" id="cancel-anagrafica-btn">Annulla</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Genera Fattura Modal -->
-    <div id="fattura-modal" class="modal-overlay hidden">
-        <div class="modal-content" style="max-width: 800px;">
-            <div class="modal-header" style="background-color: #10b981; color: white;">
-                <h3>Emissione Nuova Fattura</h3>
-                <button id="close-fattura-modal" class="close-btn" style="color: white;">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="fattura-form">
-                    
-                    <div style="display: flex; gap: 15px; margin-bottom: 20px; background: #f8fafc; padding: 15px; border-radius: 8px;">
-                        <div class="form-group" style="flex: 2; margin-bottom: 0;">
-                            <label for="fat-cliente">Cliente Destinatario *</label>
-                            <select id="fat-cliente" required>
-                                <option value="" disabled selected>Caricamento anagrafiche in corso...</option>
-                            </select>
-                        </div>
-                        <div style="display: flex; align-items: flex-end; padding-bottom: 10px;">
-                            <button type="button" class="btn btn-outline" id="btn-nuovo-cliente-fat" title="Aggiungi Nuovo Cliente" style="padding: 0 10px; font-size: 1.2em;">➕</button>
-                        </div>
-                    </div>
-
-                    <div style="display: flex; gap: 15px;">
-                        <div class="form-group" style="flex: 1;">
-                            <label for="fat-numero">Numero Fattura *</label>
-                            <input type="text" id="fat-numero" required placeholder="Es. 01/2024">
-                        </div>
-                        <div class="form-group" style="flex: 1;">
-                            <label for="fat-data">Data Emissione *</label>
-                            <input type="date" id="fat-data" required>
-                        </div>
-                        <div class="form-group" style="flex: 1;">
-                            <label for="fat-scadenza">Data Scadenza</label>
-                            <input type="date" id="fat-scadenza">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="fat-descrizione">Descrizione Servizio / Prestazione *</label>
-                        <textarea id="fat-descrizione" required rows="3" placeholder="Dettaglio della prestazione resa..."></textarea>
-                    </div>
-
-                    <div style="display: flex; gap: 15px; background: #f1f5f9; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                            <label for="fat-imponibile">Imponibile (€) *</label>
-                            <input type="number" id="fat-imponibile" step="0.01" required>
-                        </div>
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                            <label for="fat-iva">Aliquota IVA (%) *</label>
-                            <select id="fat-iva" required>
-                                <option value="22">22% (Ordinaria)</option>
-                                <option value="10">10% (Agevolata)</option>
-                                <option value="4">4% (Minima)</option>
-                                <option value="0">0% (Esente/Non Imp.)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Riepilogo Calcoli -->
-                    <div style="background: white; border: 2px dashed #cbd5e1; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                            <span>Totale Imponibile:</span>
-                            <strong id="fat-calc-imponibile">€ 0.00</strong>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                            <span>Imposta IVA:</span>
-                            <strong id="fat-calc-iva">€ 0.00</strong>
-                        </div>
-                        <hr style="border-color: #e2e8f0; margin: 10px 0;">
-                        <div style="display: flex; justify-content: space-between; font-size: 1.3em; color: #10b981;">
-                            <strong>TOTALE DA PAGARE:</strong>
-                            <strong id="fat-calc-totale">€ 0.00</strong>
-                        </div>
-                    </div>
-
-                    <div style="display: flex; gap: 10px;">
-                        <button type="submit" class="btn" id="save-fattura-btn" style="background-color: #10b981; flex: 1; font-size: 1.1em;">Emetti e Salva Fattura</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="modal-overlay hidden">
-        <div class="modal-content" style="max-width: 600px;">
-            <div class="modal-header">
-                <h3>Gestione Causali (Raggruppamenti Personalizzati)</h3>
-                <button id="close-settings-modal" class="close-btn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p style="font-size: 0.9em; color: #64748b; margin-bottom: 15px;">
-                    Crea dei raggruppamenti personalizzati (es. "Spese Auto") e scegli quali Tipi, Categorie e Descrizioni includere spuntando le caselle sottostanti.
-                </p>
-
-                <!-- Elenco Raggruppamenti Esistenti -->
-                <div id="settings-groups-list" style="margin-bottom: 20px;">
-                    <h4>Raggruppamenti Attuali:</h4>
-                    <div id="custom-groups-container" style="display:flex; flex-wrap:wrap; gap:10px; margin-top:10px;">
-                        <!-- Injected by JS -->
-                    </div>
-                </div>
-
-                <hr style="border: 0; height: 1px; background: #e2e8f0; margin: 20px 0;">
-
-                <!-- Form Creazione/Modifica Raggruppamento -->
-                <div id="settings-form-area">
-                    <h4 id="settings-form-title">Crea Nuovo Raggruppamento</h4>
-                    <div class="form-group">
-                        <label for="new-group-name">Nome Raggruppamento</label>
-                        <input type="text" id="new-group-name" placeholder="Es. Spese di Viaggio" style="width: 100%;">
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px;">
-                        <div>
-                            <label style="font-weight: 600; margin-bottom: 5px; display:block;">Seleziona Tipi</label>
-                            <div id="settings-types-container" class="checkbox-group" style="max-height: 150px; overflow-y: auto; border: 1px solid #e2e8f0; padding: 10px; border-radius: 4px;">
-                                <!-- Checkboxes Injected by JS -->
-                            </div>
-                        </div>
-                        <div>
-                            <label style="font-weight: 600; margin-bottom: 5px; display:block;">Seleziona Categorie</label>
-                            <div id="settings-categories-container" class="checkbox-group" style="max-height: 150px; overflow-y: auto; border: 1px solid #e2e8f0; padding: 10px; border-radius: 4px;">
-                                <!-- Checkboxes Injected by JS -->
-                            </div>
-                        </div>
-                    </div>
-                    <div style="margin-top: 15px;">
-                        <label style="font-weight: 600; margin-bottom: 5px; display:block;">Seleziona Descrizioni (Opzionale)</label>
-                        <div id="settings-descriptions-container" class="checkbox-group" style="max-height: 150px; overflow-y: auto; border: 1px solid #e2e8f0; padding: 10px; border-radius: 4px; display: grid; grid-template-columns: 1fr 1fr;">
-                            <!-- Checkboxes Injected by JS -->
-                        </div>
-                    </div>
-
-                    <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
-                        <button id="cancel-group-btn" class="btn-outline" style="display:none;">Annulla Modifica</button>
-                        <button id="save-group-btn" class="btn" style="background: #10b981; color: white;">Salva Raggruppamento</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Drill-down Righe -->
-    <div id="drilldown-modal" class="modal-overlay hidden">
-        <div class="modal-content" style="width: 95%; max-width: 1200px; max-height: 90vh; display: flex; flex-direction: column; padding: 0;">
-            <div class="modal-header" style="padding: 15px 20px;">
-                <h3 id="drilldown-title" style="margin: 0; color: #1e293b;">Dettaglio Righe</h3>
-                <button id="close-drilldown" class="close-btn" style="font-size: 1.5rem;">&times;</button>
-            </div>
-            <div class="modal-body" style="overflow-y: auto; flex: 1; padding: 0;">
-                <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 0.9em; margin: 0;">
-                    <thead>
-                        <tr>
-                            <th style="position: sticky; top: 0; background: #f8fafc; z-index: 1; border-bottom: 2px solid #cbd5e1; padding: 10px;">Data</th>
-                            <th style="position: sticky; top: 0; background: #f8fafc; z-index: 1; border-bottom: 2px solid #cbd5e1; padding: 10px;">N. Fattura</th>
-                            <th style="position: sticky; top: 0; background: #f8fafc; z-index: 1; border-bottom: 2px solid #cbd5e1; padding: 10px;">Fornitore</th>
-                            <th style="position: sticky; top: 0; background: #f8fafc; z-index: 1; border-bottom: 2px solid #cbd5e1; padding: 10px;">Cliente</th>
-                            <th style="position: sticky; top: 0; background: #f8fafc; z-index: 1; border-bottom: 2px solid #cbd5e1; padding: 10px;">Tipo</th>
-                            <th style="position: sticky; top: 0; background: #f8fafc; z-index: 1; border-bottom: 2px solid #cbd5e1; padding: 10px;">Categoria</th>
-                            <th style="position: sticky; top: 0; background: #f8fafc; z-index: 1; border-bottom: 2px solid #cbd5e1; padding: 10px;">Descrizione Macro</th>
-                            <th style="position: sticky; top: 0; background: #f8fafc; z-index: 1; border-bottom: 2px solid #cbd5e1; padding: 10px;">Dettaglio</th>
-                            <th style="position: sticky; top: 0; background: #f8fafc; z-index: 1; border-bottom: 2px solid #cbd5e1; padding: 10px; text-align: right;">Importo</th>
-                        </tr>
-                    </thead>
-                    <tbody id="drilldown-tbody">
-                        <!-- Generato via JS -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Contenuto Fatture XML -->
-    <div id="raw-xml-modal" class="modal-overlay hidden">
-        <div class="modal-content" style="width: 98vw; height: 95vh; max-width: 2500px; max-height: none; display: flex; flex-direction: column; padding: 0; resize: both; overflow: auto; min-width: 800px; min-height: 500px;">
-            <div class="modal-header" style="padding: 15px 20px;">
-                <h3 style="margin: 0; color: #1e293b;"><i class="fas fa-file-invoice"></i> Contenuto Raw Fatture XML</h3>
-                <button id="close-raw-xml" class="close-btn" style="font-size: 1.5rem;">&times;</button>
-            </div>
             
-            <div style="padding: 15px 20px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-                <input type="text" id="raw-search-input" placeholder="Cerca (fornitore, articolo, importo...)" style="flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;">
-                <select id="raw-file-filter" style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; min-width: 150px;">
-                    <option value="">-- Tutti i File --</option>
-                </select>
-                <div style="position: relative; display: inline-block;">
-                    <button type="button" id="raw-type-btn" class="btn-outline btn-small" style="background: white;"><i class="fas fa-filter"></i> Tipo</button>
-                    <!-- Contextual Filter Dropdowns for Raw Modal -->
-                    <div id="raw-type-dropdown" class="popover hidden" style="position: absolute; top: 100%; right: 0; left: auto; z-index: 1002; margin-top: 5px;">
-                        <div class="popover-actions"><button id="raw-type-sel-all" class="btn-small btn-outline">Seleziona tutte</button><button id="raw-type-desel-all" class="btn-small btn-outline">Deseleziona tutte</button></div>
-                        <div id="raw-type-checkboxes" class="checkbox-group popover-checkboxes"></div>
-                    </div>
-                </div>
-                <div style="position: relative; display: inline-block;">
-                    <button type="button" id="raw-cat-btn" class="btn-outline btn-small" style="background: white;"><i class="fas fa-filter"></i> Categoria</button>
-                    <div id="raw-cat-dropdown" class="popover hidden" style="position: absolute; top: 100%; right: 0; left: auto; z-index: 1002; margin-top: 5px;">
-                        <div class="popover-actions"><button id="raw-cat-sel-all" class="btn-small btn-outline">Seleziona tutte</button><button id="raw-cat-desel-all" class="btn-small btn-outline">Deseleziona tutte</button></div>
-                        <div id="raw-cat-checkboxes" class="checkbox-group popover-checkboxes"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="raw-active-filters-container" style="padding: 8px 20px; background: #fff; border-bottom: 1px solid #e2e8f0; font-size: 0.85em; display: none;"></div>
-            
-            <div class="modal-body" style="overflow-y: auto; flex: 1; padding: 0;">
-                <table class="data-table" id="raw-xml-table" style="width: 100%; border-collapse: collapse; font-size: 0.85em; margin: 0;">
-                    <thead>
-                        <tr>
-                            <th class="sortable-raw" data-sort="fileSorgente" style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">File <span class="sort-icon-raw"></span></th>
-                            <th class="sortable-raw" data-sort="date" style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">Data <span class="sort-icon-raw"></span></th>
-                            <th class="sortable-raw" data-sort="numero" style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">N. Fattura <span class="sort-icon-raw"></span></th>
-                            <th class="sortable-raw" data-sort="fornitore" style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">Fornitore <span class="sort-icon-raw"></span></th>
-                            <th class="sortable-raw" data-sort="type" style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">Tipo <span class="sort-icon-raw"></span></th>
-                            <th class="sortable-raw" data-sort="category" style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">Categoria <span class="sort-icon-raw"></span></th>
-                            <th class="sortable-raw" data-sort="description" style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">Descrizione Macro <span class="sort-icon-raw"></span></th>
-                            <th class="sortable-raw" data-sort="dettaglio" style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">Dettaglio/Articolo (XML) <span class="sort-icon-raw"></span></th>
-                            <th class="sortable-raw" data-sort="quantita" style="position: sticky; top: 0; background: #f8fafc; z-index: 1; text-align: center;">Q.tà <span class="sort-icon-raw"></span></th>
-                            <th class="sortable-raw" data-sort="prezzoUnitario" style="position: sticky; top: 0; background: #f8fafc; z-index: 1; text-align: right;">P. Unit. <span class="sort-icon-raw"></span></th>
-                            <th class="sortable-raw" data-sort="amount" style="position: sticky; top: 0; background: #f8fafc; z-index: 1; text-align: right;">P. Tot. <span class="sort-icon-raw"></span></th>
-                        </tr>
-                    </thead>
-                    <tbody id="raw-xml-tbody">
-                        <!-- Generato via JS -->
-                    </tbody>
-                </table>
+            <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+                <button id="valExportBtn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 6px 12px; display: none;">📥 ESPORTA CSV</button>
             </div>
         </div>
     </div>
+    <script type="module" src="app.js?v=58"></script>
+    <script type="module" src="ai_chat.js?v=12"></script>
+    <script type="module" src="global_notifications.js?v=58"></script>
+    <script>
+      // Gestione layout PC
+      document.addEventListener('DOMContentLoaded', () => {
+          const btnTogglePC = document.getElementById('btnTogglePC');
+          const isPcMode = localStorage.getItem('antimo_pcmode') === 'true';
+          
+          if (isPcMode) {
+              document.body.classList.add('pc-layout-mode');
+              btnTogglePC.style.background = 'white';
+              btnTogglePC.style.color = '#15803d';
+          }
+          
+          if (btnTogglePC) {
+              btnTogglePC.addEventListener('click', () => {
+                  const currentlyPC = document.body.classList.contains('pc-layout-mode');
+                  if (currentlyPC) {
+                      document.body.classList.remove('pc-layout-mode');
+                      localStorage.setItem('antimo_pcmode', 'false');
+                      btnTogglePC.style.background = 'rgba(255,255,255,0.2)';
+                      btnTogglePC.style.color = 'white';
+                  } else {
+                      document.body.classList.add('pc-layout-mode');
+                      localStorage.setItem('antimo_pcmode', 'true');
+                      btnTogglePC.style.background = 'white';
+                      btnTogglePC.style.color = '#15803d';
+                  }
+              });
+          }
+      });
 
-    <script src="data.js?v=6"></script>
-    <script src="app.js?v=22"></script>
+
+
+      function nukeCache() {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) { registration.unregister(); }
+                alert("Cache App azzerata! Riavvio in corso...");
+                window.location.href = window.location.href.split('?')[0] + '?v=' + Date.now();
+            });
+        }
+      }
+    </script>
 </body>
 </html>
