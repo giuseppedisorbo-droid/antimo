@@ -4125,20 +4125,48 @@ document.addEventListener('DOMContentLoaded', async () => {
         const tbody = document.getElementById('raw-xml-tbody');
         if (!tbody) return;
         
-        let data = appData.map(item => ({
-            fileSorgente: item.fileSorgente || 'Inserimento Manuale',
-            date: item.date,
-            numero: item.numero || '-',
-            fornitore: item.fornitore || '-',
-            type: item.type || '-',
-            category: item.category || '-',
-            description: item.description || '-',
-            dettaglio: item.dettaglio || '-',
-            quantita: item.quantita || 1,
-            prezzoUnitario: item.prezzoUnitario !== undefined ? item.prezzoUnitario : item.amount,
-            aliquotaIVA: item.aliquotaIVA || 0,
-            amount: item.amount || 0
-        }));
+        // Two-pass approach to heal orphaned records (manual entries missing invoice numbers)
+        let parentInvoices = {};
+        appData.forEach(item => {
+            if (item.numero && item.numero !== '-' && item.numero !== 'N/A' && item.fornitore) {
+                const key = `${item.date}_${item.fornitore}`;
+                if (!parentInvoices[key]) {
+                    parentInvoices[key] = { 
+                        numero: item.numero, 
+                        fileSorgente: item.fileSorgente || `Fattura_${item.numero.replace(/\//g,'-')}`
+                    };
+                }
+            }
+        });
+
+        let data = appData.map(item => {
+            let num = item.numero || '-';
+            let file = item.fileSorgente || 'Inserimento Manuale';
+            
+            if ((num === '-' || num === 'N/A') && item.fornitore) {
+                const k = `${item.date}_${item.fornitore}`;
+                if (parentInvoices[k]) {
+                    num = parentInvoices[k].numero;
+                    file = parentInvoices[k].fileSorgente;
+                }
+            }
+
+            return {
+                id: item.id,
+                fileSorgente: file,
+                date: item.date,
+                numero: num,
+                fornitore: item.fornitore || '-',
+                type: item.type || '-',
+                category: item.category || '-',
+                description: item.description || '-',
+                dettaglio: item.dettaglio || '-',
+                quantita: item.quantita || 1,
+                prezzoUnitario: item.prezzoUnitario !== undefined ? item.prezzoUnitario : item.amount,
+                aliquotaIVA: item.aliquotaIVA || 0,
+                amount: item.amount || 0
+            };
+        });
 
         if (rawXmlState.fileFilter) data = data.filter(d => d.fileSorgente === rawXmlState.fileFilter);
         if (rawXmlState.typeFilter.length > 0) data = data.filter(d => rawXmlState.typeFilter.includes(d.type));
@@ -4153,9 +4181,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         let clusterMap = {};
         data.forEach(d => {
-            let key = (d.fileSorgente && d.fileSorgente !== 'Inserimento Manuale') 
-                      ? d.fileSorgente 
-                      : `manual_${Math.random()}`; // manual entries remain unclustered
+            let key;
+            if (d.numero && d.numero !== '-' && d.numero !== 'N/A') {
+                key = `invoice_${d.numero}_${d.fornitore}_${d.date}`;
+            } else if (d.fileSorgente && d.fileSorgente !== 'Inserimento Manuale') {
+                key = d.fileSorgente;
+            } else {
+                key = `manual_${d.id}`;
+            }
                       
             if (!clusterMap[key]) {
                 clusterMap[key] = {
