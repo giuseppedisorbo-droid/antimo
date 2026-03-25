@@ -351,6 +351,25 @@ function toggleTarget(target) {
 
     updateHeaderFiltersUI();
     updateUI();
+
+    // Porta in primo piano la sezione attiva come richiesto
+    setTimeout(() => {
+        if (target === 'oggi' || target === 'eseguiti' || target === 'neseg') {
+            if (activitiesListContainer && !activitiesListContainer.classList.contains('hidden')) {
+                activitiesListContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        } else if (target === 'np') {
+            const npCont = document.getElementById('npSection');
+            if (npCont && !npCont.classList.contains('hidden')) {
+                npCont.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        } else if (target === 'domani' || target === 'planned') {
+            const progCont = document.getElementById('programmatiContainer');
+            if (progCont && !progCont.classList.contains('hidden')) {
+                progCont.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    }, 100);
 }
 
 if(btnMostraOggi) btnMostraOggi.addEventListener('click', () => toggleTarget('oggi'));

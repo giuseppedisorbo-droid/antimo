@@ -41,14 +41,11 @@
                 </button>
             </div>
 
-            <!-- Lato Destro (Griglia 6 Statistiche in max 2 righe x 3 colonne) -->
-            <div class="header-stats-grid" style="flex: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-left: 10px;">
-                <div style="display: flex; gap: 2px;">
-                    <div id="btnMostraP" class="header-stat-box" style="cursor: pointer; flex: 1; padding: 4px; min-width: unset;">
-                        <div style="font-size: 0.6rem; text-transform: uppercase;">PT</div>
-                        <div style="font-size: 1rem; font-weight: 700;"><strong id="programmatiCount">0</strong></div>
-                    </div>
-                    <a href="programmati.html" id="btnCalendarLink" class="header-stat-box" style="cursor: pointer; flex: 1; padding: 4px; font-size: 1rem; text-decoration: none; min-width: unset; color: inherit;">📅</a>
+            <!-- Lato Destro (Griglia 8 slot in max 2 righe x 4 colonne) -->
+            <div class="header-stats-grid" style="flex: 2; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-left: 10px;">
+                <div id="btnMostraP" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
+                    <div style="font-size: 0.6rem; text-transform: uppercase;">PT</div>
+                    <div style="font-size: 1rem; font-weight: 700;"><strong id="programmatiCount">0</strong></div>
                 </div>
                 <div id="btnMostraOggi" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
                     <div style="font-size: 0.6rem; text-transform: uppercase;">Oggi</div>
@@ -58,6 +55,7 @@
                     <div style="font-size: 0.6rem; text-transform: uppercase;">Domani</div>
                     <div style="font-size: 1rem; font-weight: 700;"><strong id="domaniCount">0</strong></div>
                 </div>
+                <a href="programmati.html" id="btnCalendarLink" class="header-stat-box" style="cursor: pointer; padding: 4px; font-size: 1.2rem; text-decoration: none; min-width: unset; color: inherit; display:flex; justify-content:center; align-items:center;">📅</a>
                 
                 <div id="btnMostraNP" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
                     <div style="font-size: 0.6rem; text-transform: uppercase;">NP</div>
@@ -68,10 +66,10 @@
                     <div style="font-size: 1rem; font-weight: 700; color: #e11d48;"><strong id="nesegCount">0</strong></div>
                 </div>
                 <div id="btnMostraEseguiti" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
-                <div id="btnMostraEseguiti" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
                     <div style="font-size: 0.6rem; text-transform: uppercase;">Eseg</div>
                     <div style="font-size: 1rem; font-weight: 700;"><strong id="interventiCount">0</strong></div>
                 </div>
+                <!-- 8th spot is deliberately left empty perfectly aligning the grid layout -->
             </div>
         </div>
 
@@ -88,7 +86,7 @@
         <!-- Datalist Autocomplete -->
         <datalist id="assistitiDatalist"></datalist>
         <!-- GLOBAL TOGGLE FOR LISTS -->
-        <div id="globalToggleCardContainer" style="text-align: right; width: 100%;">
+        <div id="globalToggleCardContainer" class="hidden" style="display: none; text-align: right; width: 100%;">
             <button id="btnToggleAllCollapse" class="btn btn-secondary btn-sm" style="width: 100%; font-size: 0.95rem; padding: 12px; margin-bottom: 0px;">
                 <span class="btn-icon">⏬</span> APRI TUTTE LE SCHEDE
             </button>
