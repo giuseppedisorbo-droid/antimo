@@ -3649,24 +3649,40 @@ function renderListsSetupTable() {
     listsSetupTable.innerHTML = '';
     const list = window.antimoDropdownLists[currentListTab] || [];
     
+    // Mostra/nascondi campo Valore in alto
+    const valInput = document.getElementById('newListItemVal');
+    if (valInput) {
+        valInput.style.display = currentListTab === 'interventi' ? 'block' : 'none';
+    }
+
     if(list.length === 0) {
         listsSetupTable.innerHTML = '<tr><td style="text-align:center; padding: 20px; color: #666;">Nessuna voce presente.</td></tr>';
         return;
     }
 
     list.forEach((item, index) => {
+        const hasVal = currentListTab === 'interventi';
+        let valFieldHtml = '';
+        if (hasVal) {
+            valFieldHtml = `<div style="margin-top:5px; display:flex; gap: 5px; align-items:center;">
+                                <label style="font-size:0.75rem; color:#666;">Valore €</label>
+                                <input type="number" id="val_${item.id}" value="${item.val || 0}" step="0.01" style="width: 80px; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+                            </div>`;
+        }
+
         const tr = document.createElement('tr');
         tr.style.borderBottom = '1px solid #eee';
         
         tr.innerHTML = `
-            <td style="padding: 10px; width: 30%; color: #888; font-size: 0.8rem; vertical-align: middle;">
+            <td style="padding: 10px; width: 30%; color: #888; font-size: 0.8rem; vertical-align: top;">
                 ID: ${item.id}
             </td>
-            <td style="padding: 10px; width: 40%; vertical-align: middle;">
+            <td style="padding: 10px; width: 40%; vertical-align: top;">
                 <input type="text" id="desc_${item.id}" value="${item.desc.replace(/"/g, '&quot;')}" style="width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
+                ${valFieldHtml}
             </td>
-            <td style="padding: 10px; width: 30%; text-align: right; vertical-align: middle;">
-                <button class="btn btn-primary btn-sm" onclick="salvaVoceEdit('${item.id}')" style="padding: 6px 10px; margin: 0 5px 0 0; font-size: 0.8rem;">Modifica</button>
+            <td style="padding: 10px; width: 30%; text-align: right; vertical-align: top; padding-top: 15px;">
+                <button class="btn btn-primary btn-sm" onclick="salvaVoceEdit('${item.id}')" style="padding: 6px 10px; margin: 0 5px 0 0; font-size: 0.8rem;">Salva</button>
                 <button class="btn btn-danger btn-sm" onclick="eliminaVoce('${item.id}')" style="padding: 6px 10px; margin: 0; font-size: 0.8rem;">X</button>
             </td>
         `;
@@ -3686,7 +3702,12 @@ window.salvaVoceEdit = function(id) {
     const item = list.find(x => x.id === id);
     if(item) {
         item.desc = newDesc;
+        if(currentListTab === 'interventi') {
+            const valInput = document.getElementById('val_' + id);
+            item.val = valInput ? parseFloat(valInput.value || 0) : 0;
+        }
         renderListsSetupTable();
+        alert("Modifica applicata! Ricordati di premere 'SALVA MODIFICHE E CHIUDI' per salvare su Cloud.");
     }
 };
 
@@ -3708,8 +3729,15 @@ if(btnAddListItem) {
         else if (currentListTab === 'ruoli') prefix = 'RUO_';
         const newId = prefix + Date.now().toString();
         
-        window.antimoDropdownLists[currentListTab].push({ id: newId, desc: desc });
+        let newItem = { id: newId, desc: desc };
+        if (currentListTab === 'interventi') {
+            const valInput = document.getElementById('newListItemVal');
+            newItem.val = valInput ? parseFloat(valInput.value || 0) : 0;
+        }
+        
+        window.antimoDropdownLists[currentListTab].push(newItem);
         newListItemDesc.value = '';
+        if (document.getElementById('newListItemVal')) document.getElementById('newListItemVal').value = '';
         renderListsSetupTable();
     });
 }
@@ -3738,3 +3766,197 @@ if(btnSaveFirebaseLists) {
         }
     });
 }
+
+/* ==========================================
+ * VALORIZZAZIONE ATTIVITÀ
+ * ========================================== */
+const btnOpenValuation = document.getElementById('btnOpenValuation');
+const valorizzazioneModal = document.getElementById('valorizzazioneModal');
+const btnCloseValuation = document.getElementById('btnCloseValuation');
+const valPeriod = document.getElementById('valPeriod');
+const valCustomDates = document.getElementById('valCustomDates');
+const valDateFrom = document.getElementById('valDateFrom');
+const valDateTo = document.getElementById('valDateTo');
+const valRole = document.getElementById('valRole');
+const valOperator = document.getElementById('valOperator');
+const btnCalculateValuation = document.getElementById('btnCalculateValuation');
+const valDetailsTableBody = document.getElementById('valDetailsTableBody');
+const valTotalCount = document.getElementById('valTotalCount');
+const valTotalAmount = document.getElementById('valTotalAmount');
+const valExportBtn = document.getElementById('valExportBtn');
+
+if(valPeriod) {
+    valPeriod.addEventListener('change', (e) => {
+        if(e.target.value === 'custom') valCustomDates.classList.remove('hidden');
+        else valCustomDates.classList.add('hidden');
+    });
+}
+
+function initValuationDropdowns() {
+    if(valRole && window.antimoDropdownLists && window.antimoDropdownLists.ruoli) {
+        valRole.innerHTML = '<option value="">Tutti i Ruoli</option>';
+        window.antimoDropdownLists.ruoli.forEach(r => {
+            valRole.innerHTML += `<option value="${r.desc}">${r.desc}</option>`;
+        });
+    }
+    if(valOperator && window.anagrafiche) {
+        valOperator.innerHTML = '<option value="">Tutti gli Operatori</option>';
+        const dipendenti = window.anagrafiche.filter(d => !!d.qualifica).map(d => (d.ragioneSociale || (d.nome + " " + (d.cognome || ""))).trim()).sort();
+        /* Rimuovo i duplicati */
+        const dedupe = [...new Set(dipendenti)];
+        dedupe.forEach(nome => {
+            if(nome) valOperator.innerHTML += `<option value="${nome}">${nome}</option>`;
+        });
+    }
+}
+
+if(btnOpenValuation) {
+    btnOpenValuation.addEventListener('click', () => {
+        initValuationDropdowns();
+        valorizzazioneModal.classList.remove('hidden');
+        valDetailsTableBody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #94a3b8;">Imposta i filtri e clicca su Calcola per visualizzare la valorizzazione economica.</td></tr>';
+        valTotalCount.textContent = "0";
+        valTotalAmount.textContent = "€ 0.00";
+        valExportBtn.style.display = 'none';
+        valExportBtn.onclick = null;
+    });
+}
+if(btnCloseValuation) {
+    btnCloseValuation.addEventListener('click', () => {
+        valorizzazioneModal.classList.add('hidden');
+    });
+}
+
+if(btnCalculateValuation) {
+    btnCalculateValuation.addEventListener('click', async () => {
+        try {
+            if(!isFirebaseConfigured) return alert("Firebase non configurato o offline.");
+            
+            btnCalculateValuation.innerHTML = '<span class="btn-icon">⏳</span> CARICAMENTO...';
+            btnCalculateValuation.disabled = true;
+
+            const now = new Date();
+            let startTs = 0; let endTs = 0;
+            const p = valPeriod.value;
+
+            if(p === 'oggi') {
+                startTs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                endTs = startTs + 86399999;
+            } else if(p === 'ieri') {
+                startTs = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime();
+                endTs = startTs + 86399999;
+            } else if(p === 'mese_corrente') {
+                startTs = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+                endTs = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime();
+            } else if(p === 'mese_scorso') {
+                startTs = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+                endTs = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).getTime();
+            } else if(p === 'trimestre') {
+                const q = Math.floor(now.getMonth() / 3);
+                startTs = new Date(now.getFullYear(), q * 3, 1).getTime();
+                endTs = new Date(now.getFullYear(), q * 3 + 3, 0, 23, 59, 59).getTime();
+            } else if(p === 'anno') {
+                startTs = new Date(now.getFullYear(), 0, 1).getTime();
+                endTs = new Date(now.getFullYear(), 11, 31, 23, 59, 59).getTime();
+            } else if(p === 'custom') {
+                if(!valDateFrom.value || !valDateTo.value) { alert("Inserisci le date di inizio e fine."); btnCalculateValuation.disabled = false; btnCalculateValuation.innerHTML = '<span class="btn-icon">🧮</span> CALCOLA'; return; }
+                startTs = new Date(valDateFrom.value).getTime();
+                endTs = new Date(valDateTo.value);
+                endTs.setHours(23, 59, 59, 999);
+                endTs = endTs.getTime();
+            }
+
+            const rFilter = valRole.value;
+            const oFilter = valOperator.value;
+
+            const { collection, getDocs, query, where } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            // Filtra su Firestore con limite Date
+            const q = query(collection(db, "interventi"), where("startTime", ">=", startTs), where("startTime", "<=", endTs));
+            const snaps = await getDocs(q);
+
+            // Mappa ruoli 
+            let cacheRuoliApp = {};
+            if(window.anagrafiche) {
+                window.anagrafiche.forEach(a => {
+                    const nm = (a.ragioneSociale || (a.nome + " " + (a.cognome||""))).trim();
+                    if(nm) cacheRuoliApp[nm] = a.ruolo || "Sconosciuto";
+                });
+            }
+
+            let validCount = 0;
+            let sumVal = 0;
+            let rowsHtml = '';
+            let resultsCSV = [];
+
+            // Costruisci dizionario val
+            let valInterventi = {};
+            if(window.antimoDropdownLists && window.antimoDropdownLists.interventi) {
+                window.antimoDropdownLists.interventi.forEach(i => valInterventi[i.id] = parseFloat(i.val || 0));
+            }
+
+            snaps.forEach(doc => {
+                const data = doc.data();
+                let opStr = data.operatore || "Sconosciuto";
+                let rStr = cacheRuoliApp[opStr] || "Sconosciuto";
+
+                if (oFilter && opStr !== oFilter) return;
+                if (rFilter && rStr !== rFilter) return;
+
+                let tipis = data.tipo ? data.tipo.split(',').map(x => x.trim()) : [];
+                let msgTipo = window.decodeCodeToLabel(data.tipo, 'interventi');
+                let curVal = 0;
+                tipis.forEach(tCode => {
+                    if (valInterventi[tCode]) curVal += valInterventi[tCode];
+                });
+
+                validCount++;
+                sumVal += curVal;
+                
+                const dDate = new Date(data.startTime);
+                const dStr = `${String(dDate.getDate()).padStart(2,'0')}/${String(dDate.getMonth()+1).padStart(2,'0')}/${dDate.getFullYear()}`;
+
+                rowsHtml += `<tr style="border-bottom: 1px solid #e2e8f0; background: ${validCount % 2 === 0 ? '#f8fafc' : 'white'};">
+                    <td style="padding: 10px;">${dStr}</td>
+                    <td style="padding: 10px; font-weight: bold; color: var(--blue-dark);">${opStr}</td>
+                    <td style="padding: 10px; color: #475569;">${rStr} / <strong>${data.paziente}</strong></td>
+                    <td style="padding: 10px; color: #475569;">${msgTipo}</td>
+                    <td style="padding: 10px; text-align: right; color: #64748b;">€ ${curVal.toFixed(2)}</td>
+                    <td style="padding: 10px; text-align: right; font-weight: bold; color: #15803d;">€ ${curVal.toFixed(2)}</td>
+                </tr>`;
+
+                resultsCSV.push({ date: dStr, op: opStr, role: rStr, patient: data.paziente, type: msgTipo, value: curVal });
+            });
+
+            valTotalCount.textContent = validCount.toString();
+            valTotalAmount.textContent = "€ " + sumVal.toFixed(2);
+            
+            if(validCount === 0) {
+                valDetailsTableBody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #94a3b8;">Nessun intervento e nessun valore economico generato nei filtri.</td></tr>';
+                valExportBtn.style.display = 'none';
+            } else {
+                valDetailsTableBody.innerHTML = rowsHtml;
+                valExportBtn.style.display = 'inline-block';
+                valExportBtn.onclick = () => {
+                   let csvContent = "Data;Operatore;Ruolo;Paziente;Tipo Intervento;Valore\n";
+                   resultsCSV.forEach(r => {
+                       csvContent += `"${r.date}";"${r.op}";"${r.role}";"${r.patient.replace(/"/g, '""')}";"${r.type}";"${r.value.toFixed(2).replace('.', ',')}"\n`;
+                   });
+                   const blob = new Blob(["\uFEFF"+csvContent], { type: 'text/csv;charset=utf-8;' });
+                   const url = URL.createObjectURL(blob);
+                   const a = document.createElement("a");
+                   a.href = url;
+                   a.download = `Valorizzazione_${p}.csv`;
+                   document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                };
+            }
+
+        } catch(e) {
+            console.error(e);
+            alert("Errore durante il calcolo. Se compare FirebaseError, assicurati di aver creato l'indice su startTime in Firestore (clicca sul link nella Console di questo browser per crearlo).");
+        } finally {
+            btnCalculateValuation.innerHTML = '<span class="btn-icon">🧮</span> CALCOLA';
+            btnCalculateValuation.disabled = false;
+        }
+    });
+}
+
