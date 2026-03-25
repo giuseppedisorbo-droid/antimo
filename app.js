@@ -1202,7 +1202,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Attach edit event listeners
             document.querySelectorAll('.edit-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
-                    const idToEdit = e.target.getAttribute('data-id');
+                    const idToEdit = e.currentTarget.getAttribute('data-id');
                     editEntry(idToEdit);
                 });
             });
@@ -1210,7 +1210,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Attach delete event listeners
             document.querySelectorAll('.delete-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
-                    const idToDelete = e.target.getAttribute('data-id');
+                    const idToDelete = e.currentTarget.getAttribute('data-id');
                     deleteEntry(idToDelete);
                 });
             });
@@ -2870,15 +2870,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 5. Delete Entry
     async function deleteEntry(id) {
-        if (confirm("Vuoi davvero eliminare questo record?")) {
-            appData = appData.filter(item => item.id !== id);
-            
-            localStorage.setItem(DATA_KEY, JSON.stringify(appData));
-            renderTable();
-            updateSummaryCards(appData); // also update sums
-            
-            // Delete from cloud independently
-            await deleteDataCloud(id);
+        try {
+            if (!id) {
+                alert("Errore interno: ID record mancante.");
+                return;
+            }
+            if (confirm("Vuoi davvero eliminare questo record?")) {
+                appData = appData.filter(item => String(item.id) !== String(id));
+                
+                localStorage.setItem(DATA_KEY, JSON.stringify(appData));
+                renderTable();
+                updateSummaryCards(appData); // also update sums
+                
+                // Delete from cloud independently
+                await deleteDataCloud(String(id));
+            }
+        } catch(err) {
+            console.error("Delete Error:", err);
+            alert("Si è verificato un errore durante l'eliminazione: " + err.message);
         }
     }
 
