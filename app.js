@@ -66,6 +66,11 @@ let filterState = {
     }
 };
 
+// --- Utilities ---
+const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(parseFloat(amount) || 0);
+};
+
 document.addEventListener('DOMContentLoaded', async () => {
     // 1. Initialize State
     const DATA_KEY = 'EUBIOTECH_financial_data';
