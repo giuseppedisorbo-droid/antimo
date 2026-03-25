@@ -552,7 +552,7 @@
 
     <!-- Modal Contenuto Fatture XML -->
     <div id="raw-xml-modal" class="modal-overlay hidden">
-        <div class="modal-content" style="width: 95%; max-width: 1400px; max-height: 90vh; display: flex; flex-direction: column; padding: 0;">
+        <div class="modal-content" style="width: 95%; max-width: 1400px; max-height: 90vh; display: flex; flex-direction: column; padding: 0; resize: both; overflow: auto; min-width: 800px; min-height: 500px;">
             <div class="modal-header" style="padding: 15px 20px;">
                 <h3 style="margin: 0; color: #1e293b;"><i class="fas fa-file-invoice"></i> Contenuto Raw Fatture XML</h3>
                 <button id="close-raw-xml" class="close-btn" style="font-size: 1.5rem;">&times;</button>
@@ -563,18 +563,21 @@
                 <select id="raw-file-filter" style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; min-width: 150px;">
                     <option value="">-- Tutti i File --</option>
                 </select>
-                <button type="button" id="raw-type-btn" class="btn-outline btn-small" style="background: white; position: relative;"><i class="fas fa-filter"></i> Tipo</button>
-                <button type="button" id="raw-cat-btn" class="btn-outline btn-small" style="background: white; position: relative;"><i class="fas fa-filter"></i> Categoria</button>
-            </div>
-            
-            <!-- Contextual Filter Dropdowns for Raw Modal -->
-            <div id="raw-type-dropdown" class="popover hidden" style="position: absolute; z-index: 1002; margin-top: 5px;">
-                <div class="popover-actions"><button id="raw-type-sel-all" class="btn-small btn-outline">Seleziona tutte</button><button id="raw-type-desel-all" class="btn-small btn-outline">Deseleziona tutte</button></div>
-                <div id="raw-type-checkboxes" class="checkbox-group popover-checkboxes"></div>
-            </div>
-            <div id="raw-cat-dropdown" class="popover hidden" style="position: absolute; z-index: 1002; margin-top: 5px;">
-                <div class="popover-actions"><button id="raw-cat-sel-all" class="btn-small btn-outline">Seleziona tutte</button><button id="raw-cat-desel-all" class="btn-small btn-outline">Deseleziona tutte</button></div>
-                <div id="raw-cat-checkboxes" class="checkbox-group popover-checkboxes"></div>
+                <div style="position: relative; display: inline-block;">
+                    <button type="button" id="raw-type-btn" class="btn-outline btn-small" style="background: white;"><i class="fas fa-filter"></i> Tipo</button>
+                    <!-- Contextual Filter Dropdowns for Raw Modal -->
+                    <div id="raw-type-dropdown" class="popover hidden" style="position: absolute; top: 100%; left: 0; z-index: 1002; margin-top: 5px;">
+                        <div class="popover-actions"><button id="raw-type-sel-all" class="btn-small btn-outline">Seleziona tutte</button><button id="raw-type-desel-all" class="btn-small btn-outline">Deseleziona tutte</button></div>
+                        <div id="raw-type-checkboxes" class="checkbox-group popover-checkboxes"></div>
+                    </div>
+                </div>
+                <div style="position: relative; display: inline-block;">
+                    <button type="button" id="raw-cat-btn" class="btn-outline btn-small" style="background: white;"><i class="fas fa-filter"></i> Categoria</button>
+                    <div id="raw-cat-dropdown" class="popover hidden" style="position: absolute; top: 100%; left: 0; z-index: 1002; margin-top: 5px;">
+                        <div class="popover-actions"><button id="raw-cat-sel-all" class="btn-small btn-outline">Seleziona tutte</button><button id="raw-cat-desel-all" class="btn-small btn-outline">Deseleziona tutte</button></div>
+                        <div id="raw-cat-checkboxes" class="checkbox-group popover-checkboxes"></div>
+                    </div>
+                </div>
             </div>
 
             <div id="raw-active-filters-container" style="padding: 8px 20px; background: #fff; border-bottom: 1px solid #e2e8f0; font-size: 0.85em; display: none;"></div>
@@ -589,6 +592,7 @@
                             <th class="sortable-raw" data-sort="fornitore" style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">Fornitore <span class="sort-icon-raw"></span></th>
                             <th class="sortable-raw" data-sort="type" style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">Tipo <span class="sort-icon-raw"></span></th>
                             <th class="sortable-raw" data-sort="category" style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">Categoria <span class="sort-icon-raw"></span></th>
+                            <th class="sortable-raw" data-sort="description" style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">Descrizione Macro <span class="sort-icon-raw"></span></th>
                             <th class="sortable-raw" data-sort="dettaglio" style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">Dettaglio/Articolo (XML) <span class="sort-icon-raw"></span></th>
                             <th class="sortable-raw" data-sort="quantita" style="position: sticky; top: 0; background: #f8fafc; z-index: 1; text-align: center;">Q.tà <span class="sort-icon-raw"></span></th>
                             <th class="sortable-raw" data-sort="prezzoUnitario" style="position: sticky; top: 0; background: #f8fafc; z-index: 1; text-align: right;">P. Unit. <span class="sort-icon-raw"></span></th>
@@ -605,6 +609,6 @@
     </div>
 
     <script src="data.js?v=6"></script>
-    <script src="app.js?v=15"></script>
+    <script src="app.js?v=16"></script>
 </body>
 </html>
