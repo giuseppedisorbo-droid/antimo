@@ -98,11 +98,24 @@ function appendMessage(role, text) {
                                  .replace(/\*([\s\S]*?)\*/g, '<em>$1</em>')
                                  .replace(/`([^`]*?)`/g, '<code style="background: rgba(0,0,0,0.1); padding: 2px 4px; border-radius: 4px;">$1</code>');
 
+    let shareHtml = '';
+    if (!isUser) {
+        const rawTextEncoded = encodeURIComponent(text);
+        shareHtml = `
+            <div style="display: flex; gap: 8px; margin-top: 8px; border-top: 1px dotted #cbd5e1; padding-top: 8px;">
+                <button onclick="shareAiToBacheca(this)" data-text="${rawTextEncoded}" style="background:none; border:none; cursor:pointer; color:#6366f1; font-size: 0.8rem; font-weight:bold; display: flex; align-items:center; gap: 4px;"><span class="btn-icon">📢</span> Bacheca</button>
+                <button onclick="shareAiToWhatsapp(this)" data-text="${rawTextEncoded}" style="background:none; border:none; cursor:pointer; color:#16a34a; font-size: 0.8rem; font-weight:bold; display: flex; align-items:center; gap: 4px;"><span class="btn-icon">💬</span> WhatsApp</button>
+                <button onclick="shareAiToEmail(this)" data-text="${rawTextEncoded}" style="background:none; border:none; cursor:pointer; color:#d97706; font-size: 0.8rem; font-weight:bold; display: flex; align-items:center; gap: 4px;"><span class="btn-icon">📧</span> Email</button>
+            </div>
+        `;
+    }
+
     const msgHtml = `
         <div style="display: flex; gap: 10px; align-items: flex-start; justify-content: ${isUser ? 'flex-end' : 'flex-start'};">
             ${isUser ? '' : '<div style="font-size: 1.5rem; margin-top: -5px;">🤖</div>'}
             <div style="background: ${bg}; color: ${color}; border: ${border}; padding: 12px 15px; border-radius: ${borderRadius}; max-width: 85%; font-size: 0.9rem; line-height: 1.4; box-shadow: ${shadow}; white-space: pre-wrap;">
                 ${formattedText}
+                ${shareHtml}
             </div>
         </div>
     `;
@@ -406,3 +419,35 @@ style.innerHTML = `
 @keyframes dotPulse { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
 `;
 document.head.appendChild(style);
+
+// 7. Funzioni Globali Condivisione
+window.shareAiToBacheca = function(btn) {
+    const text = decodeURIComponent(btn.getAttribute('data-text'));
+    // Chiudi modale chat AI
+    const aiChatModal = document.getElementById('aiChatModal');
+    if(aiChatModal) aiChatModal.classList.add('hidden');
+    
+    // Apri bacheca
+    const btnToggleMessages = document.getElementById('btnToggleMessages');
+    if(btnToggleMessages && btnToggleMessages.textContent.includes('Mostra')) {
+        btnToggleMessages.click();
+    }
+    
+    // Scrolla alla bacheca e popola il form
+    const msgText = document.getElementById('msgText');
+    if(msgText) {
+        document.getElementById('messagesSection').scrollIntoView({behavior: 'smooth'});
+        msgText.value = text;
+        msgText.focus();
+    }
+};
+
+window.shareAiToWhatsapp = function(btn) {
+    const text = decodeURIComponent(btn.getAttribute('data-text'));
+    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+};
+
+window.shareAiToEmail = function(btn) {
+    const text = decodeURIComponent(btn.getAttribute('data-text'));
+    window.open('mailto:?subject=Risultato%20Assistente%20In%20App&body=' + encodeURIComponent(text));
+};

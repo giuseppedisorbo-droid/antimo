@@ -2744,9 +2744,9 @@ newInterventionForm.addEventListener('submit', async (e) => {
             
             if (activeProgFbId) {
                 try {
-                    const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                    await updateDoc(doc(db, "programmati", activeProgFbId), { status: "completed" });
-                    console.log(`Programmato ${activeProgFbId} contrassegnato come completed`);
+                    const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                    await deleteDoc(doc(db, "programmati", activeProgFbId));
+                    console.log(`Programmato ${activeProgFbId} eliminato definitivamente dopo esecuzione`);
                 } catch(e) {
                     console.error("Non sono riuscito ad aggiornare lo status in Firebase", e);
                 }
