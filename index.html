@@ -11,60 +11,66 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <header class="top-nav">
-        <!-- Lato Sinistro: Bottoni Impostazioni, Versione, PC Mode -->
-        <div class="header-left">
-            <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
-                <button id="btnSettings" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: white;" title="Impostazioni">⚙️</button>
-                <button id="btnTogglePC" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; cursor: pointer; font-weight: bold; font-size: 0.8rem;">PC</button>
-                <a href="admin.html" id="btnOpenDashboard" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; cursor: pointer; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: flex; align-items: center;">💻 Dashboard</a>
+    <header class="top-nav" style="display: flex; flex-direction: column; gap: 10px; padding: 12px; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
+        
+        <!-- Riga 1: Controlli e Filtro -->
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button id="btnSettings" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: white; padding: 0;" title="Impostazioni">⚙️</button>
+                <button id="btnTogglePC" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; font-weight: bold; font-size: 0.75rem; cursor: pointer;">PC</button>
+                <a href="anagrafiche.html" id="btnTopAnag" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: flex; align-items: center; gap: 4px;">📇 ANAG</a>
             </div>
-            <div style="font-size: 0.75rem; color: rgba(255,255,255,0.9); margin-top: 8px; cursor: pointer; font-weight: 600;" id="appVersionStamp" onclick="nukeCache()">v26.0 - Mass Delete & AutoSync v58</div>
-            <div id="loggedInUserDisplay" style="font-size: 0.8rem; color: #fcd34d; font-weight: bold; margin-top: 4px;"></div>
-            <button id="btnTopNotification" class="hidden" style="margin-top: 5px; background: #e11d48; color: white; border-radius: 6px; padding: 4px 8px; border: 1px solid rgba(255,255,255,0.5); cursor: pointer; font-weight: 600; font-size: 0.75rem; display: flex; align-items: center; max-width: 250px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-                🔔 <span id="topNotificationText" style="margin-left: 5px; overflow:hidden; text-overflow:ellipsis; white-space: nowrap;"></span>
-            </button>
-        </div>
-
-        <!-- Selettore Multi-Tenant (Visualizzazione Eseguiti e Programmati) -->
-        <div style="margin-top: 5px; margin-bottom: 5px; text-align: center;">
-            <select id="filterTecnicoOggi" style="width: 100%; max-width: 400px; padding: 6px 15px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.5); background: rgba(0,0,0,0.2); color: white; font-weight: bold; font-size: 0.85rem; outline: none; cursor: pointer; text-align: center;">
-                <option value="" style="color: black;">Mostra Interventi in base a...</option>
-                <option value="MIO" style="color: black;" selected>👨‍🔧 Solo miei</option>
+            <select id="filterTecnicoOggi" style="padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.5); background: rgba(0,0,0,0.2); color: white; font-weight: bold; font-size: 0.75rem; outline: none; cursor: pointer; max-width: 140px;">
+                <option value="" style="color: black;">Filtro...</option>
+                <option value="MIO" style="color: black;" selected>👨‍🔧 Miei</option>
                 <option value="TUTTI" style="color: black;">🌍 Tutti</option>
             </select>
         </div>
 
-        <!-- Lato Destro: Griglia Badge Statistici -->
-        <div class="header-stats-grid">
-            <div style="display: flex; gap: 4px;">
-                <div id="btnMostraP" class="header-stat-box" style="cursor: pointer; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px;">
-                    <div style="font-size: 0.65rem; text-transform: uppercase;">PT</div>
-                    <div style="font-size: 1.1rem; font-weight: 700;"><strong id="programmatiCount">0</strong></div>
+        <!-- Riga 2 e 3 combinate (Flex Row per bilanciare i lati) -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+            
+            <!-- Lato Sinistro (Dashboard, Utente, Versione) -->
+            <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+                <a href="admin.html" id="btnOpenDashboard" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 6px 8px; color: white; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: inline-flex; align-items: center; width: fit-content; gap: 4px;">💻 Dashboard</a>
+                <div id="loggedInUserDisplay" style="font-size: 0.75rem; color: #fcd34d; font-weight: bold; line-height: 1.1; margin-top: 2px;"></div>
+                <div id="appVersionStamp" style="font-size: 0.65rem; color: rgba(255,255,255,0.7); cursor: pointer; line-height: 1.1;" onclick="nukeCache()">v26.0 - AutoSync v58</div>
+                
+                <button id="btnTopNotification" class="hidden" style="margin-top: 2px; background: #e11d48; color: white; border-radius: 6px; padding: 4px 8px; border: 1px solid rgba(255,255,255,0.5); cursor: pointer; font-weight: 600; font-size: 0.7srem; align-items: center; max-width: 120px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                    🔔 <span id="topNotificationText"></span>
+                </button>
+            </div>
+
+            <!-- Lato Destro (Griglia 6 Statistiche in max 2 righe x 3 colonne) -->
+            <div class="header-stats-grid" style="flex: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-left: 10px;">
+                <div style="display: flex; gap: 2px;">
+                    <div id="btnMostraP" class="header-stat-box" style="cursor: pointer; flex: 1; padding: 4px; min-width: unset;">
+                        <div style="font-size: 0.6rem; text-transform: uppercase;">PT</div>
+                        <div style="font-size: 1rem; font-weight: 700;"><strong id="programmatiCount">0</strong></div>
+                    </div>
+                    <a href="programmati.html" id="btnCalendarLink" class="header-stat-box" style="cursor: pointer; flex: 1; padding: 4px; font-size: 1rem; text-decoration: none; min-width: unset; color: inherit;">📅</a>
                 </div>
-                <a href="programmati.html" id="btnCalendarLink" class="header-stat-box" style="cursor: pointer; flex: 1; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; text-decoration: none; color: inherit;">
-                    📅
-                </a>
-            </div>
-            <div id="btnMostraOggi" class="header-stat-box" style="cursor: pointer;">
-                <div style="font-size: 0.65rem; text-transform: uppercase;">Oggi</div>
-                <div style="font-size: 1.1rem; font-weight: 700;"><strong id="oggiCount">0</strong></div>
-            </div>
-            <div id="btnMostraDomani" class="header-stat-box" style="cursor: pointer;">
-                <div style="font-size: 0.65rem; text-transform: uppercase;">Domani</div>
-                <div style="font-size: 1.1rem; font-weight: 700;"><strong id="domaniCount">0</strong></div>
-            </div>
-            <div id="btnMostraNP" class="header-stat-box" style="cursor: pointer;">
-                <div style="font-size: 0.65rem; text-transform: uppercase;">NP</div>
-                <div style="font-size: 1.1rem; font-weight: 700;"><strong id="npCount">0</strong></div>
-            </div>
-            <div id="btnMostraNeseguiti" class="header-stat-box" style="cursor: pointer;">
-                <div style="font-size: 0.65rem; text-transform: uppercase; color: #e11d48;">N. Eseg.</div>
-                <div style="font-size: 1.1rem; font-weight: 700; color: #e11d48;"><strong id="nesegCount">0</strong></div>
-            </div>
-            <div id="btnMostraEseguiti" class="header-stat-box" style="cursor: pointer;">
-                <div style="font-size: 0.65rem; text-transform: uppercase;">Eseg.</div>
-                <div style="font-size: 1.1rem; font-weight: 700;"><strong id="interventiCount">0</strong></div>
+                <div id="btnMostraOggi" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
+                    <div style="font-size: 0.6rem; text-transform: uppercase;">Oggi</div>
+                    <div style="font-size: 1rem; font-weight: 700;"><strong id="oggiCount">0</strong></div>
+                </div>
+                <div id="btnMostraDomani" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
+                    <div style="font-size: 0.6rem; text-transform: uppercase;">Domani</div>
+                    <div style="font-size: 1rem; font-weight: 700;"><strong id="domaniCount">0</strong></div>
+                </div>
+                
+                <div id="btnMostraNP" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
+                    <div style="font-size: 0.6rem; text-transform: uppercase;">NP</div>
+                    <div style="font-size: 1rem; font-weight: 700;"><strong id="npCount">0</strong></div>
+                </div>
+                <div id="btnMostraNeseguiti" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
+                    <div style="font-size: 0.6rem; text-transform: uppercase; color: #e11d48;">N.Eseg</div>
+                    <div style="font-size: 1rem; font-weight: 700; color: #e11d48;"><strong id="nesegCount">0</strong></div>
+                </div>
+                <div id="btnMostraEseguiti" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
+                    <div style="font-size: 0.6rem; text-transform: uppercase;">Eseg</div>
+                    <div style="font-size: 1rem; font-weight: 700;"><strong id="interventiCount">0</strong></div>
+                </div>
             </div>
         </div>
     </header>
@@ -176,11 +182,9 @@
             </div>
         </section>
 
-        <!-- PULSANTE ANAGRAFICHE & NUOVO INTERVENTO -->
+        <!-- PULSANTE ANAGRAFICHE SPOSTATO NEL HEADER -->
+        <!-- NUOVO INTERVENTO & VALORIZZAZIONE -->
         <div style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
-            <a href="anagrafiche.html" class="btn btn-primary btn-blue btn-large" style="width: 100%; text-decoration: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(30,58,138,0.2); display: flex; align-items: center; justify-content: center; gap: 8px; color: white;">
-                <span style="font-size: 1.4rem;">📇</span> GESTIONE ANAGRAFICHE
-            </a>
             <button id="btnToggleNuovoIntervento" class="btn btn-primary btn-blue btn-large" style="width: 100%; border: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(30,58,138,0.2); display: flex; align-items: center; justify-content: center; gap: 8px; color: white; margin: 0; cursor: pointer;">
                 <span style="font-size: 1.4rem;">📝</span> NUOVO INTERVENTO
             </button>
