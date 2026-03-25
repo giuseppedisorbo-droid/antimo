@@ -352,6 +352,19 @@ function toggleTarget(target) {
     updateHeaderFiltersUI();
     updateUI();
 
+    // Modalita "Schermo Pieno": Nascondi elementi intermedi se c'è una lista aperta
+    const activeListNow = isOggiVisible || isDomaniVisible || isPlannedVisible || isNpVisible || isEseguitiVisible || isNesegVisible;
+    const msgSect = document.getElementById('messagesSection');
+    const bntSect = document.getElementById('nuovoInterventoBtnContainer');
+    
+    if (activeListNow) {
+        if (msgSect) msgSect.style.display = 'none';
+        if (bntSect) bntSect.style.display = 'none';
+    } else {
+        if (msgSect) msgSect.style.display = '';
+        if (bntSect) bntSect.style.display = '';
+    }
+
     // Porta in primo piano ripristinando la visuale in alto per mantenere visibile lo spazio verde!
     setTimeout(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
