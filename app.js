@@ -2871,12 +2871,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 5. Delete Entry
     async function deleteEntry(id) {
         try {
-            if (!id) {
-                alert("Errore interno: ID record mancante.");
+            const strId = String(id);
+            if (!id || strId === 'undefined' || strId === 'null') {
+                alert("❗ Impossibile eliminare: Questo record non possiede un ID valido (vecchio salvataggio offline). Usa 'Sincronizza Cloud' per re-iniettare gli ID univoci.");
                 return;
             }
             if (confirm("Vuoi davvero eliminare questo record?")) {
-                appData = appData.filter(item => String(item.id) !== String(id));
+                appData = appData.filter(item => String(item.id) !== strId);
                 
                 localStorage.setItem(DATA_KEY, JSON.stringify(appData));
                 renderTable();
