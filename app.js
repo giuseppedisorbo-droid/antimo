@@ -3806,20 +3806,38 @@ if(valPeriod) {
 }
 
 function initValuationDropdowns() {
+    const currentUser = localStorage.getItem('antimo_user_name') || "";
+    let isDirezione = false;
+    if(window.anagrafiche) {
+        const u = window.anagrafiche.find(a => (a.ragioneSociale || (a.nome + " " + (a.cognome||""))).trim() === currentUser);
+        if(u && u.ruolo && u.ruolo.toUpperCase() === 'DIREZIONE') isDirezione = true;
+    }
+
     if(valRole && window.antimoDropdownLists && window.antimoDropdownLists.ruoli) {
         valRole.innerHTML = '<option value="">Tutti i Ruoli</option>';
-        window.antimoDropdownLists.ruoli.forEach(r => {
-            valRole.innerHTML += `<option value="${r.desc}">${r.desc}</option>`;
-        });
+        if (!isDirezione) {
+            valRole.disabled = true;
+        } else {
+            window.antimoDropdownLists.ruoli.forEach(r => {
+                valRole.innerHTML += `<option value="${r.desc}">${r.desc}</option>`;
+            });
+            valRole.disabled = false;
+        }
     }
     if(valOperator && window.anagrafiche) {
-        valOperator.innerHTML = '<option value="">Tutti gli Operatori</option>';
-        const dipendenti = window.anagrafiche.filter(d => !!d.qualifica).map(d => (d.ragioneSociale || (d.nome + " " + (d.cognome || ""))).trim()).sort();
-        /* Rimuovo i duplicati */
-        const dedupe = [...new Set(dipendenti)];
-        dedupe.forEach(nome => {
-            if(nome) valOperator.innerHTML += `<option value="${nome}">${nome}</option>`;
-        });
+        if (!isDirezione) {
+            valOperator.innerHTML = `<option value="${currentUser}">${currentUser}</option>`;
+            valOperator.disabled = true;
+        } else {
+            valOperator.innerHTML = '<option value="">Tutti gli Operatori</option>';
+            const dipendenti = window.anagrafiche.filter(d => !!d.qualifica).map(d => (d.ragioneSociale || (d.nome + " " + (d.cognome || ""))).trim()).sort();
+            /* Rimuovo i duplicati */
+            const dedupe = [...new Set(dipendenti)];
+            dedupe.forEach(nome => {
+                if(nome) valOperator.innerHTML += `<option value="${nome}">${nome}</option>`;
+            });
+            valOperator.disabled = false;
+        }
     }
 }
 
@@ -3879,8 +3897,7 @@ if(btnCalculateValuation) {
                 endTs = endTs.getTime();
             }
 
-            const rFilter = valRole.value;
-            const oFilter = valOperator.value;
+
             const valExcludeTextEl = document.getElementById('valExcludeText');
             const excludeTxt = valExcludeTextEl ? valExcludeTextEl.value.trim().toLowerCase() : "";
 
@@ -3909,6 +3926,16 @@ if(btnCalculateValuation) {
                     const nm = (a.ragioneSociale || (a.nome + " " + (a.cognome||""))).trim();
                     if(nm) cacheRuoliApp[nm] = a.ruolo || "Sconosciuto";
                 });
+            }
+
+            const rFilter = valRole.value;
+            let oFilter = valOperator.value;
+            
+            // SECURITY: Forza filtro se non è direzione
+            const currentUser = localStorage.getItem('antimo_user_name') || "";
+            const currentUserRole = cacheRuoliApp[currentUser] || "Sconosciuto";
+            if (currentUserRole.toUpperCase() !== 'DIREZIONE') {
+                oFilter = currentUser;
             }
 
             let validCount = 0;
