@@ -800,6 +800,10 @@
                         <!-- Popolato dinamicamente -->
                     </select>
                 </div>
+                <div style="flex: 1; min-width: 150px;">
+                    <label style="font-size: 0.8rem; font-weight: bold; color: #166534;">Escludi testo</label>
+                    <input type="text" id="valExcludeText" placeholder="es. test" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px;">
+                </div>
                 <div style="display: flex; align-items: flex-end;">
                     <button id="btnCalculateValuation" class="btn btn-primary" style="margin: 0; padding: 8px 15px; background: #22c55e; border-color: #16a34a;"><span class="btn-icon">🧮</span> CALCOLA</button>
                 </div>
@@ -827,10 +831,11 @@
                             <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155;">Tipo Intervento</th>
                             <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155; text-align: right;">Valore Unit.</th>
                             <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155; text-align: right;">Valore Tot.</th>
+                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155; text-align: center; width: 40px;"></th>
                         </tr>
                     </thead>
                     <tbody id="valDetailsTableBody">
-                        <tr><td colspan="6" style="padding: 20px; text-align: center; color: #94a3b8;">Imposta i filtri e clicca su Calcola per visualizzare la valorizzazione economica.</td></tr>
+                        <tr><td colspan="7" style="padding: 20px; text-align: center; color: #94a3b8;">Imposta i filtri e clicca su Calcola per visualizzare la valorizzazione economica.</td></tr>
                     </tbody>
                 </table>
             </div>
