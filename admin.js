@@ -249,6 +249,23 @@ const filterSearch = document.getElementById('filterSearch');
 const toggleStoricoHeader = document.getElementById('toggleStoricoHeader');
 const storicoWrapper = document.getElementById('storicoWrapper');
 const storicoToggleIcon = document.getElementById('storicoToggleIcon');
+
+const toggleNonEseguitiHeader = document.getElementById('toggleNonEseguitiHeader');
+const nonEseguitiWrapper = document.getElementById('nonEseguitiWrapper');
+const nonEseguitiToggleIcon = document.getElementById('nonEseguitiToggleIcon');
+const badgeNonEseguitiHeader = document.getElementById('badgeNonEseguitiHeader');
+
+if (toggleNonEseguitiHeader && nonEseguitiWrapper && nonEseguitiToggleIcon) {
+    toggleNonEseguitiHeader.addEventListener('click', () => {
+        if (nonEseguitiWrapper.classList.contains('hidden')) {
+            nonEseguitiWrapper.classList.remove('hidden');
+            nonEseguitiToggleIcon.innerHTML = 'Chiudi ⬆️';
+        } else {
+            nonEseguitiWrapper.classList.add('hidden');
+            nonEseguitiToggleIcon.innerHTML = 'Apri ⬇️';
+        }
+    });
+}
 const quickFilters = document.querySelectorAll('.filter-quick');
 const btnToggleFilters = document.getElementById('btnToggleFilters');
 const filtersWrapper = document.getElementById('filtersWrapper');
@@ -418,6 +435,8 @@ function renderTable(dataArray) {
 }
 
 function renderNonEseguitiTable(dataArray) {
+    if (badgeNonEseguitiHeader) badgeNonEseguitiHeader.textContent = dataArray.length;
+
     if (dataArray.length === 0) {
         nonEseguitiTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: #666;">🎉 Nessun intervento pendente da controllare.</td></tr>`;
         return;
