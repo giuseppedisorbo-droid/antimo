@@ -381,50 +381,13 @@
 
         </div>
     </div>
-                        <th>Tipo Intervento / Disp.</th>
-                        <th>Motivazione Mancata Esecuzione</th>
-                        <th>Azioni</th>
-                    </tr>
-                </thead>
-                <tbody id="nonEseguitiTableBody">
-                    <tr><td colspan="6" class="loading-spinner">Caricamento dati da Firebase... ⏳</td></tr>
-                </tbody>
-            </table>
         </div>
-
-            <h2 id="toggleStoricoHeader" style="padding: 1rem 1.5rem; margin: 0; background: #f8fafc; color: var(--blue-dark); border-bottom: 1px solid #eee; cursor: pointer; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <span>✅ Storico Interventi (Eseguiti)</span>
-                    <button id="btnMassDeleteStorico" class="btn btn-danger btn-sm hidden" style="margin: 0; padding: 6px 12px; font-weight: bold; font-size: 0.8rem; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.4);">🗑️ Elimina Selezionati (<span id="countStorico">0</span>)</button>
-                </div>
-                <div>
-                    <input type="text" id="quickSearchStorico" placeholder="Cerca al volo..." style="padding: 5px 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.85rem; margin-right: 10px;" onclick="event.stopPropagation();">
-                    <button id="btnToggleFilters" class="btn btn-primary btn-sm" style="margin:0; font-size:0.85rem; padding: 5px 10px; background: #b45309; border: none; margin-right: 5px;">⚙️ Filtri Avanzati</button>
-                    <button id="storicoToggleIcon" class="btn btn-secondary btn-sm" style="margin:0; font-size:0.85rem; padding: 5px 10px;">Apri Storico ⬇️</button>
-                </div>
-            </h2>
-            <div id="storicoWrapper" class="hidden">
-                <table id="interventiTable">
-                    <thead>
-                        <tr>
-                            <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAllStorico" style="transform: scale(1.3); cursor: pointer;"></th>
-                            <th>Data Esecuzione</th>
-                            <th>Orario (Inizio - Fine)</th>
-                            <th>Paziente</th>
-                            <th>Località</th>
-                            <th>Indirizzo (Tel)</th>
-                            <th>Tipo Intervento</th>
-                            <th>Dispositivi / Matricola</th>
-                            <th>Km</th>
-                            <th>Allegato</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody">
-                        <tr><td colspan="8" class="loading-spinner">Caricamento dati da Firebase... ⏳</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    </div>
+    
+    <!-- SEZIONE STATISTICHE E GRAFICI (Originalmente sotto riga 234) -->
+    <!-- (La sezione statistica e grafici riprende qui giu) -->
+    <!-- Assicuriamoci di non rompere i tag di chiusura di adminStatsSection se presenti sotto -->
+<!-- (Inizio vuoto pulito per cancellazione blocchi orfani) -->
         
         <!-- SEZIONE STATISTICHE E GRAFICI -->
         <div id="adminStatsSection" class="hidden" style="margin-bottom: 2rem; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); padding: 20px;">

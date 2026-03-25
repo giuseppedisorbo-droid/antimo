@@ -4068,3 +4068,114 @@ if(btnCalculateValuation) {
     });
 }
 
+/* ==========================================
+ * RICERCA MAGICA GLOBALE (index.html)
+ * ========================================== */
+const magicSearchApp = document.getElementById('magicSearchApp');
+const btnCloseMagicSearch = document.getElementById('btnCloseMagicSearch');
+const magicSearchModal = document.getElementById('magicSearchModal');
+const magicSearchTermDisplay = document.getElementById('magicSearchTermDisplay');
+const magicSearchResultsContainer = document.getElementById('magicSearchResultsContainer');
+
+let magicSearchTimer = null;
+
+if(btnCloseMagicSearch) {
+    btnCloseMagicSearch.addEventListener('click', () => {
+        magicSearchModal.classList.add('hidden');
+        if(magicSearchApp) magicSearchApp.value = '';
+    });
+}
+
+if(magicSearchApp) {
+    magicSearchApp.addEventListener('input', (e) => {
+        // Ignora input vuoti o minori di 3 caratteri per non sovraccaricare il db
+        const term = e.target.value.trim().toLowerCase();
+        if(term.length < 3) {
+            magicSearchModal.classList.add('hidden');
+            return;
+        }
+        
+        clearTimeout(magicSearchTimer);
+        // Debounce 800ms
+        magicSearchTimer = setTimeout(async () => {
+            if(!isFirebaseConfigured) return alert("Firebase risulta offline nella configurazione.");
+            
+            magicSearchModal.classList.remove('hidden');
+            magicSearchTermDisplay.textContent = term;
+            magicSearchResultsContainer.innerHTML = '<div style="text-align:center; padding: 20px; color: #64748b;">Esecuzione ricerca nel Cloud globale in corso... ⏳</div>';
+            
+            try {
+                const { collection, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                const results = [];
+                
+                // Cerca negli Interventi Eseguiti
+                const intSnap = await getDocs(collection(db, "interventi"));
+                intSnap.forEach(doc => {
+                    const d = doc.data();
+                    const s = `${d.paziente || ''} ${d.localita || ''} ${d.indirizzo || ''} ${d.tipo || ''} ${d.note || ''}`.toLowerCase();
+                    if(s.includes(term)) results.push({ id: doc.id, ...d, isProg: false });
+                });
+                
+                // Cerca nei Programmati
+                const progSnap = await getDocs(collection(db, "programmati"));
+                progSnap.forEach(doc => {
+                    const d = doc.data();
+                    const s = `${d.paziente || ''} ${d.localita || ''} ${d.indirizzo || ''} ${d.tipo || ''} ${d.note || ''}`.toLowerCase();
+                    if(s.includes(term)) results.push({ id: doc.id, ...d, isProg: true });
+                });
+                
+                // Ordina dal più recente al più vecchio
+                results.sort((a,b) => {
+                    const tsA = a.timestamp?.seconds || a.startTime/1000 || 0;
+                    const tsB = b.timestamp?.seconds || b.startTime/1000 || 0;
+                    return tsB - tsA;
+                });
+                
+                magicSearchResultsContainer.innerHTML = '';
+                if(results.length === 0) {
+                    magicSearchResultsContainer.innerHTML = '<div style="text-align:center; padding: 20px; color: #ef4444; font-weight: bold;">Nessun risultato globale trovato nei server.</div>';
+                    return;
+                }
+                
+                // Limito a 50 per problemi di memoria su mobile
+                results.slice(0, 50).forEach(item => {
+                    const div = document.createElement('div');
+                    div.style.cssText = "background: #f8fafc; border: 1px solid #cbd5e1; padding: 12px; border-radius: 8px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 5px;";
+                    
+                    let dataStr = "Data Sconosciuta";
+                    if(item.dataEsecuzione) dataStr = "Eseguito: " + item.dataEsecuzione;
+                    else if(item.dataProgrammata) dataStr = "Prog: " + item.dataProgrammata;
+                    else if(item.timestamp) dataStr = "Creato: " + new Date(item.timestamp.seconds * 1000).toLocaleDateString('it-IT');
+                    
+                    const iconState = item.isProg ? "📅 PROG" : "✅ ESEG";
+                    const colorState = item.isProg ? "#ea580c" : "#166534";
+                    
+                    const pName = item.paziente || 'Sconosciuto';
+                    const locStr = `${item.localita || ''} ${item.indirizzo ? '- '+item.indirizzo : ''}`.trim();
+                    const techStr = item.operatore || item.tecnicoAssegnato || '';
+                    const tipoDecoded = window.decodeCodeToLabel ? window.decodeCodeToLabel(item.tipo, 'interventi') : (item.tipo || '');
+                    
+                    div.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center; color: var(--blue-dark); border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
+                            <strong style="font-size: 1.05rem;">${pName}</strong>
+                            <span style="font-size: 0.70rem; background: ${colorState}; color: white; padding: 3px 6px; border-radius: 12px; font-weight: bold; white-space: nowrap;">${iconState}</span>
+                        </div>
+                        <div style="font-size: 0.85rem; color: #475569; display: flex; justify-content: space-between; margin-top: 2px;">
+                            <span>📍 ${locStr || 'N/A'}</span>
+                            <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; white-space: nowrap;">${dataStr}</span>
+                        </div>
+                        ${tipoDecoded ? `<div style="font-size: 0.85rem; color: #b45309;">📝 ${tipoDecoded}</div>` : ''}
+                        ${techStr ? `<div style="font-size: 0.8rem; color: var(--blue-primary); font-weight: 600;">👨‍🔧 ${techStr}</div>` : ''}
+                        ${item.note ? `<div style="font-size: 0.8rem; color: #666; font-style: italic; background: #f1f5f9; padding: 6px; border-radius: 4px; margin-top: 4px;">Note: ${item.note}</div>` : ''}
+                        ${item.fileUrls && item.fileUrls.length > 0 ? `<div style="font-size: 0.8rem; color: #2563eb; background: #e0f2fe; display: inline-block; padding: 2px 6px; border-radius: 4px; align-self: flex-start; margin-top: 4px; font-weight: 600;">📎 ${item.fileUrls.length} Allegat${item.fileUrls.length > 1 ? 'i' : 'o'} (Da app per PC)</div>` : ''}
+                    `;
+                    magicSearchResultsContainer.appendChild(div);
+                });
+                
+            } catch(e) {
+                console.error("Magic Search err:", e);
+                magicSearchResultsContainer.innerHTML = '<div style="color: #ef4444; text-align: center; padding: 20px; font-weight: bold;">Errore Firebase durante la ricerca.</div>';
+            }
+        }, 800); // end timeout
+    });
+}
