@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Importazione AI | EUBIOTECH</title>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- SheetJS for CSV/Excel parsing -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    
+    <!-- PDF.js for simple PDF text extraction (fallback) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';</script>
+
+    <!-- Firebase SDK (Compat Version) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+    
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .import-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .drag-zone {
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            background-color: #f8fafc;
+            color: #64748b;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        
+        .drag-zone.dragover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+            color: #1d4ed8;
+            transform: scale(1.01);
+        }
+        
+        .drag-zone i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            color: #94a3b8;
+        }
+        
+        .drag-zone.dragover i {
+            color: #3b82f6;
+        }
+        
+        .staging-table-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            display: none;
+            margin-top: 20px;
+        }
+        
+        .staging-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+        
+        .staging-table th, .staging-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .staging-table th {
+            background-color: #f8fafc;
+            font-weight: 600;
+            color: #475569;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .staging-table tr:hover {
+            background-color: #f1f5f9;
+        }
+        
+        .ai-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 0.75em;
+            font-weight: bold;
+            background-color: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .ai-high-confidence { background-color: #dcfce7; color: #166534; }
+        .ai-low-confidence { background-color: #fef3c7; color: #92400e; }
+        
+        select.staging-select {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            background-color: white;
+            font-size: 0.9em;
+        }
+        
+        .row-status-ready { border-left: 4px solid #10b981; }
+        .row-status-saved { border-left: 4px solid #94a3b8; opacity: 0.6; }
+        .row-status-error { border-left: 4px solid #ef4444; background-color: #fef2f2; }
+
+        .btn-icon {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="import-container">
+        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <div>
+                <button type="button" class="btn btn-outline" onclick="window.location.href='index.html'">
+                    <i class="fas fa-arrow-left"></i> Torna al Gestionale
+                </button>
+            </div>
+            <div style="text-align: right;">
+                <h1 style="margin: 0; color: #1e293b; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-robot" style="color: #3b82f6;"></i> Importazione Intelligente
+                </h1>
+                <p style="margin: 0; color: #64748b;">Trascina XML, CSV o PDF. L'AI capirà dove inserirli.</p>
+            </div>
+        </header>
+
+        <!-- Modulo Caricamento -->
+        <input type="file" id="file-uploader" accept=".xml,.csv,.xlsx,.pdf" multiple style="display: none;">
+        <div class="drag-zone" id="drag-zone">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <h2>Trascina qui i tuoi documenti</h2>
+            <p>Supportati: Fatture Elettroniche (XML), Resoconti Bancari (CSV, Excel), o PDF.</p>
+            <button class="btn" style="margin-top: 15px;" onclick="document.getElementById('file-uploader').click()">Sfoglia File</button>
+        </div>
+        
+        <div style="text-align: center; margin-bottom: 20px;">
+            <button type="button" class="btn" id="show-raw-xml-btn" style="background-color: #3b82f6; color: white;">
+                <i class="fas fa-table"></i> Mostra Fatture e Contenuto
+            </button>
+        </div>
+        
+        <!-- Loading bar -->
+        <div id="loading-indicator" style="display: none; text-align: center; padding: 20px;">
+            <i class="fas fa-circle-notch fa-spin fa-2x" style="color: #3b82f6;"></i>
+            <p style="margin-top: 10px; color: #475569;" id="loading-text">Analisi dei documenti in corso...</p>
+        </div>
+
+        <!-- Tabella di Staging -->
+        <div class="staging-table-container" id="staging-container">
+            <div class="header-actions">
+                <div>
+                    <strong>Record Trovati: <span id="record-count">0</span></strong>
+                </div>
+                <div>
+                    <button class="btn" id="save-all-btn" style="background-color: #10b981;">
+                        <i class="fas fa-check-double"></i> Approva e Salva Tutto nel Gestionale
+                    </button>
+                </div>
+            </div>
+            
+            <div style="overflow-x: auto;">
+                <table class="staging-table" id="staging-table">
+                    <thead>
+                        <tr>
+                            <th width="5%"></th>
+                            <th width="10%">Data</th>
+                            <th width="15%">Fornitore / Soggetto</th>
+                            <th width="15%">Descrizione Macrocategoria</th>
+                            <th width="15%">Dettaglio (da XML)</th>
+                            <th width="10%">Importo</th>
+                            <th width="15%">Tipo (Proposta AI)</th>
+                            <th width="15%">Categoria (Proposta AI)</th>
+                            <th width="5%">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody id="staging-tbody">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Modal Contenuto Fatture -->
+    <div id="raw-xml-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 25px; border-radius: 12px; width: 95%; max-width: 1200px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 15px;">
+                <h3 style="margin: 0; color: #1e293b;"><i class="fas fa-file-invoice"></i> Contenuto Raw Fatture XML</h3>
+                <button type="button" onclick="document.getElementById('raw-xml-modal').style.display='none'" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b;">&times;</button>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 8px;">
+                <input type="text" id="raw-search-input" placeholder="Cerca ovunque (fornitore, articolo, importo...)" style="flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                <select id="raw-file-filter" style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; min-width: 200px;">
+                    <option value="">-- Tutti i File --</option>
+                </select>
+            </div>
+            
+            <div style="overflow-y: auto; flex: 1;">
+                <table class="staging-table" id="raw-xml-table">
+                    <thead>
+                        <tr>
+                            <th>File</th>
+                            <th>Data</th>
+                            <th>Fornitore</th>
+                            <th>Dettaglio/Articolo</th>
+                            <th>Q.tà</th>
+                            <th>Prezzo Un.</th>
+                            <th>Aliquota IVA</th>
+                            <th>Prezzo Tot.</th>
+                        </tr>
+                    </thead>
+                    <tbody id="raw-xml-tbody">
+                        <!-- Generato via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Il motore logico andrà qui -->
+    <script src="import_ai.js"></script>
+</body>
+</html>
