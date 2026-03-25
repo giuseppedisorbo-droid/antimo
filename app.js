@@ -4150,7 +4150,36 @@ document.addEventListener('DOMContentLoaded', async () => {
             );
         }
 
-        data.sort((a, b) => {
+        let clusterMap = {};
+        data.forEach(d => {
+            let key = (d.fileSorgente && d.fileSorgente !== 'Inserimento Manuale') 
+                      ? d.fileSorgente 
+                      : `manual_${Math.random()}`; // manual entries remain unclustered
+                      
+            if (!clusterMap[key]) {
+                clusterMap[key] = {
+                    key: key,
+                    fileSorgente: d.fileSorgente,
+                    date: d.date,
+                    numero: d.numero,
+                    fornitore: d.fornitore,
+                    type: d.type,
+                    category: d.category,
+                    description: d.description,
+                    dettaglio: d.dettaglio,       // First line item
+                    quantita: d.quantita,         // First line item quantity
+                    prezzoUnitario: d.prezzoUnitario, // First line item price
+                    amount: 0,                    // Will sum
+                    lines: []
+                };
+            }
+            clusterMap[key].lines.push(d);
+            clusterMap[key].amount += parseFloat(d.amount || 0);
+        });
+
+        let clusterArray = Object.values(clusterMap);
+
+        clusterArray.sort((a, b) => {
             let valA = a[rawXmlState.sortCol];
             let valB = b[rawXmlState.sortCol];
             if (typeof valA === 'string') valA = valA.toLowerCase();
@@ -4178,33 +4207,88 @@ document.addEventListener('DOMContentLoaded', async () => {
         activeContainer.style.display = activeTags.length > 0 ? 'block' : 'none';
 
         tbody.innerHTML = '';
-        if (data.length === 0) {
+        if (clusterArray.length === 0) {
             tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 20px; color: #64748b;">Nessun dato corrispondente ai filtri.</td></tr>';
             return;
         }
 
         const typeLabelsShort = { 'REVENUE_EUBIOS': 'RICAVI EUBIOS', 'COSTS_EUBIOS': 'COSTI EUBIOS', 'REVENUE_EUBIOTECH': 'RICAVI EUBIOTECH', 'Costi risorse umane': 'C. RISORSE UMANE', 'Costi altri': 'ALTRI COSTI' };
 
-        data.forEach(d => {
+        clusterArray.forEach((c, index) => {
+            const hasMultiple = c.lines.length > 1;
+            
             const tr = document.createElement('tr');
-            let dispDate = d.date;
-            try { const p = d.date.split('-'); if(p.length===3) dispDate = `${p[2]}/${p[1]}/${p[0]}`; } catch(e){}
-            const dispType = typeLabelsShort[d.type] || d.type;
+            tr.style.transition = "background-color 0.2s";
+            
+            let dispDate = c.date;
+            try { const p = c.date.split('-'); if(p.length===3) dispDate = `${p[2]}/${p[1]}/${p[0]}`; } catch(e){}
+            const dispType = typeLabelsShort[c.type] || c.type;
+            
+            let badge = '';
+            if (hasMultiple) {
+                badge = `<div style="margin-top:5px;"><span class="expand-btn-${index}" style="display:inline-block; font-size:0.75em; background:#e0e7ff; color:#2563eb; padding:2px 8px; border-radius:12px; cursor:pointer; font-weight:bold; border: 1px solid #bfdbfe;"><i class="fas fa-chevron-down"></i> ${c.lines.length} Righe Totali</span></div>`;
+                tr.style.cursor = "pointer";
+                tr.addEventListener('mouseenter', () => tr.style.backgroundColor = '#f8fafc');
+                tr.addEventListener('mouseleave', () => tr.style.backgroundColor = 'transparent');
+            }
 
             tr.innerHTML = `
-                <td style="font-size: 0.8em; color: #64748b; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${d.fileSorgente}">${d.fileSorgente}</td>
+                <td style="font-size: 0.8em; color: #64748b; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${c.fileSorgente}">${c.fileSorgente}</td>
                 <td style="font-size: 0.85em; padding:8px;">${dispDate}</td>
-                <td style="font-family: monospace; font-weight: bold; color:#475569; padding:8px;">${d.numero}</td>
-                <td style="font-size: 0.9em; font-weight: 500; padding:8px;">${d.fornitore}</td>
+                <td style="font-family: monospace; font-weight: bold; color:#475569; padding:8px;">${c.numero}</td>
+                <td style="font-size: 0.9em; font-weight: 500; padding:8px;">${c.fornitore}</td>
                 <td style="font-size: 0.8em; padding:8px;"><strong>${dispType}</strong></td>
-                <td style="font-size: 0.85em; padding:8px;">${d.category}</td>
-                <td style="font-size: 0.85em; color: #475569; padding:8px;">${d.description}</td>
-                <td style="font-size: 0.85em; color: #475569; padding:8px;">${d.dettaglio}</td>
-                <td style="font-family: monospace; text-align: center; padding:8px;">${d.quantita}</td>
-                <td style="font-family: monospace; text-align: right; padding:8px;">${formatCurrency(d.prezzoUnitario)}</td>
-                <td style="font-family: monospace; font-weight: bold; color: #0f172a; text-align: right; padding:8px;">${formatCurrency(d.amount)}</td>
+                <td style="font-size: 0.85em; padding:8px;">${c.category}</td>
+                <td style="font-size: 0.85em; color: #475569; padding:8px;">${c.description}</td>
+                <td style="font-size: 0.85em; color: #475569; padding:8px;">${c.dettaglio} ${badge}</td>
+                <td style="font-family: monospace; text-align: center; padding:8px;">${hasMultiple ? '-' : c.quantita}</td>
+                <td style="font-family: monospace; text-align: right; padding:8px;">${hasMultiple ? '-' : formatCurrency(c.prezzoUnitario)}</td>
+                <td style="font-family: monospace; font-weight: bold; color: #0f172a; text-align: right; padding:8px;">${formatCurrency(c.amount)}</td>
             `;
+            
+            if (hasMultiple) {
+                tr.addEventListener('click', () => {
+                    const children = document.querySelectorAll(`.child-of-${index}`);
+                    let isExpanded = false;
+                    children.forEach(child => {
+                        if (child.style.display === 'none') {
+                            child.style.display = 'table-row';
+                            isExpanded = true;
+                        } else {
+                            child.style.display = 'none';
+                        }
+                    });
+                    const btn = tr.querySelector(`.expand-btn-${index}`);
+                    if (isExpanded) {
+                        btn.innerHTML = `<i class="fas fa-chevron-up"></i> Chiudi Righe`;
+                        btn.style.background = '#dbeafe';
+                    } else {
+                        btn.innerHTML = `<i class="fas fa-chevron-down"></i> ${c.lines.length} Righe Totali`;
+                        btn.style.background = '#e0e7ff';
+                    }
+                });
+            }
+
             tbody.appendChild(tr);
+
+            if (hasMultiple) {
+                c.lines.forEach((line, lidx) => {
+                    const ctr = document.createElement('tr');
+                    ctr.className = `child-of-${index}`;
+                    ctr.style.display = 'none';
+                    ctr.style.backgroundColor = '#f1f5f9'; 
+                    ctr.style.borderBottom = (lidx === c.lines.length - 1) ? '2px solid #cbd5e1' : '1px solid #e2e8f0';
+                    
+                    ctr.innerHTML = `
+                         <td colspan="7" style="text-align:right; font-size:0.8em; color:#64748b; padding:8px 15px;">↳ Riga ${lidx+1} di ${c.lines.length}</td>
+                         <td style="font-size:0.85em; color:#475569; padding:8px;">${line.dettaglio}</td>
+                         <td style="font-family:monospace; text-align:center; padding:8px;">${line.quantita}</td>
+                         <td style="font-family:monospace; text-align:right; padding:8px;">${formatCurrency(line.prezzoUnitario)}</td>
+                         <td style="font-family:monospace; font-weight:bold; color:#0f172a; text-align:right; padding:8px;">${formatCurrency(line.amount)}</td>
+                    `;
+                    tbody.appendChild(ctr);
+                });
+            }
         });
     }
 
