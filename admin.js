@@ -218,7 +218,7 @@ async function loadAiLogs() {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${new Date(lg.timestamp).toLocaleString()}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold; color: var(--blue-dark);">${lg.user || "Sconosciuto"}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold; color: var(--blue-dark);">${lg.user || lg.inseritoDa || "Pietro Cammarota"}</td>
                 <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${(lg.prompt || '').replace(/"/g, '&quot;')}">${lg.prompt || '-'}</td>
                 <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${lg.tokens || '0'}</td>
                 <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${(lg.durationMs ? (lg.durationMs / 1000).toFixed(2) : '0')}</td>
@@ -597,7 +597,7 @@ function renderAdminCharts(eseguiti, programmati) {
     if (ctxTecnici) {
         const counts = {};
         eseguiti.forEach(inv => {
-            const t = inv.tecnico || 'Sconosciuto';
+            const t = inv.tecnico || inv.operatore || inv.user || inv.inseritoDa || 'Pietro Cammarota';
             counts[t] = (counts[t] || 0) + 1;
         });
         const labels = Object.keys(counts).sort((a,b) => counts[b] - counts[a]);
@@ -1217,8 +1217,9 @@ if(btnCalculateValuation) {
 
             snaps.forEach(documentSnapshot => {
                 const data = documentSnapshot.data();
-                let opStr = data.operatore || "Sconosciuto";
-                let rStr = cacheRuoliApp[opStr] || "Sconosciuto";
+                // User requirement: if operator is completely unknown, it defaults to the inserter or "Pietro Cammarota"
+                let opStr = data.operatore || data.user || data.inseritoDa || "Pietro Cammarota";
+                let rStr = cacheRuoliApp[opStr] || "Ruolo Non Definito";
 
                 if (oFilter && opStr !== oFilter) return;
                 if (rFilter && rStr !== rFilter) return;

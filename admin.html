@@ -136,6 +136,9 @@
             <button class="btn btn-primary hidden" id="btnManualSync" style="margin: 0; background-color: var(--orange); border-color: var(--orange);">= Sincronizza Dati</button>
             <a href="index.html" class="btn" style="margin: 0; background-color: white; color: var(--blue-dark); text-decoration: none; border: 2px solid var(--blue-dark); display: flex; align-items: center; padding: 0.5rem 1rem; border-radius: 8px; font-weight: bold;">= Torna al Menu</a>
             <button class="btn btn-primary" id="btnExportExcel" style="margin: 0;">�! Esporta Excel (CSV)</button>
+                    <button class="btn btn-primary" id="btnOpenValuation" style="background-color: #22c55e; border-color: #16a34a; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.2; margin-left: 10px;">
+                        <span class="btn-icon">💰</span> VALORIZZAZIONE<br>ATTIVITÀ
+                    </button>
         </div>
     </header>
 
@@ -541,7 +544,97 @@
         </div>
     </div>
 
-    <!-- Libs -->
+    
+
+<!-- MODAL VALORIZZAZIONE ATTIVITÀ -->
+    <div id="valorizzazioneModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2300; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+        <div style="background: white; padding: 20px; border-radius: 12px; width: 95%; max-width: 900px; margin: 20px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2); display: flex; flex-direction: column;">
+            <h3 style="color: #15803d; margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center; border-bottom: 2px solid #bbf7d0; padding-bottom: 10px;">
+                <span><span class="btn-icon">💰</span> Valorizzazione Attività</span>
+                <button id="btnCloseValuation" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+            </h3>
+            
+            <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; background: #f0fdf4; padding: 15px; border-radius: 8px; border: 1px solid #bbf7d0;">
+                <div style="flex: 1; min-width: 150px;">
+                    <label style="font-size: 0.8rem; font-weight: bold; color: #166534;">Periodo / Modus</label>
+                    <select id="valPeriod" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px;">
+                        <option value="oggi">Oggi</option>
+                        <option value="ieri">Ieri</option>
+                        <option value="mese_corrente" selected>Questo Mese</option>
+                        <option value="mese_scorso">Mese Scorso</option>
+                        <option value="trimestre">Questo Trimestre</option>
+                        <option value="anno">Quest'Anno</option>
+                        <option value="custom">Date Personalizzate...</option>
+                    </select>
+                </div>
+                <div id="valCustomDates" class="hidden" style="flex: 2; display: flex; gap: 10px; min-width: 250px;">
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.8rem; font-weight: bold; color: #166534;">Dal</label>
+                        <input type="date" id="valDateFrom" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.8rem; font-weight: bold; color: #166534;">Al</label>
+                        <input type="date" id="valDateTo" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px;">
+                    </div>
+                </div>
+                <div style="flex: 1; min-width: 150px;">
+                    <label style="font-size: 0.8rem; font-weight: bold; color: #166534;">Ruolo</label>
+                    <select id="valRole" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px;">
+                        <option value="">Tutti i Ruoli</option>
+                        <!-- Popolato dinamicamente -->
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 150px;">
+                    <label style="font-size: 0.8rem; font-weight: bold; color: #166534;">Operatore/Tecnico</label>
+                    <select id="valOperator" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px;">
+                        <option value="">Tutti gli Operatori</option>
+                        <!-- Popolato dinamicamente -->
+                    </select>
+                </div>
+
+                <div style="display: flex; align-items: flex-end;">
+                    <button id="btnCalculateValuation" class="btn btn-primary" style="margin: 0; padding: 8px 15px; background: #22c55e; border-color: #16a34a;"><span class="btn-icon">🧮</span> CALCOLA</button>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                <div style="flex: 1; background: #f8fafc; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #e2e8f0;">
+                    <div style="font-size: 0.85rem; color: #64748b; font-weight: bold; text-transform: uppercase;">Totale Interventi Validi</div>
+                    <div id="valTotalCount" style="font-size: 1.8rem; font-weight: bold; color: #0f172a;">0</div>
+                </div>
+                <div style="flex: 1; background: #ecfdf5; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #6ee7b7;">
+                    <div style="font-size: 0.85rem; color: #047857; font-weight: bold; text-transform: uppercase;">Valore Economico Totale</div>
+                    <div id="valTotalAmount" style="font-size: 1.8rem; font-weight: bold; color: #059669;">€ 0.00</div>
+                </div>
+            </div>
+
+            <h4 style="color: #334155; margin-bottom: 10px; font-size: 1rem;">Dettaglio Attività Valutate</h4>
+            <div style="overflow-x: auto; max-height: 400px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                <table id="valDetailsTable" style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
+                    <thead style="background: #f1f5f9; position: sticky; top: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                        <tr>
+                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155;">Data</th>
+                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155;">Operatore</th>
+                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155;">Ruolo / Paziente</th>
+                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155;">Tipo Intervento</th>
+                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155; text-align: right;">Valore Unit.</th>
+                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155; text-align: right;">Valore Tot.</th>
+                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155; text-align: center; width: 40px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="valDetailsTableBody">
+                        <tr><td colspan="7" style="padding: 20px; text-align: center; color: #94a3b8;">Imposta i filtri e clicca su Calcola per visualizzare la valorizzazione economica.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+                <button id="valExportBtn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 6px 12px; display: none;">📥 ESPORTA CSV</button>
+            </div>
+        </div>
+    </div>
+
+<!-- Libs -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
