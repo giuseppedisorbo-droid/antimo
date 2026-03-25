@@ -1,16 +1,17 @@
-const CACHE_NAME = 'antimo-attivita-v58';
+const CACHE_NAME = 'antimo-attivita-v59';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './style.css',
-  './app.js?v=58',
-  './global_notifications.js?v=58',
+  './app.js?v=59',
+  './global_notifications.js?v=59',
   './programmati.html',
-  './programmati.js?v=58',
+  './programmati.js?v=59',
   './admin.html',
-  './admin.js?v=58',
+  './admin.js?v=59',
   './anagrafiche.html',
-  './anagrafiche.js?v=58',
+  './anagrafiche.js?v=59',
+  './guida.js?v=59',
   './manifest.json'
 ];
 
