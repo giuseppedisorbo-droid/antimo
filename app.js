@@ -113,6 +113,32 @@ async function loadDropdownLists() {
             });
         } catch(e) { console.error("Errore fetch operatori sanitari", e); }
         
+        // Fetch Tecnici per Dropdown Assegnato
+        try {
+            window.tecniciAssegnati = [];
+            const qT = query(collection(db, "anagrafiche"), where("localita", "==", "App (Dipendente)"));
+            const tSnap = await getDocs(qT);
+            tSnap.forEach(d => {
+                const data = d.data();
+                window.tecniciAssegnati.push({id: d.id, nome: (data.ragioneSociale || (data.nome + " " + (data.cognome||""))).trim()});
+            });
+            
+            const dd = document.getElementById('tecnicoAssegnato');
+            if (dd && dd.options.length <= 1) {
+                window.tecniciAssegnati.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t.nome;
+                    opt.textContent = t.nome;
+                    dd.appendChild(opt);
+                });
+                if (localStorage.getItem('antimo_user_name')) {
+                    const myName = localStorage.getItem('antimo_user_name');
+                    if (Array.from(dd.options).some(o => o.value === myName)) {
+                        dd.value = myName; // DEFAULT a me
+                    }
+                }
+            }
+        } catch(e) { console.error("Errore fetch tecnici", e); }
     } else {
         let cached = localStorage.getItem('antimo_dropdown_lists');
         if(cached) window.antimoDropdownLists = JSON.parse(cached);
@@ -449,15 +475,28 @@ function initDynamicBlocks(containerId, addBtnId) {
             }
         });
 
-        if(data) {
-            block.querySelector('.block-tipo').value = data.tipo || "";
+        if (data) {
+            let tipoSelect = block.querySelector('.block-tipo');
+            let tipoMatched = Array.from(tipoSelect.options).some(o => o.value === data.tipo);
+            if (data.tipo && !tipoMatched) {
+                const optT = document.createElement('option');
+                optT.value = data.tipo;
+                optT.textContent = data.tipo;
+                let altroTOpt = tipoSelect.querySelector('option[value="Altro"]');
+                if (altroTOpt) tipoSelect.insertBefore(optT, altroTOpt);
+                else tipoSelect.appendChild(optT);
+            }
+            tipoSelect.value = data.tipo || "";
+
             let dispSelect = block.querySelector('.block-disp');
             let dispMatched = Array.from(dispSelect.options).some(o => o.value === data.disp);
-            if(data.disp && !dispMatched) {
-                const opt = document.createElement('option');
-                opt.value = data.disp;
-                opt.textContent = data.disp;
-                dispSelect.insertBefore(opt, dispSelect.querySelector('option[value="Altro"]'));
+            if (data.disp && !dispMatched) {
+                const optD = document.createElement('option');
+                optD.value = data.disp;
+                optD.textContent = data.disp;
+                let altroDOpt = dispSelect.querySelector('option[value="Altro"]');
+                if (altroDOpt) dispSelect.insertBefore(optD, altroDOpt);
+                else dispSelect.appendChild(optD);
             }
             dispSelect.value = data.disp || "";
             block.querySelector('.block-mat').value = data.mat || "";
