@@ -520,9 +520,18 @@ function createInterventionBlockHTML() {
                     </select>
                 </div>
             </div>
+            
+            <div class="accessori-container form-group" style="margin-bottom: 10px; display: none;">
+                <label style="font-size: 0.8rem; color: #ea580c; font-weight: bold;">Accessori Modello (Multiselezionabili):</label>
+                <div class="accessori-list" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px;"></div>
+            </div>
+
             <div class="form-group" style="margin-bottom: 10px;">
                 <label style="font-size: 0.8rem; color: #475569;">Matricola / Note Extra</label>
-                <input type="text" class="block-mat" placeholder="Es. SN123456" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: white;">
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" class="block-mat" placeholder="Es. SN123456" style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: white;">
+                    <button type="button" class="btn-scan-barcode" style="background: #1e293b; color: white; border: none; border-radius: 6px; padding: 0 15px; font-size: 1.2rem; cursor: pointer;" title="Scansiona Codice a Barre / QR">📷</button>
+                </div>
             </div>
             
             <div style="border-top: 1px dashed #cbd5e1; padding-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
@@ -594,8 +603,64 @@ function initDynamicBlocks(containerId, addBtnId) {
                 else dispSelect.appendChild(optD);
             }
             dispSelect.value = data.disp || "";
-            block.querySelector('.block-mat').value = data.mat || "";
+            
+            if(data.mat) block.querySelector('.block-mat').value = data.mat;
+            if(data.operatoreValutazione) {
+                let opSel = block.querySelector('.block-operatore');
+                if(opSel) opSel.value = data.operatoreValutazione;
+            }
+            if(data.esito) {
+                let eSel = block.querySelector('.block-esito');
+                if(eSel) eSel.value = data.esito;
+            }
+            if(data.statoValutazione) {
+                let sSel = block.querySelector('.block-stato-valutazione');
+                if(sSel) sSel.value = data.statoValutazione;
+            }
         }
+        
+        // Logica Accessori Dinamici
+        const dispSelectNode = block.querySelector('.block-disp');
+        const accContainer = block.querySelector('.accessori-container');
+        const accList = block.querySelector('.accessori-list');
+        
+        const renderAccessoriForDisp = (selectedDispId, preselectedAccArray = []) => {
+            accList.innerHTML = '';
+            const listDispositivi = window.antimoDropdownLists?.dispositivi || [];
+            const dev = listDispositivi.find(d => d.id === selectedDispId);
+            
+            if (dev && dev.accessori && dev.accessori.length > 0) {
+                accContainer.style.display = 'block';
+                dev.accessori.forEach(a => {
+                    const isChecked = preselectedAccArray.includes(a.desc) ? 'checked' : '';
+                    accList.innerHTML += `
+                        <label style="display:flex; align-items:center; gap:5px; font-size:0.85rem; background:white; border:1px solid #cbd5e1; padding:4px 8px; border-radius:6px; cursor:pointer;">
+                            <input type="checkbox" class="acc-chkbox" value="${a.desc.replace(/"/g, '&quot;')}" ${isChecked}>
+                            ${a.desc}
+                        </label>
+                    `;
+                });
+            } else {
+                accContainer.style.display = 'none';
+            }
+        };
+
+        // Aggiorna dinamicamente all'onchange
+        dispSelectNode.addEventListener('change', (e) => {
+            renderAccessoriForDisp(e.target.value, []);
+        });
+
+        // Avvio iniziale (es. in Modifica)
+        if (data && data.disp) {
+            renderAccessoriForDisp(data.disp, data.accessori || []);
+        }
+        
+        // Logica Barcode Scanner
+        const scanBtn = block.querySelector('.btn-scan-barcode');
+        const matInput = block.querySelector('.block-mat');
+        scanBtn.addEventListener('click', () => {
+            window.openBarcodeScanner(matInput);
+        });
         
         container.appendChild(block);
     };
@@ -620,10 +685,18 @@ function extractDynamicBlocksData(containerId) {
         let t = b.querySelector('.block-tipo').value.trim();
         let d = b.querySelector('.block-disp').value.trim();
         let m = b.querySelector('.block-mat').value.trim();
+        
+        let accCheckboxes = b.querySelectorAll('.acc-chkbox:checked');
+        let acc = Array.from(accCheckboxes).map(c => c.value);
+        let accJoin = acc.join(' + ');
+        
         let op = b.querySelector('.block-operatore') ? b.querySelector('.block-operatore').value.trim() : "";
         let es = b.querySelector('.block-esito') ? b.querySelector('.block-esito').value.trim() : "";
         let st = b.querySelector('.block-stato-valutazione') ? b.querySelector('.block-stato-valutazione').value.trim() : "";
-        if(t || d || m || op || es || st) blocks.push({ tipo: t, disp: d, mat: m, operatoreValutazione: op, esito: es, statoValutazione: st });
+        
+        if(t || d || m || op || es || st || acc.length > 0) {
+            blocks.push({ tipo: t, disp: d, mat: m, accessori: acc, accessoriStr: accJoin, operatoreValutazione: op, esito: es, statoValutazione: st });
+        }
     });
     
     return {
@@ -631,12 +704,59 @@ function extractDynamicBlocksData(containerId) {
         tipoStr: blocks.map(b => b.tipo).filter(x=>x).join(', '),
         dispStr: blocks.map(b => b.disp).filter(x=>x).join(', '),
         matStr: blocks.map(b => b.mat).filter(x=>x).join('; '),
+        accStr: blocks.map(b => b.accessoriStr).filter(x=>x).join('; '),
         operatoreValutazioneStr: blocks.map(b => b.operatoreValutazione).filter(x=>x).join(', '),
         esitoStr: blocks.map(b => b.esito).filter(x=>x).join('; '),
         statoValutazioneStr: blocks.map(b => b.statoValutazione).filter(x=>x).join(', ')
     };
 }
-// --- FINE LOGICA BLOCCHI DINAMICI ---
+
+// --- LOGICA HTML5-QRCODE SCANNER ---
+let html5QrcodeScanner = null;
+window.openBarcodeScanner = function(targetInputElement) {
+    const modal = document.getElementById('barcodeScannerModal');
+    if(!modal) return alert("Errore: Modale Scanner non trovato.");
+    
+    modal.classList.remove('hidden');
+    
+    if(!html5QrcodeScanner) {
+        html5QrcodeScanner = new Html5Qrcode("qr-reader");
+    }
+    
+    html5QrcodeScanner.start(
+        { facingMode: "environment" }, 
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText, decodedResult) => {
+            // Success callback
+            html5QrcodeScanner.stop().then((ignore) => {
+                targetInputElement.value = decodedText;
+                modal.classList.add('hidden');
+                // Optional beep feedback
+                try { if("vibrate" in navigator) navigator.vibrate(200); } catch(e){}
+            }).catch((err) => {
+                console.error("Failed to stop scanner", err);
+            });
+        },
+        (errorMessage) => {
+            // Ignore ongoing errors while searching for code
+        }
+    ).catch((err) => {
+        alert("Errore fotocamera: " + err);
+        modal.classList.add('hidden');
+    });
+    
+    const btnClose = document.getElementById('btnCloseBarcodeScanner');
+    if(btnClose) {
+        btnClose.onclick = () => {
+            html5QrcodeScanner.stop().then((ignore) => {
+                modal.classList.add('hidden');
+            }).catch((err) => {
+                modal.classList.add('hidden');
+            });
+        };
+    }
+}
+// --- FINE LOGICA BLOCCHI DINAMICI E SCANNER ---
 
 // LOGICA MESSAGGISTICA E NOTIFICHE
 let messagesDataCache = []; // Cache for filtering without refetching
@@ -2072,6 +2192,8 @@ function renderSpecialPlannedList(container, filteredData) {
                 <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${p.indirizzo || ''}</div>
                 <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${p.telefono || '-'}</div>
                 <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${p.dispositivi || 'Nessuno'}</div>
+                <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Accessori:</strong> ${p.accessoriStr || 'Nessuno'}</div>
+                <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Matricola:</strong> ${p.matricola || 'N/D'}</div>
                 <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${p.note || 'Nessuna'}</div>
                 ${attachHtml}
                 <div style="display:flex; gap:10px; margin-top: 15px;">
@@ -2195,6 +2317,8 @@ function renderNpInterventions(visibiliCustom) {
                 <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${p.indirizzo || ''}</div>
                 <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${p.telefono || '-'}</div>
                 <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${p.dispositivi || 'Nessuno'}</div>
+                <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Accessori:</strong> ${p.accessoriStr || 'Nessuno'}</div>
+                <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Matricola:</strong> ${p.matricola || 'N/D'}</div>
                 <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${noteStr}</div>
                 <div style="display:flex; gap:10px; margin-top: 15px;">
                     <button class="btn btn-primary btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="edit" data-index="${index}">✏ Modifica</button>
@@ -2858,6 +2982,7 @@ newInterventionForm.addEventListener('submit', async (e) => {
         telefono: iTelefono ? iTelefono.value : "",
         dispositivi: dispFinale,
         matricola: matricolaTxt,
+        accessoriStr: blocksData.accStr || "",
         operatoreValutazione: blocksData.operatoreValutazioneStr,
         esito: blocksData.esitoStr,
         statoValutazione: blocksData.statoValutazioneStr,
@@ -3244,6 +3369,7 @@ function renderActivitiesList() {
                     <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${inv.indirizzo || ''}</div>
                     <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${inv.telefono || '-'}</div>
                     <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi') || 'Nessuno'}</div>
+                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Accessori:</strong> ${inv.accessoriStr || 'Nessuno'}</div>
                     <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Matricola:</strong> ${inv.matricola || 'N/D'}</div>
                     <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:5px;"><strong>Note:</strong> ${inv.note || 'Nessuna'}</div>
                     <div style="font-size:0.85rem; color:#0f172a; margin-top:5px; padding-bottom:10px;"><strong>⏳ Prog. da:</strong> ${inv.programmatoDa || 'N/D'}</div>
@@ -3337,6 +3463,7 @@ function renderActivitiesList() {
                     <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${inv.indirizzo || ''}</div>
                     <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${inv.telefono || '-'}</div>
                     <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi') || 'Nessuno'}</div>
+                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Accessori:</strong> ${inv.accessoriStr || 'Nessuno'}</div>
                     <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Matricola:</strong> ${inv.matricola || 'N/D'}</div>
                     <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${inv.note || 'Nessuna'}</div>
                     <div style="font-size:0.85rem; color:#15803d; margin-top:5px;"><strong>Km A/R:</strong> ${inv.kmPercorsi || '0'}</div>
@@ -3869,6 +3996,18 @@ function renderListsSetupTable() {
         const tr = document.createElement('tr');
         tr.style.borderBottom = '1px solid #eee';
         
+        let accBtnHtml = '';
+        if (currentListTab === 'dispositivi') {
+            const numAcc = (item.accessori && Array.isArray(item.accessori)) ? item.accessori.length : 0;
+            accBtnHtml = `
+                <div style="margin-top: 8px;">
+                    <button class="btn btn-secondary btn-sm" onclick="window.openManageAccessori('${item.id}')" style="padding: 4px 8px; font-size: 0.75rem; border:1px solid var(--blue-primary); color:var(--blue-primary); background:white;">
+                        ⚙️ Accessori Dedicati (${numAcc})
+                    </button>
+                </div>
+            `;
+        }
+        
         tr.innerHTML = `
             <td style="padding: 10px; width: 30%; color: #888; font-size: 0.8rem; vertical-align: top;">
                 ID: ${item.id}
@@ -3876,10 +4015,11 @@ function renderListsSetupTable() {
             <td style="padding: 10px; width: 40%; vertical-align: top;">
                 <input type="text" id="desc_${item.id}" value="${item.desc.replace(/"/g, '&quot;')}" style="width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
                 ${valFieldHtml}
+                ${accBtnHtml}
             </td>
             <td style="padding: 10px; width: 30%; text-align: right; vertical-align: top; padding-top: 15px;">
-                <button class="btn btn-primary btn-sm" onclick="salvaVoceEdit('${item.id}')" style="padding: 6px 10px; margin: 0 5px 0 0; font-size: 0.8rem;">Salva</button>
-                <button class="btn btn-danger btn-sm" onclick="eliminaVoce('${item.id}')" style="padding: 6px 10px; margin: 0; font-size: 0.8rem;">X</button>
+                <button class="btn btn-primary btn-sm" onclick="salvaVoceEdit('${item.id}')" style="padding: 6px 10px; margin: 0 0 5px 0; font-size: 0.8rem; width:100%;">Salva</button>
+                <button class="btn btn-danger btn-sm" onclick="eliminaVoce('${item.id}')" style="padding: 6px 10px; margin: 0; font-size: 0.8rem; width:100%;">X</button>
             </td>
         `;
         listsSetupTable.appendChild(tr);
@@ -3913,6 +4053,122 @@ window.eliminaVoce = function(id) {
     window.antimoDropdownLists[currentListTab] = list.filter(x => x.id !== id);
     renderListsSetupTable();
 };
+
+// --- GESTIONE ACCESSORI DEDICATI ---
+window.currentManageAccessoriDeviceId = null;
+
+window.openManageAccessori = function(deviceId) {
+    window.currentManageAccessoriDeviceId = deviceId;
+    const modal = document.getElementById('manageAccessoriModal');
+    const title = document.getElementById('manageAccessoriTitle');
+    if(!modal || !title) return;
+    
+    const list = window.antimoDropdownLists['dispositivi'] || [];
+    const device = list.find(d => d.id === deviceId);
+    if(!device) return;
+    
+    title.innerHTML = `<span class="btn-icon">⚙️</span> Accessori: ${device.desc}`;
+    const newAccDesc = document.getElementById('newAccessorioDesc');
+    if(newAccDesc) newAccDesc.value = '';
+    
+    window.renderAccessoriTable(device);
+    modal.classList.remove('hidden');
+};
+
+window.renderAccessoriTable = function(device) {
+    const table = document.getElementById('accessoriSetupTable');
+    if(!table) return;
+    table.innerHTML = '';
+    
+    if(!device.accessori || device.accessori.length === 0) {
+        table.innerHTML = '<tr><td style="text-align:center; padding: 20px; color: #666;">Nessun accessorio dedicato impostato.</td></tr>';
+        return;
+    }
+    
+    device.accessori.forEach((acc) => {
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px dotted #ccc';
+        tr.innerHTML = `
+            <td style="padding: 10px 5px; width: 70%;">
+                <input type="text" id="acc_desc_${acc.id}" value="${acc.desc.replace(/"/g, '&quot;')}" style="width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
+            </td>
+            <td style="padding: 10px 5px; width: 30%; text-align: right;">
+                <button class="btn btn-primary btn-sm" onclick="salvaAccessorioEdit('${device.id}', '${acc.id}')" style="padding: 4px 8px; font-size: 0.75rem; margin-right:4px;">Salva</button>
+                <button class="btn btn-danger btn-sm" onclick="eliminaAccessorio('${device.id}', '${acc.id}')" style="padding: 4px 8px; font-size: 0.75rem;">X</button>
+            </td>
+        `;
+        table.appendChild(tr);
+    });
+};
+
+window.salvaAccessorioEdit = function(deviceId, accId) {
+    const list = window.antimoDropdownLists['dispositivi'];
+    const device = list.find(d => d.id === deviceId);
+    if(!device || !device.accessori) return;
+    
+    const acc = device.accessori.find(a => a.id === accId);
+    const input = document.getElementById('acc_desc_' + accId);
+    if(acc && input && input.value.trim()) {
+        acc.desc = input.value.trim();
+        window.renderAccessoriTable(device);
+        renderListsSetupTable();
+    }
+};
+
+window.eliminaAccessorio = function(deviceId, accId) {
+    if(!confirm("Eliminare accessorio?")) return;
+    const list = window.antimoDropdownLists['dispositivi'];
+    const device = list.find(d => d.id === deviceId);
+    if(device && device.accessori) {
+        device.accessori = device.accessori.filter(a => a.id !== accId);
+        window.renderAccessoriTable(device);
+        renderListsSetupTable();
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    const btnAddAccessorio = document.getElementById('btnAddAccessorio');
+    const btnCloseManageAccessori = document.getElementById('btnCloseManageAccessori');
+    const btnSaveAccessoriFirebase = document.getElementById('btnSaveAccessoriFirebase');
+    const modal = document.getElementById('manageAccessoriModal');
+    
+    if(btnAddAccessorio) {
+        btnAddAccessorio.addEventListener('click', () => {
+            const input = document.getElementById('newAccessorioDesc');
+            const desc = input.value.trim();
+            if(!desc) return;
+            
+            const deviceId = window.currentManageAccessoriDeviceId;
+            const list = window.antimoDropdownLists['dispositivi'];
+            if(!list || list.length===0) return;
+            const device = list.find(d => d.id === deviceId);
+            if(!device) return;
+            
+            if(!device.accessori) device.accessori = [];
+            device.accessori.push({
+                id: 'ACC_' + Date.now(),
+                desc: desc
+            });
+            input.value = '';
+            window.renderAccessoriTable(device);
+            renderListsSetupTable();
+        });
+    }
+    
+    if(btnCloseManageAccessori) {
+        btnCloseManageAccessori.addEventListener('click', () => {
+            if(modal) modal.classList.add('hidden');
+        });
+    }
+    
+    if(btnSaveAccessoriFirebase) {
+        btnSaveAccessoriFirebase.addEventListener('click', () => {
+            const btnSaveFirebaseLists = document.getElementById('btnSaveFirebaseLists');
+            if(btnSaveFirebaseLists) btnSaveFirebaseLists.click();
+            if(modal) modal.classList.add('hidden');
+        });
+    }
+});
 
 if(btnAddListItem) {
     btnAddListItem.addEventListener('click', () => {

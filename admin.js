@@ -409,7 +409,13 @@ function renderTable(dataArray) {
             <td>${inv.localita || inv.destinazione || "N/D"}</td>
             <td>${inv.indirizzo || ""} <br><small style="color:gray;">${inv.telefono || ""}</small></td>
             <td><span class="badge badge-success">${window.decodeCodeToLabel(inv.tipo, 'interventi')}</span><br><small style="color:gray;">${inv.note || ''}</small></td>
-            <td>${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi')}<br><small style="color:gray;">${inv.matricola ? 'SN: ' + inv.matricola : ''}</small><br>${badgeVal}</td>
+            <td>
+                ${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi')}<br>
+                <small style="color:gray;">
+                    ${inv.accessoriStr ? 'Acc: ' + inv.accessoriStr + '<br>' : ''}
+                    ${inv.matricola ? 'SN: ' + inv.matricola : ''}
+                </small><br>${badgeVal}
+            </td>
             <td>${inv.kmPercorsi ? inv.kmPercorsi + ' km' : '-'}</td>
             <td>${fileHtml} ${adminActions}</td>
         `;
@@ -466,7 +472,14 @@ function renderNonEseguitiTable(dataArray) {
             <td style="font-weight: 600;">${inv.paziente}</td>
             <td>${inv.localita || inv.destinazione || "N/D"}</td>
             <td>${inv.indirizzo || ""} <br><small style="color:gray;">${inv.telefono || ""}</small></td>
-            <td><span class="badge badge-warning">${window.decodeCodeToLabel(inv.tipo, 'interventi')}</span><br><small style="color:gray;">${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi')} ${inv.matricola ? `(SN: ${inv.matricola})` : ''}</small><br>${badgeVal}</td>
+            <td>
+                <span class="badge badge-warning">${window.decodeCodeToLabel(inv.tipo, 'interventi')}</span><br>
+                <small style="color:gray;">
+                    ${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi')}<br>
+                    ${inv.accessoriStr ? 'Acc: ' + inv.accessoriStr + '<br>' : ''}
+                    ${inv.matricola ? 'SN: ' + inv.matricola : ''}
+                </small><br>${badgeVal}
+            </td>
             <td style="color:#b45309; font-weight:600; font-style: italic;">"${inv.motivazione || 'Nessuna'}"</td>
             <td>
                 <button class="btn btn-primary btn-sm btn-chiudi" data-fbid="${inv.fbId}" style="background-color: var(--blue-dark); color: white; width: 100%; margin-bottom: 5px;">Archivia (Chiudi)</button>
@@ -718,7 +731,7 @@ function esporterCSV() {
         return alert("Nessun dato da esportare con questi filtri.");
     }
 
-    let header = ["Data", "Orario Inizio", "Orario Fine", "Paziente / Ente", "Localita", "Indirizzo", "Telefono", "Tipo Intervento", "Dispositivi", "Matricola", "Km Extra", "Note", "Link Allegato"];
+    let header = ["Data", "Orario Inizio", "Orario Fine", "Paziente / Ente", "Localita", "Indirizzo", "Telefono", "Tipo Intervento", "Dispositivi", "Accessori", "Matricola", "Km Extra", "Note", "Link Allegato"];
     let csvContent = header.join(";") + "\n";
 
     currentData.forEach(inv => {
@@ -728,7 +741,7 @@ function esporterCSV() {
         let rs = [
             `"${formatDateDMY(new Date(inv.startTime))}"`, `"${formatTime(inv.startTime)}"`, `"${formatTime(inv.endTime)}"`,
             `"${inv.paziente.replace(/"/g, '""')}"`, `"${loc.replace(/"/g, '""')}"`, `"${ind.replace(/"/g, '""')}"`, `"${inv.telefono || ""}"`,
-            `"${window.decodeCodeToLabel(inv.tipo, 'interventi')}"`, `"${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi').replace(/"/g, '""')}"`, `"${inv.matricola ? inv.matricola.replace(/"/g, '""') : ''}"`, `"${inv.kmPercorsi}"`,
+            `"${window.decodeCodeToLabel(inv.tipo, 'interventi')}"`, `"${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi').replace(/"/g, '""')}"`, `"${inv.accessoriStr ? inv.accessoriStr.replace(/"/g, '""') : ''}"`, `"${inv.matricola ? inv.matricola.replace(/"/g, '""') : ''}"`, `"${inv.kmPercorsi}"`,
             `"${inv.note ? inv.note.replace(/"/g, '""') : ''}"`, `"${inv.fileUrl || ''}"`
         ];
         csvContent += rs.join(";") + "\n";

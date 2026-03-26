@@ -425,7 +425,12 @@ function renderTable() {
             <td>${p.localita || p.destinazione || 'N/D'}</td>
             <td>${p.indirizzo || ''} <br><small style="color:gray;">${p.telefono || ''}</small></td>
             <td><span class="status-badge" style="background-color: #f1f5f9; color: var(--text-main); font-size: 0.8rem; padding: 4px 8px;">${window.decodeCodeToLabel(p.tipo, 'interventi') || 'Non spec.'}</span><br>${badgeVal}</td>
-            <td style="font-size: 0.85rem; color: #555;">${window.decodeCodeToLabel(p.dispositivi, 'dispositivi')} <br /> ${p.note || ''}</td>
+            <td style="font-size: 0.85rem; color: #555;">
+                <strong>Disp:</strong> ${window.decodeCodeToLabel(p.dispositivi, 'dispositivi') || 'Nessuno'} <br />
+                <strong>Matricola:</strong> ${p.matricola || 'N/D'} <br />
+                <strong>Accessori:</strong> ${p.accessoriStr || 'Nessuno'} <br />
+                <strong>Note:</strong> ${p.note || ''}
+            </td>
             <td>
                 <button class="btn btn-primary btn-sm" onclick="editProgrammato('${p.idFb}')" style="padding: 4px 8px; font-size: 0.8rem; text-transform: none; margin-bottom: 4px; width:100%; border-radius: 6px;">Modifica</button>
                 <button class="btn btn-danger btn-sm" onclick="deleteProgrammato('${p.idFb}')" style="padding: 4px 8px; font-size: 0.8rem; text-transform: none; width:100%; border-radius: 6px;">Elimina</button>
@@ -524,9 +529,18 @@ function createInterventionBlockHTML() {
                     </select>
                 </div>
             </div>
+            
+            <div class="accessori-container form-group" style="margin-bottom: 10px; display: none;">
+                <label style="font-size: 0.8rem; color: #ea580c; font-weight: bold;">Accessori Modello (Multiselezionabili):</label>
+                <div class="accessori-list" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px;"></div>
+            </div>
+
             <div class="form-group" style="margin-bottom: 10px;">
                 <label style="font-size: 0.8rem; color: #475569;">Matricola / Note Extra</label>
-                <input type="text" class="block-mat" placeholder="Es. SN123456" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: white;">
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" class="block-mat" placeholder="Es. SN123456" style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: white;">
+                    <button type="button" class="btn-scan-barcode" style="background: #1e293b; color: white; border: none; border-radius: 6px; padding: 0 15px; font-size: 1.2rem; cursor: pointer;" title="Scansiona Codice a Barre / QR">📷</button>
+                </div>
             </div>
             <div style="border-top: 1px dashed #cbd5e1; padding-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
                 <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 0;">
@@ -586,6 +600,48 @@ function initDynamicBlocks(containerId, addBtnId) {
             block.querySelector('.block-mat').value = data.mat || "";
         }
         
+        // Logica Accessori Dinamici
+        const dispSelectNode = block.querySelector('.block-disp');
+        const accContainer = block.querySelector('.accessori-container');
+        const accList = block.querySelector('.accessori-list');
+        
+        const renderAccessoriForDisp = (selectedDispId, preselectedAccArray = []) => {
+            accList.innerHTML = '';
+            const listDispositivi = window.antimoDropdownLists?.dispositivi || [];
+            const dev = listDispositivi.find(d => d.id === selectedDispId);
+            
+            if (dev && dev.accessori && dev.accessori.length > 0) {
+                accContainer.style.display = 'block';
+                dev.accessori.forEach(a => {
+                    const isChecked = preselectedAccArray.includes(a.desc) ? 'checked' : '';
+                    accList.innerHTML += `
+                        <label style="display:flex; align-items:center; gap:5px; font-size:0.85rem; background:white; border:1px solid #cbd5e1; padding:4px 8px; border-radius:6px; cursor:pointer;">
+                            <input type="checkbox" class="acc-chkbox" value="${a.desc.replace(/"/g, '&quot;')}" ${isChecked}>
+                            ${a.desc}
+                        </label>
+                    `;
+                });
+            } else {
+                accContainer.style.display = 'none';
+            }
+        };
+
+        dispSelectNode.addEventListener('change', (e) => {
+            renderAccessoriForDisp(e.target.value, []);
+        });
+
+        if (data && data.disp) {
+            renderAccessoriForDisp(data.disp, data.accessori || []);
+        }
+        
+        // Logica Barcode Scanner
+        const scanBtn = block.querySelector('.btn-scan-barcode');
+        const matInput = block.querySelector('.block-mat');
+        scanBtn.addEventListener('click', () => {
+            if(window.openBarcodeScanner) window.openBarcodeScanner(matInput);
+            else alert('Scanner initialization pending.');
+        });
+        
         container.appendChild(block);
     };
 
@@ -597,17 +653,22 @@ function initDynamicBlocks(containerId, addBtnId) {
 
 function extractDynamicBlocksData(containerId) {
     const container = document.getElementById(containerId);
-    if(!container) return { array: [], tipoStr: "", dispStr: "", matStr: "", operatoreValutazioneStr: "", esitoStr: "", statoValutazioneStr: "" };
+    if(!container) return { array: [], tipoStr: "", dispStr: "", matStr: "", operatoreValutazioneStr: "", esitoStr: "", statoValutazioneStr: "", accStr: "" };
     
     let blocks = [];
     container.querySelectorAll('.dynamic-intervention-block').forEach(b => {
         let t = b.querySelector('.block-tipo').value.trim();
         let d = b.querySelector('.block-disp').value.trim();
         let m = b.querySelector('.block-mat').value.trim();
+        let accCheckboxes = b.querySelectorAll('.acc-chkbox:checked');
+        let acc = Array.from(accCheckboxes).map(c => c.value);
+        let accJoin = acc.join(' + ');
+
         let op = b.querySelector('.block-operatore') ? b.querySelector('.block-operatore').value.trim() : "";
         let es = b.querySelector('.block-esito') ? b.querySelector('.block-esito').value.trim() : "";
         let st = b.querySelector('.block-stato-valutazione') ? b.querySelector('.block-stato-valutazione').value.trim() : "";
-        if(t || d || m || op || es || st) blocks.push({ tipo: t, disp: d, mat: m, operatoreValutazione: op, esito: es, statoValutazione: st });
+        
+        if(t || d || m || op || es || st || acc.length > 0) blocks.push({ tipo: t, disp: d, mat: m, accessori: acc, accessoriStr: accJoin, operatoreValutazione: op, esito: es, statoValutazione: st });
     });
     
     return {
@@ -615,6 +676,7 @@ function extractDynamicBlocksData(containerId) {
         tipoStr: blocks.map(b => b.tipo).filter(x=>x).join(', '),
         dispStr: blocks.map(b => b.disp).filter(x=>x).join(', '),
         matStr: blocks.map(b => b.mat).filter(x=>x).join('; '),
+        accStr: blocks.map(b => b.accessoriStr).filter(x=>x).join('; '),
         operatoreValutazioneStr: blocks.map(b => b.operatoreValutazione).filter(x=>x).join(', '),
         esitoStr: blocks.map(b => b.esito).filter(x=>x).join('; '),
         statoValutazioneStr: blocks.map(b => b.statoValutazione).filter(x=>x).join(', ')
@@ -674,6 +736,7 @@ if (btnProgStartIntervention) {
             telefono: iTelefono ? iTelefono.value : "",
             dispositivi: blocksData.dispStr || "Nessuno",
             matricola: blocksData.matStr,
+            accessoriStr: blocksData.accStr || "",
             operatoreValutazione: blocksData.operatoreValutazioneStr,
             esito: blocksData.esitoStr,
             statoValutazione: blocksData.statoValutazioneStr,
@@ -707,6 +770,7 @@ if (btnProgStartIntervention) {
                     telefono: invToSave.telefono || "",
                     dispositivi: invToSave.dispositivi || "",
                     matricola: invToSave.matricola || "",
+                    accessoriStr: invToSave.accessoriStr || "",
                     interventiList: invToSave.interventiList || [], 
                     note: invToSave.note || "",
                     operatore: invToSave.operatore || "Sconosciuto",
@@ -800,6 +864,7 @@ form.addEventListener('submit', async (e) => {
         telefono: iTelefono ? iTelefono.value : "",
         dispositivi: blocksData.dispStr,
         matricola: blocksData.matStr,
+        accessoriStr: blocksData.accStr || "",
         operatoreValutazione: blocksData.operatoreValutazioneStr,
         esito: blocksData.esitoStr,
         statoValutazione: blocksData.statoValutazioneStr,
@@ -897,6 +962,7 @@ btnSaveWaiting.addEventListener('click', async () => {
         telefono: iTelefono ? iTelefono.value : "",
         dispositivi: blocksData.dispStr,
         matricola: blocksData.matStr,
+        accessoriStr: blocksData.accStr || "",
         operatoreValutazione: blocksData.operatoreValutazioneStr,
         esito: blocksData.esitoStr,
         statoValutazione: blocksData.statoValutazioneStr,
