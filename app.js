@@ -138,6 +138,22 @@ async function loadDropdownLists() {
                     }
                 }
             }
+            
+            // Popolamento dinamico Modal Incarichi (Multi-select)
+            const incContainer = document.getElementById('incarichiListContainer');
+            if (incContainer) {
+                incContainer.innerHTML = '';
+                window.tecniciAssegnati.forEach(t => {
+                    const isChecked = window.selectedIncarichi && (window.selectedIncarichi.includes("TUTTI") || window.selectedIncarichi.includes(t.nome)) ? 'checked' : '';
+                    incContainer.innerHTML += `
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px; border-radius: 6px; background: rgba(0,0,0,0.02); transition: background 0.2s;">
+                            <input type="checkbox" class="cbx-incarico" value="${t.nome}" style="width: 18px; height: 18px; cursor: pointer;" ${isChecked}>
+                            <span style="font-size: 0.95rem; color: #334155;">${t.nome}</span>
+                        </label>
+                    `;
+                });
+            }
+            
         } catch(e) { console.error("Errore fetch tecnici", e); }
     } else {
         let cached = localStorage.getItem('antimo_dropdown_lists');
@@ -150,7 +166,24 @@ loadDropdownLists().then(() => {
     initDynamicBlocks('dynamicProgInterventionsContainer', 'btnAddProgInterventionBlock');
 });
 
-// Stato App
+// Stato App (Incarichi Filter & Interventions)
+window.selectedIncarichi = JSON.parse(localStorage.getItem('antimo_incarichi_filter')) || ["TUTTI"];
+
+window.stringToColorData = function(str) {
+    if(!str) str = "Unknown";
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+    const hex = "00000".substring(0, 6 - c.length) + c;
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const yiq = ((r*299)+(g*587)+(b*114))/1000;
+    return { bg: '#' + hex, text: (yiq >= 128) ? '#0f172a' : '#ffffff' };
+};
+
 let completedInterventions = JSON.parse(localStorage.getItem('antimo_interventions')) || [];
 let plannedInterventions = JSON.parse(localStorage.getItem('antimo_plannedInterventions')) || [];
 
@@ -1797,8 +1830,22 @@ async function updateInterventiCount() {
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
 
-    // Aggiorna contatori
-    const soloPlanned = plannedInterventions.filter(p => !p.status || p.status === 'planned');
+    // Applica logic Multi-Tenant (MIO/TUTTI)
+    let soloPlanned = plannedInterventions.filter(p => !p.status || p.status === 'planned');
+    const targetFilter = filterTecnicoOggi ? filterTecnicoOggi.value : "MIO";
+    const myName = localStorage.getItem('antimo_user_name') || "";
+    
+    if (targetFilter === "MIO" || targetFilter === "") {
+        soloPlanned = soloPlanned.filter(p => p.tecnicoAssegnato === myName || p.programmatoDa === myName || p.operatore === myName);
+    } else if (targetFilter !== "TUTTI") {
+        soloPlanned = soloPlanned.filter(p => p.tecnicoAssegnato === targetFilter || p.programmatoDa === targetFilter || p.operatore === targetFilter);
+    }
+
+    // Applica logic Incarichi (Multi-select)
+    if (window.selectedIncarichi && window.selectedIncarichi.length > 0 && !window.selectedIncarichi.includes("TUTTI")) {
+        soloPlanned = soloPlanned.filter(p => window.selectedIncarichi.includes(p.tecnicoAssegnato) || window.selectedIncarichi.includes(p.programmatoDa) || window.selectedIncarichi.includes(p.operatore));
+    }
+
     let cOggi = 0, cDomani = 0, cNeseg = 0;
     soloPlanned.forEach(p => {
         if(p.dataPrevista === todayStr) cOggi++;
@@ -1807,12 +1854,21 @@ async function updateInterventiCount() {
         if(p.dataPrevista && p.dataPrevista <= todayStr) cNeseg++;
     });
 
-    const soloNP = plannedInterventions.filter(p => p.status === 'in_attesa').length;
+    // Stessa logica per In Attesa
+    let soloNP = plannedInterventions.filter(p => p.status === 'in_attesa');
+    if (targetFilter === "MIO" || targetFilter === "") {
+        soloNP = soloNP.filter(p => p.tecnicoAssegnato === myName || p.programmatoDa === myName || p.operatore === myName);
+    } else if (targetFilter !== "TUTTI") {
+        soloNP = soloNP.filter(p => p.tecnicoAssegnato === targetFilter || p.programmatoDa === targetFilter || p.operatore === targetFilter);
+    }
+    if (window.selectedIncarichi && window.selectedIncarichi.length > 0 && !window.selectedIncarichi.includes("TUTTI")) {
+        soloNP = soloNP.filter(p => window.selectedIncarichi.includes(p.tecnicoAssegnato) || window.selectedIncarichi.includes(p.programmatoDa) || window.selectedIncarichi.includes(p.operatore));
+    }
 
     if (programmatiCount) programmatiCount.textContent = soloPlanned.length;
     if (oggiCount) oggiCount.textContent = cOggi;
     if (domaniCount) domaniCount.textContent = cDomani;
-    if (npCount) npCount.textContent = soloNP;
+    if (npCount) npCount.textContent = soloNP.length;
     if (nesegCount) nesegCount.textContent = cNeseg;
     
     // Calculate start and end of today
@@ -1821,14 +1877,13 @@ async function updateInterventiCount() {
     const endOfToday = startOfToday.getTime() + 24 * 60 * 60 * 1000 - 1;
 
     // Filter completedInterventions for today only
-    const doneToday = completedInterventions.filter(inv => inv.startTime >= startOfToday.getTime() && inv.startTime <= endOfToday);
-    
-    // Gestione Multi-Tenant (Tutti vs MIO)
-    const targetFilter = filterTecnicoOggi ? filterTecnicoOggi.value : "MIO";
-    const myName = localStorage.getItem('antimo_user_name') || "";
+    let doneToday = completedInterventions.filter(inv => inv.startTime >= startOfToday.getTime() && inv.startTime <= endOfToday);
     
     if (targetFilter === "MIO" || targetFilter === "" || !isFirebaseConfigured) {
-        interventiCount.textContent = doneToday.length;
+        if (window.selectedIncarichi && window.selectedIncarichi.length > 0 && !window.selectedIncarichi.includes("TUTTI")) {
+            doneToday = doneToday.filter(p => window.selectedIncarichi.includes(p.operatore) || window.selectedIncarichi.includes(p.tecnicoAssegnato));
+        }
+        if (interventiCount) interventiCount.textContent = doneToday.length;
     } else {
         // Fetch dal DB chiunque oppure un utente specifico
         try {
@@ -1837,15 +1892,50 @@ async function updateInterventiCount() {
             window.firebaseEseguitiOggi = [];
             snap.forEach(d => window.firebaseEseguitiOggi.push(d.data()));
             
-            if (targetFilter === "TUTTI") {
-                interventiCount.textContent = window.firebaseEseguitiOggi.length;
-            } else {
-                interventiCount.textContent = window.firebaseEseguitiOggi.filter(x => x.operatore === targetFilter).length;
+            let fbDone = window.firebaseEseguitiOggi;
+            if (targetFilter !== "TUTTI") {
+                fbDone = fbDone.filter(x => x.operatore === targetFilter || x.tecnicoAssegnato === targetFilter);
             }
+            if (window.selectedIncarichi && window.selectedIncarichi.length > 0 && !window.selectedIncarichi.includes("TUTTI")) {
+                fbDone = fbDone.filter(x => window.selectedIncarichi.includes(x.operatore) || window.selectedIncarichi.includes(x.tecnicoAssegnato));
+            }
+            if (interventiCount) interventiCount.textContent = fbDone.length;
         } catch(e) {
-            console.error(e);
-            interventiCount.textContent = doneToday.length; // fallback
+            console.error("Errore fetch firebase eseguiti:", e);
+            if (window.selectedIncarichi && window.selectedIncarichi.length > 0 && !window.selectedIncarichi.includes("TUTTI")) {
+                doneToday = doneToday.filter(p => window.selectedIncarichi.includes(p.operatore) || window.selectedIncarichi.includes(p.tecnicoAssegnato));
+            }
+            if (interventiCount) interventiCount.textContent = doneToday.length; // fallback
         }
+    }
+    
+    // --- GESTIONE COLORI PULSANTI --- //
+    const statBtns = [
+        document.getElementById('btnMostraP'),
+        document.getElementById('btnMostraOggi'),
+        document.getElementById('btnMostraDomani'),
+        document.getElementById('btnMostraNP'),
+        document.getElementById('btnMostraEseguiti'),
+        document.getElementById('btnMostraNeseguiti')
+    ];
+    
+    if (window.selectedIncarichi && window.selectedIncarichi.length === 1 && window.selectedIncarichi[0] !== "TUTTI") {
+        const colorData = window.stringToColorData(window.selectedIncarichi[0]);
+        statBtns.forEach(b => {
+            if(b) {
+                b.style.backgroundColor = colorData.bg;
+                b.style.color = colorData.text;
+                Array.from(b.querySelectorAll('div, span, strong')).forEach(c => c.style.color = colorData.text);
+            }
+        });
+    } else {
+        statBtns.forEach(b => {
+            if(b) {
+                b.style.backgroundColor = ""; // Ripristina base classe CSS
+                b.style.color = "";
+                Array.from(b.querySelectorAll('div, span, strong')).forEach(c => c.style.color = "");
+            }
+        });
     }
 }
 
@@ -3013,12 +3103,17 @@ function renderActivitiesList() {
     const myName = localStorage.getItem('antimo_user_name') || "";
     const filterName = targetFilter === "MIO" ? myName : targetFilter;
 
-    const toDO = plannedInterventions.filter(inv => {
+    let toDO = plannedInterventions.filter(inv => {
         if (inv.status !== 'planned') return false;
         
         if (targetFilter !== "TUTTI") {
             if (inv.tecnicoAssegnato && inv.tecnicoAssegnato !== filterName) return false;
             if (!inv.tecnicoAssegnato) return false; // Nascondi quelli non assegnati se il filtro MIO è attivo
+        }
+        
+        // Multi-Select Additive Logic
+        if (window.selectedIncarichi && window.selectedIncarichi.length > 0 && !window.selectedIncarichi.includes("TUTTI")) {
+            if (!window.selectedIncarichi.includes(inv.tecnicoAssegnato) && !window.selectedIncarichi.includes(inv.operatore) && !window.selectedIncarichi.includes(inv.programmatoDa)) return false;
         }
 
         if (inv.dataPrevista) {
@@ -3044,11 +3139,17 @@ function renderActivitiesList() {
                 const d = new Date(inv.startTime).getTime();
                 return (d >= startOfToday && d <= endOfToday);
             });
+            if (window.selectedIncarichi && window.selectedIncarichi.length > 0 && !window.selectedIncarichi.includes("TUTTI")) {
+                done = done.filter(inv => window.selectedIncarichi.includes(inv.operatore) || window.selectedIncarichi.includes(inv.tecnicoAssegnato));
+            }
         } else {
             if (targetFilter === "TUTTI") {
                 done = window.firebaseEseguitiOggi;
             } else {
-                done = window.firebaseEseguitiOggi.filter(inv => inv.operatore === targetFilter);
+                done = window.firebaseEseguitiOggi.filter(inv => inv.operatore === targetFilter || inv.tecnicoAssegnato === targetFilter);
+            }
+            if (window.selectedIncarichi && window.selectedIncarichi.length > 0 && !window.selectedIncarichi.includes("TUTTI")) {
+                done = done.filter(inv => window.selectedIncarichi.includes(inv.operatore) || window.selectedIncarichi.includes(inv.tecnicoAssegnato));
             }
             // Ordiniamo
             done.sort((a,b) => a.startTime - b.startTime);
@@ -4131,4 +4232,80 @@ function renderChangelogList() {
         container.appendChild(div);
     });
 }
+
+// ==========================================
+// INCARICHI MULTI-SELECT MODULE EVENTS
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    const btnIncarichiFilter = document.getElementById('btnIncarichiFilter');
+    const incarichiModal = document.getElementById('incarichiModal');
+    const btnCloseIncarichi = document.getElementById('btnCloseIncarichi');
+    const btnApplyIncarichi = document.getElementById('btnApplyIncarichi');
+    const cbxIncarichiTutti = document.getElementById('cbxIncarichiTutti');
+    
+    if(btnIncarichiFilter && incarichiModal) {
+        btnIncarichiFilter.addEventListener('click', () => {
+            incarichiModal.classList.remove('hidden');
+        });
+    }
+    if(btnCloseIncarichi && incarichiModal) {
+        btnCloseIncarichi.addEventListener('click', () => {
+            incarichiModal.classList.add('hidden');
+        });
+    }
+    
+    // Toggle Tutti behavior
+    if (cbxIncarichiTutti) {
+        cbxIncarichiTutti.addEventListener('change', (e) => {
+            const isTutti = e.target.checked;
+            const checkboxes = document.querySelectorAll('.cbx-incarico');
+            checkboxes.forEach(cbx => cbx.checked = isTutti);
+        });
+    }
+    
+    // Handle individual box changes
+    document.addEventListener('change', (e) => {
+        if(e.target && e.target.classList.contains('cbx-incarico')) {
+            if(!e.target.checked && cbxIncarichiTutti) {
+                cbxIncarichiTutti.checked = false;
+            }
+            const allCbx = document.querySelectorAll('.cbx-incarico');
+            let allChecked = true;
+            allCbx.forEach(c => { if(!c.checked) allChecked = false; });
+            if(allChecked && cbxIncarichiTutti) cbxIncarichiTutti.checked = true;
+        }
+    });
+
+    if(btnApplyIncarichi) {
+        btnApplyIncarichi.addEventListener('click', () => {
+            const checkboxes = document.querySelectorAll('.cbx-incarico');
+            let selected = [];
+            checkboxes.forEach(cbx => {
+                if(cbx.checked) selected.push(cbx.value);
+            });
+            
+            if(cbxIncarichiTutti && cbxIncarichiTutti.checked) {
+                selected = ["TUTTI"];
+            } else if (selected.length === 0) {
+                selected = [localStorage.getItem('antimo_user_name') || "TUTTI"];
+            } else if (selected.length === checkboxes.length) {
+                selected = ["TUTTI"];
+            }
+            
+            window.selectedIncarichi = selected;
+            localStorage.setItem('antimo_incarichi_filter', JSON.stringify(selected));
+            
+            if(incarichiModal) incarichiModal.classList.add('hidden');
+            
+            // Rilancia Pipeline
+            if(typeof updateInterventiCount === 'function') updateInterventiCount();
+            if(typeof updateUI === 'function') updateUI();
+            
+            const alContainer = document.getElementById('activitiesListContainer');
+            if(typeof renderActivitiesList === 'function' && alContainer && !alContainer.classList.contains('hidden')) {
+                renderActivitiesList();
+            }
+        });
+    }
+});
 

@@ -19,6 +19,9 @@
                 <button id="btnSettings" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: white; padding: 0;" title="Impostazioni">⚙️</button>
                 <button id="btnTogglePC" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; font-weight: bold; font-size: 0.75rem; cursor: pointer;">PC</button>
                 <a href="anagrafiche.html" id="btnTopAnag" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: flex; align-items: center; gap: 4px;">📇 ANAG</a>
+                <button id="btnIncarichiFilter" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; font-weight: bold; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                    👤 INCARICHI
+                </button>
             </div>
             <select id="filterTecnicoOggi" style="padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.5); background: rgba(0,0,0,0.2); color: white; font-weight: bold; font-size: 0.75rem; outline: none; cursor: pointer; max-width: 140px;">
                 <option value="" style="color: black;">Filtro...</option>
@@ -744,6 +747,31 @@
             <div id="changelogList" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right:5px;">
                 <div style="text-align: center; color: #666; font-size:0.9rem;">Caricamento in corso...</div>
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL MULTI-SELECT INCARICHI -->
+    <div id="incarichiModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2500; display: flex; align-items: center; justify-content: center; padding: 15px;">
+        <div style="background: white; padding: 20px; border-radius: 12px; width: 100%; max-width: 380px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); display: flex; flex-direction: column; max-height: 85vh;">
+            <h3 style="color: var(--blue-dark); margin-top: 0; margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+                <span>👥 Filtro Incarichi</span>
+                <button id="btnCloseIncarichi" style="background:none; border:none; font-size:1.8rem; cursor:pointer; color: #64748b;">&times;</button>
+            </h3>
+            
+            <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: bold; color: var(--blue-primary);">
+                    <input type="checkbox" id="cbxIncarichiTutti" value="TUTTI" style="width: 20px; height: 20px; cursor: pointer;" checked>
+                    🌍 Tutti gli Incaricati
+                </label>
+            </div>
+
+            <div id="incarichiListContainer" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; padding-right: 5px;">
+                <div style="text-align: center; color: #666; font-size:0.9rem;">Caricamento in corso...</div>
+            </div>
+
+            <button id="btnApplyIncarichi" class="btn btn-primary btn-blue" style="width: 100%; padding: 14px; font-size: 1.05rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <span class="btn-icon">✔️</span> APPLICA FILTRO
+            </button>
         </div>
     </div>
 
