@@ -1276,7 +1276,7 @@ if(btnCalculateValuation) {
 
         } catch(e) {
             console.error(e);
-            alert("Errore durante il calcolo. Se compare FirebaseError, assicurati di aver creato l'indice su startTime in Firestore (clicca sul link nella Console di questo browser per crearlo).");
+            alert("Errore Reale: " + e.message);
         } finally {
             btnCalculateValuation.innerHTML = '<span class="btn-icon">🧮</span> CALCOLA';
             btnCalculateValuation.disabled = false;
