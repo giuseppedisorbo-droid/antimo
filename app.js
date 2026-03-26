@@ -1528,7 +1528,7 @@ async function syncPlannedInterventions() {
         snap.forEach(doc => {
             const data = doc.data();
             if (!data.status || data.status === 'planned' || data.status === 'in_attesa') {
-                cloudPlanned.push({ id: doc.id, ...data });
+                cloudPlanned.push({ idFb: doc.id, id: doc.id, ...data });
             }
         });
         
