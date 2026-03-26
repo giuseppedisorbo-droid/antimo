@@ -1508,6 +1508,7 @@ function initApp() {
     // Inizializza Listeners Real-time e sync
     loadMessages();
     syncAssistitiDatabase();
+    initChangelog();
     
     // Proviamo a sincronizzare i dati locali vecchi/offline non ancora sul cloud
     setTimeout(syncLocalDataToCloud, 2000);
@@ -3948,3 +3949,183 @@ if(magicSearchApp) {
         }, 800); // end timeout
     });
 }
+
+// ==========================================
+// CHANGELOG (MODIFICHE SOFTWARE) MODULE
+// ==========================================
+let changelogData = [];
+let unreadChangelogIds = [];
+
+async function initChangelog() {
+    if (!isFirebaseConfigured) return;
+    const btnOpenChangelog = document.getElementById('btnOpenChangelog');
+    if (!btnOpenChangelog) return; // Only run on index.html
+    
+    try {
+        const { collection, query, orderBy, onSnapshot, doc, updateDoc, arrayUnion, addDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        const q = query(collection(db, "changelog"), orderBy("timestamp", "desc"));
+        
+        onSnapshot(q, (snap) => {
+            changelogData = [];
+            unreadChangelogIds = [];
+            let total = 0;
+            let unread = 0;
+            const myName = localStorage.getItem('antimo_user_name') || "Sconosciuto";
+            
+            snap.forEach(d => {
+                const data = d.data();
+                data.idFb = d.id;
+                changelogData.push(data);
+                total++;
+                if (!data.lettiDa || !data.lettiDa.includes(myName)) {
+                    unread++;
+                    unreadChangelogIds.push(d.id);
+                }
+            });
+            
+            // Aggiorna UI Pulsante
+            if (unread > 0) {
+                btnOpenChangelog.innerHTML = `🆕 Modifiche Software <span style="background:#ef4444; color:white; padding:2px 8px; border-radius:12px; font-size:0.75rem; margin-left:6px; box-shadow:0 1px 3px rgba(0,0,0,0.3);">${unread} da leggere (su ${total})</span>`;
+                btnOpenChangelog.style.background = 'rgba(239, 68, 68, 0.8)';
+                btnOpenChangelog.style.border = '2px solid white';
+                // Animazione respiro definita altrove o custom (es. pulse)
+                btnOpenChangelog.style.animation = 'pulse 2s infinite';
+                
+                // Mostra notifica fluttuante
+                const notif = document.getElementById('changelogNotification');
+                if (notif) notif.classList.remove('hidden');
+            } else {
+                btnOpenChangelog.innerHTML = `✅ Modifiche Software <span style="background:rgba(255,255,255,0.3); padding:2px 8px; border-radius:12px; font-size:0.75rem; margin-left:6px; color:white;">${total} totali</span>`;
+                btnOpenChangelog.style.background = 'rgba(255,255,255,0.2)';
+                btnOpenChangelog.style.border = '1px solid white';
+                btnOpenChangelog.style.animation = 'none';
+                
+                // Nascondi notifica fluttuante
+                const notif = document.getElementById('changelogNotification');
+                if (notif) notif.classList.add('hidden');
+            }
+            
+            renderChangelogList();
+        });
+        
+        // Listener per aprire modale
+        btnOpenChangelog.addEventListener('click', async () => {
+            document.getElementById('changelogModal').classList.remove('hidden');
+            const notif = document.getElementById('changelogNotification');
+            if(notif) notif.classList.add('hidden');
+            
+            // Marca tutti come letti
+            if (unreadChangelogIds.length > 0) {
+                const myName = localStorage.getItem('antimo_user_name') || "Sconosciuto";
+                unreadChangelogIds.forEach(id => {
+                    updateDoc(doc(db, "changelog", id), {
+                        lettiDa: arrayUnion(myName)
+                    }).catch(e => console.error("Errore update letto:", e));
+                });
+                unreadChangelogIds = []; // reset locale per sicurezza immediata
+            }
+        });
+        
+        // Listener notifica fluttuante
+        const notif = document.getElementById('changelogNotification');
+        if (notif) {
+            notif.addEventListener('click', () => {
+                btnOpenChangelog.click();
+            });
+        }
+        
+        // Chiusura modale
+        document.getElementById('btnCloseChangelog').addEventListener('click', () => {
+            document.getElementById('changelogModal').classList.add('hidden');
+        });
+        
+        // Salvataggio nuova modifica
+        document.getElementById('btnSaveChangelog').addEventListener('click', async () => {
+            const tArea = document.getElementById('clTesto');
+            const tVal = tArea.value.trim();
+            if(!tVal) return;
+            
+            const myName = localStorage.getItem('antimo_user_name') || "Sconosciuto";
+            const now = new Date();
+            const formatZ = num => num.toString().padStart(2, '0');
+            const dataOra = formatZ(now.getDate()) + "/" + formatZ(now.getMonth()+1) + "/" + now.getFullYear() + " " + formatZ(now.getHours()) + ":" + formatZ(now.getMinutes());
+            
+            try {
+                const clBtn = document.getElementById('btnSaveChangelog');
+                const oldHtml = clBtn.innerHTML;
+                clBtn.innerHTML = "⏳ Salvataggio...";
+                clBtn.disabled = true;
+                
+                await addDoc(collection(db, "changelog"), {
+                    testo: tVal,
+                    timestamp: Date.now(),
+                    dataOra: dataOra,
+                    autore: myName,
+                    lettiDa: [myName] // L'autore l'ha già letto
+                });
+                
+                tArea.value = "";
+                clBtn.innerHTML = oldHtml;
+                clBtn.disabled = false;
+            } catch(e) {
+                console.error("Errore invio changelog", e);
+                alert("Errore durante l'invio.");
+                document.getElementById('btnSaveChangelog').disabled = false;
+                document.getElementById('btnSaveChangelog').innerHTML = `<span class="btn-icon">✅</span> Pubblica`;
+            }
+        });
+        
+    } catch(e) {
+        console.error("Errore initChangelog:", e);
+    }
+}
+
+function renderChangelogList() {
+    const container = document.getElementById('changelogList');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    if (changelogData.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">Nessuna modifica registrata.</div>';
+        return;
+    }
+    
+    const myName = localStorage.getItem('antimo_user_name') || "Sconosciuto";
+    
+    changelogData.forEach(item => {
+        const isNew = !item.lettiDa || !item.lettiDa.includes(myName);
+        const div = document.createElement('div');
+        div.style.cssText = `
+            background: ${isNew ? '#fff7ed' : '#ffffff'};
+            border: 1px solid ${isNew ? '#fdba74' : '#e2e8f0'};
+            border-left: 4px solid ${isNew ? '#ea580c' : '#cbd5e1'};
+            padding: 12px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            position: relative;
+        `;
+        
+        let header = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-size:0.75rem; color:#64748b; font-weight:600;">👤 ${item.autore || 'Admin'}</div>
+                <div style="font-size:0.75rem; color:#64748b;">🕒 ${item.dataOra || ''}</div>
+            </div>
+        `;
+        
+        // Aggiungiamo il parsing dei link se abbiamo window.linkify (dalla bacheca)
+        let safeText = item.testo || '';
+        if (typeof window.linkify === 'function') safeText = window.linkify(safeText);
+        
+        let bodyText = `<div style="font-size:0.95rem; color:#334155; line-height:1.4; white-space:pre-wrap;">${safeText}</div>`;
+        
+        if (isNew) {
+            bodyText += `<div style="position:absolute; top:-8px; right:-8px; background:#ef4444; color:white; font-size:0.6rem; font-weight:bold; padding:2px 6px; border-radius:10px; box-shadow:0 1px 2px rgba(0,0,0,0.2);">NUOVO</div>`;
+        }
+        
+        div.innerHTML = header + bodyText;
+        container.appendChild(div);
+    });
+}
+

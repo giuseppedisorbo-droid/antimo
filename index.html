@@ -80,6 +80,9 @@
                 <input type="text" id="magicSearchApp" placeholder="🔍 Ricerca Magica globale (Paziente, Città)..." style="width: 100%; padding: 8px 15px 8px 35px; border-radius: 20px; border: none; font-size: 0.9rem; outline: none; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); background: rgba(255,255,255,0.95); color: #333;">
                 <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 1rem;">🔍</span>
             </div>
+            <button id="btnOpenChangelog" style="width: 100%; margin-top: 8px; padding: 6px 12px; background: rgba(255,255,255,0.2); color: white; border: 1px solid white; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                🆕 Modifiche Software
+            </button>
         </div>
     </header>
 
@@ -719,6 +722,34 @@
     </main>
 
     
+    <!-- CHANGELOG NOTIFICATION (Floating Badge) -->
+    <div id="changelogNotification" class="hidden" style="position: fixed; bottom: 20px; right: 20px; background-color: var(--orange); color: white; padding: 15px 20px; border-radius: 8px; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 9999; display: flex; align-items: center; gap: 10px; cursor: pointer; border: 2px solid white;">
+        <div style="font-size: 1.5rem; animation: pulse 2s infinite;">🆕</div>
+        <div id="changelogNotificationText" style="font-size: 0.85rem; font-weight: bold;">Ci sono nuove modifiche software da leggere!</div>
+    </div>
+
+    <!-- CHANGELOG MODAL -->
+    <div id="changelogModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10000; padding: 15px; display: flex; align-items: center; justify-content: center;">
+        <div class="card glass-card" style="width: 100%; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; background: #fff; border-top: 4px solid var(--blue-dark);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; color: var(--blue-dark); display:flex; align-items:center; gap:8px;">🆕 Modifiche Software</h3>
+                <button id="btnCloseChangelog" style="background:none; border:none; font-size: 1.8rem; color: #666; cursor: pointer;">&times;</button>
+            </div>
+            
+            <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #cbd5e1;">
+                <div style="font-size:0.8rem; font-weight:bold; color:var(--blue-dark); margin-bottom:6px;">Aggiungi una modifica o nota di rilascio:</div>
+                <textarea id="clTesto" rows="3" placeholder="Scrivi i dettagli dell'aggiornamento..." style="width:100%; border-radius:6px; padding:10px; border:1px solid #ccc; font-size:0.9rem; resize:vertical; outline: none;"></textarea>
+                <div style="display:flex; justify-content:flex-end; margin-top: 8px;">
+                    <button id="btnSaveChangelog" class="btn btn-primary btn-sm" style="margin:0; padding:6px 15px;"><span class="btn-icon">✅</span> Pubblica</button>
+                </div>
+            </div>
+
+            <div id="changelogList" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right:5px;">
+                <div style="text-align: center; color: #666; font-size:0.9rem;">Caricamento in corso...</div>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="app.js?v=58"></script>
     <script type="module" src="ai_chat.js?v=12"></script>
     <script type="module" src="global_notifications.js?v=58"></script>
