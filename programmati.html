@@ -133,13 +133,27 @@
                     ➕ Aggiungi Dispositivo / Intervento
                 </button>
 
-                <div style="display: flex; gap: 10px; margin-top: 10px;">
-                    <button type="submit" class="btn btn-primary btn-orange" style="flex: 1;" id="btnPlanIntervention">
-                        <span class="btn-icon">📅</span> SALVA PROGRAMMAZIONE
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="progAllegatoFile">Allegato/i (Foto, PDF, o Video) - Obbligatorio per Chiudere</label>
+                    <input type="file" id="progAllegatoFile" accept="image/*,video/*,application/pdf" multiple>
+                    <div id="progFilePreviewContainer" class="hidden" style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: start; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px;">
+                        <!-- Le anteprime verranno inserite qui dinamicamente -->
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 10px; flex-direction: column;">
+                    <button type="button" class="btn btn-primary btn-orange btn-large" style="width: 100%; border: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(234, 88, 12, 0.4); display: flex; align-items: center; justify-content: center; gap: 8px; color: white;" id="btnProgStartIntervention">
+                        <span class="btn-icon">⚡</span> TERMINA ATTIVITA'
                     </button>
-                    <button type="button" class="btn btn-secondary" style="flex: 1;" id="btnSaveWaiting">
-                        <span class="btn-icon">⏳</span> SALVA IN ATTESA
-                    </button>
+                    
+                    <div style="display: flex; gap: 10px; margin-top: 5px;">
+                        <button type="submit" class="btn btn-primary" style="flex: 1; background-color: var(--blue-primary); border: none; color: white; padding: 12px; font-weight: bold;" id="btnPlanIntervention">
+                            <span class="btn-icon">📅</span> SALVA PROGRAM.
+                        </button>
+                        <button type="button" class="btn btn-secondary" style="flex: 1; padding: 12px; font-weight: bold;" id="btnSaveWaiting">
+                            <span class="btn-icon">⏳</span> SALVA IN ATTESA
+                        </button>
+                    </div>
                 </div>
             </form>
         </section>

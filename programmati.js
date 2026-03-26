@@ -145,10 +145,63 @@ const iDispositivi = document.getElementById('dispositivi');
 const tableBody = document.getElementById('programmatiTableBody');
 const calendarEl = document.getElementById('calendar');
 
+const btnProgStartIntervention = document.getElementById('btnProgStartIntervention');
+const progAllegatoFile = document.getElementById('progAllegatoFile');
+const progFilePreviewContainer = document.getElementById('progFilePreviewContainer');
+
 const btnSaveWaiting = document.getElementById('btnSaveWaiting');
 const btnToggleWaiting = document.getElementById('btnToggleWaiting');
 const waitingContainer = document.getElementById('waitingContainer');
 const waitingTableBody = document.getElementById('waitingTableBody');
+
+let currentProgAttachments = [];
+
+// Gestione Anteprima Allegati "TERMINA ATTIVITA'"
+if (progAllegatoFile) {
+    progAllegatoFile.addEventListener('change', function(e) {
+        progFilePreviewContainer.innerHTML = '';
+        currentProgAttachments = [];
+        
+        if (this.files.length > 0) {
+            progFilePreviewContainer.classList.remove('hidden');
+        } else {
+            progFilePreviewContainer.classList.add('hidden');
+            return;
+        }
+
+        Array.from(this.files).forEach(f => {
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const dataUrl = evt.target.result;
+                currentProgAttachments.push({ name: f.name, type: f.type, data: dataUrl });
+                
+                const wrapper = document.createElement('div');
+                wrapper.style.width = '70px';
+                wrapper.style.height = '70px';
+                wrapper.style.border = '1px solid #ccc';
+                wrapper.style.borderRadius = '6px';
+                wrapper.style.overflow = 'hidden';
+                wrapper.style.display = 'flex';
+                wrapper.style.alignItems = 'center';
+                wrapper.style.justifyContent = 'center';
+                wrapper.style.backgroundColor = '#fff';
+
+                if (f.type.startsWith('image/')) {
+                    wrapper.innerHTML = `<img src="${dataUrl}" style="max-width:100%; max-height:100%; object-fit:cover;">`;
+                } else if (f.type === 'application/pdf') {
+                    wrapper.innerHTML = `<span style="font-size:1.5rem; color:#e11d48;">📄</span>`;
+                } else if (f.type.startsWith('video/')) {
+                    wrapper.innerHTML = `<span style="font-size:1.5rem; color:#3b82f6;">🎥</span>`;
+                } else {
+                    wrapper.innerHTML = `<span style="font-size:1.5rem;">📎</span>`;
+                }
+                progFilePreviewContainer.appendChild(wrapper);
+            };
+            reader.readAsDataURL(f);
+        });
+    });
+}
+
 
 // Format
 function padZ(num) { return num.toString().padStart(2, '0'); }
@@ -450,6 +503,129 @@ function extractDynamicBlocksData(containerId) {
     };
 }
 // --- FINE LOGICA BLOCCHI DINAMICI ---
+
+// === NUOVA LOGICA: TERMINA ATTIVITA' DIRETTAMENTE DAL CALENDARIO ===
+if (btnProgStartIntervention) {
+    btnProgStartIntervention.addEventListener('click', async (e) => {
+        e.preventDefault();
+
+        const blocksData = extractDynamicBlocksData('dynamicProgInterventionsContainer');
+        if (blocksData.array.length === 0 || !blocksData.tipoStr) {
+            return alert("Devi inserire almeno un intervento compilando la tipologia.");
+        }
+        if (!iPaziente.value || !iLocalita.value || !iIndirizzo.value) {
+            return alert("Compila Paziente, Località e Indirizzo per terminare l'attività.");
+        }
+
+        const oldHtml = btnProgStartIntervention.innerHTML;
+        btnProgStartIntervention.innerHTML = `<span class="btn-icon">⏳</span> SALVATAGGIO IN CORSO...`;
+        btnProgStartIntervention.disabled = true;
+
+        const invToSave = {
+            id: Date.now().toString(),
+            dataObj: new Date().getTime(),
+            tipo: blocksData.tipoStr,
+            paziente: iPaziente.value,
+            localita: iLocalita.value,
+            indirizzo: iIndirizzo.value,
+            telefono: iTelefono ? iTelefono.value : "",
+            dispositivi: blocksData.dispStr || "Nessuno",
+            matricola: blocksData.matStr,
+            operatoreValutazione: blocksData.operatoreValutazioneStr,
+            esito: blocksData.esitoStr,
+            statoValutazione: blocksData.statoValutazioneStr,
+            tecnicoAssegnato: document.getElementById('progTecnicoAssegnato') ? document.getElementById('progTecnicoAssegnato').value : (localStorage.getItem('antimo_user_name') || "Sconosciuto"),
+            interventiList: blocksData.array,
+            note: "Completato da Calendario", // Default note if missing
+            operatore: localStorage.getItem('antimo_user_name') || "Sconosciuto",
+            attachments: currentProgAttachments,
+            startTime: new Date().getTime(),
+            endTime: new Date().getTime(),
+            kmPercorsi: "0"
+        };
+
+        let uploadedUrls = [];
+
+        try {
+            if (db) {
+                // 1. Upload Attachments to Storage
+                if (invToSave.attachments && invToSave.attachments.length > 0) {
+                    const { getStorage, ref, uploadString, getDownloadURL } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js");
+                    const storage = getStorage(app);
+                    
+                    for (let i = 0; i < invToSave.attachments.length; i++) {
+                        const att = invToSave.attachments[i];
+                        let ext = "jpg";
+                        if (att.name) ext = att.name.split('.').pop();
+                        else if (att.type === "application/pdf") ext = "pdf";
+                        else if (att.type && att.type.startsWith("video/")) ext = "mp4";
+
+                        const storageRef = ref(storage, `allegati/${invToSave.id}_${i}.${ext}`);
+                        await uploadString(storageRef, att.data, 'data_url');
+                        const url = await getDownloadURL(storageRef);
+                        uploadedUrls.push(url);
+                    }
+                }
+                
+                // 2. Save directly to `interventi` completely skipping `programmati`
+                const { serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                
+                const payloadToSave = {
+                    timestamp: serverTimestamp(),
+                    id: invToSave.id,
+                    tipo: invToSave.tipo || "Gen",
+                    paziente: invToSave.paziente || "Sconosciuto",
+                    localita: invToSave.localita || "",
+                    indirizzo: invToSave.indirizzo || "",
+                    telefono: invToSave.telefono || "",
+                    dispositivi: invToSave.dispositivi || "",
+                    matricola: invToSave.matricola || "",
+                    interventiList: invToSave.interventiList || [], 
+                    note: invToSave.note || "",
+                    operatore: invToSave.operatore || "Sconosciuto",
+                    startTime: invToSave.startTime,
+                    endTime: invToSave.endTime,
+                    kmPercorsi: invToSave.kmPercorsi,
+                    fileUrls: uploadedUrls.length > 0 ? uploadedUrls : null,
+                    haAllegato: uploadedUrls.length > 0
+                };
+
+                Object.keys(payloadToSave).forEach(k => payloadToSave[k] === undefined && delete payloadToSave[k]);
+                await addDoc(collection(db, "interventi"), payloadToSave);
+
+                // Nuova logica: se salvo un intervento per un paziente, chiudo in automatico i suoi vecchi N.ESEG.
+                try {
+                    const qNeseg = query(
+                        collection(db, "programmati"), 
+                        where("paziente", "==", invToSave.paziente),
+                        where("status", "==", "justified_not_executed")
+                    );
+                    const snapsNeseg = await getDocs(qNeseg);
+                    snapsNeseg.forEach(async (d) => {
+                        await updateDoc(doc(db, "programmati", d.id), { status: "completed" });
+                    });
+                } catch(e) { console.error("Errore pulizia vecchi N.ESEG", e); }
+
+                form.reset();
+                if (progFilePreviewContainer) {
+                    progFilePreviewContainer.innerHTML = '';
+                    progFilePreviewContainer.classList.add('hidden');
+                }
+                currentProgAttachments = [];
+
+                alert("✅ ATTIVITA' TERMINATA CORRETTAMENTE!");
+                window.location.href = "index.html"; // Ritorniamo alla dashboard
+            }
+        } catch (err) {
+            console.error("Errore Termina Attivita in Programmati", err);
+            alert("Errore salvataggio attività nel Cloud.");
+        } finally {
+            btnProgStartIntervention.innerHTML = oldHtml;
+            btnProgStartIntervention.disabled = false;
+        }
+    });
+}
+
 
 // Submit Nuovo Programmazione
 form.addEventListener('submit', async (e) => {

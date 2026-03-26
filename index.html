@@ -55,7 +55,8 @@
                     <div style="font-size: 0.6rem; text-transform: uppercase;">Domani</div>
                     <div style="font-size: 1rem; font-weight: 700;"><strong id="domaniCount">0</strong></div>
                 </div>
-                <a href="programmati.html" id="btnCalendarLink" class="header-stat-box" style="cursor: pointer; padding: 4px; font-size: 1.2rem; text-decoration: none; min-width: unset; color: inherit; display:flex; justify-content:center; align-items:center;">📅</a>
+                <!-- Spazio per allineamento griglia (ex calendario) -->
+                <div class="header-stat-box" style="visibility: hidden; padding: 4px; min-width: unset;"></div>
                 
                 <div id="btnMostraNP" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
                     <div style="font-size: 0.6rem; text-transform: uppercase;">NP</div>
@@ -192,14 +193,14 @@
         <!-- PULSANTE ANAGRAFICHE SPOSTATO NEL HEADER -->
         <!-- NUOVO INTERVENTO & VALORIZZAZIONE -->
         <div style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
-            <button id="btnToggleNuovoIntervento" class="btn btn-primary btn-blue btn-large" style="width: 100%; border: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(30,58,138,0.2); display: flex; align-items: center; justify-content: center; gap: 8px; color: white; margin: 0; cursor: pointer;">
-                <span style="font-size: 1.4rem;">📝</span> NUOVO INTERVENTO
-            </button>
+            <a href="programmati.html" id="btnToggleNuovoIntervento" class="btn btn-primary btn-blue btn-large" style="width: 100%; border: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(30,58,138,0.2); display: flex; align-items: center; justify-content: center; gap: 8px; color: white; margin: 0; cursor: pointer; text-decoration: none;">
+                <span style="font-size: 1.4rem;">📅</span> CALENDARIO PROGRAMMAZIONE
+            </a>
             
         </div>
 
-        <!-- SEZIONE INSERIMENTO INTERVENTO -->
-        <section class="card glass-card hidden" id="interventionSection">
+        <!-- SEZIONE INSERIMENTO INTERVENTO (NASCOSTA: Funzioni spostate nel calendario) -->
+        <section class="card glass-card hidden" id="interventionSection" style="display: none !important;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <h2 style="margin: 0; padding: 0;">Nuovo Intervento</h2>
                 <button id="btnCloseInterventionSection" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #666;">&times;</button>
