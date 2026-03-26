@@ -178,9 +178,12 @@
 
         <!-- ELENCO DA PROGRAMMARE (IN ATTESA) -->
         <section class="card glass-card" style="padding: 1rem 0; overflow-x: auto; margin-bottom: 20px;">
-            <div style="padding: 0 1rem; display: flex; justify-content: space-between; align-items: center;">
+            <div style="padding: 0 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <h2 style="margin: 0;"><span class="btn-icon">⏳</span> Da Programmare (In Attesa)</h2>
-                <button id="btnToggleWaiting" class="btn btn-secondary" style="width: auto; padding: 5px 10px; font-size: 0.8rem; margin: 0;">Mostra / Nascondi</button>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" id="btnStampaListone" onclick="if(window.stampaListoneMagazzinoPDF) window.stampaListoneMagazzinoPDF()" class="btn btn-sm" style="background: #ea580c; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; width: auto; margin: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">🖨️ Stampa Riepilogo Magazzino</button>
+                    <button id="btnToggleWaiting" class="btn btn-secondary" style="width: auto; padding: 6px 12px; font-size: 0.8rem; margin: 0;">Mostra / Nascondi</button>
+                </div>
             </div>
             <div id="waitingContainer" class="hidden" style="margin: 10px 1rem 0 1rem;">
                 <table id="waitingTable" style="width: 100%; border-collapse: collapse; font-size: 0.9rem; background: white; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow);">
@@ -193,7 +196,7 @@
                         </tr>
                     </thead>
                     <tbody id="waitingTableBody">
-                        <tr><td colspan="3" style="text-align: center; padding: 20px;">Caricamento...</td></tr>
+                        <tr><td colspan="4" style="text-align: center; padding: 20px;">Caricamento...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -207,7 +210,10 @@
 
         <!-- ELENCO TABELLA -->
         <section class="card glass-card" style="padding: 1rem 0; overflow-x: auto;">
-            <h2 style="padding: 0 1rem;"><span class="btn-icon">📋</span> Elenco Programmati</h2>
+            <div style="padding: 0 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+                <h2 style="margin: 0;"><span class="btn-icon">📋</span> Elenco Programmati</h2>
+                <button type="button" onclick="if(window.stampaListoneMagazzinoPDF) window.stampaListoneMagazzinoPDF()" class="btn btn-sm" style="background: #ea580c; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; width: auto; margin: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">🖨️ Stampa Riepilogo Magazzino</button>
+            </div>
             <div style="margin: 0 1rem;">
                 <table id="programmatiTable">
                     <thead>

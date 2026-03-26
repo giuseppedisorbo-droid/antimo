@@ -387,6 +387,7 @@ function renderWaitingTable() {
                     <button class="btn btn-primary btn-sm" onclick="programmaAttesa('${p.idFb}')" style="padding: 5px 10px; font-size: 0.8rem; width: auto; text-transform: none;">Assegna</button>
                     <button class="btn btn-secondary btn-sm" onclick="editProgrammato('${p.idFb}')" style="padding: 5px 10px; font-size: 0.8rem; width: auto; text-transform: none;">Modifica</button>
                     <button class="btn btn-danger btn-sm" onclick="deleteProgrammato('${p.idFb}')" style="padding: 5px 10px; font-size: 0.8rem; width: auto; text-transform: none;">Elimina</button>
+                    <button class="btn btn-sm" onclick="window.stampaModuloMagazzinoPDF('${p.idFb}')" style="padding: 5px 10px; font-size: 0.8rem; width: auto; text-transform: none; background: #6366f1; color: white; border: none; border-radius: 4px;">🖨️ Bolla Magazzino</button>
                 </div>
             </td>
         `;
@@ -433,7 +434,8 @@ function renderTable() {
             </td>
             <td>
                 <button class="btn btn-primary btn-sm" onclick="editProgrammato('${p.idFb}')" style="padding: 4px 8px; font-size: 0.8rem; text-transform: none; margin-bottom: 4px; width:100%; border-radius: 6px;">Modifica</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteProgrammato('${p.idFb}')" style="padding: 4px 8px; font-size: 0.8rem; text-transform: none; width:100%; border-radius: 6px;">Elimina</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteProgrammato('${p.idFb}')" style="padding: 4px 8px; font-size: 0.8rem; text-transform: none; width:100%; border-radius: 6px; margin-bottom: 4px;">Elimina</button>
+                <button class="btn btn-sm" onclick="window.stampaModuloMagazzinoPDF('${p.idFb}')" style="padding: 4px 8px; font-size: 0.8rem; text-transform: none; width:100%; border-radius: 6px; background: #6366f1; color: white; border: none;">🖨️ Bolla Magazzino</button>
             </td>
         `;
         tableBody.appendChild(tr);
@@ -535,6 +537,22 @@ function createInterventionBlockHTML() {
                 <div class="accessori-list" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px;"></div>
             </div>
 
+            <div class="seqex-container form-group" style="margin-bottom: 10px; display: none; background: #e0e7ff; padding: 10px; border-radius: 8px; border: 1px dashed #6366f1;">
+                <label style="font-size: 0.85rem; color: #4338ca; font-weight: bold; width: 100%; display: block; margin-bottom: 8px;">Dettagli Terapia SEQEX</label>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px;">
+                    <div style="flex: 1; min-width: 120px;">
+                        <label style="font-size: 0.75rem; color: #3730a3;">Volte al giorno</label>
+                        <input type="number" class="seqex-volte" placeholder="Es. 2" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #a5b4fc; font-size: 0.85rem;">
+                    </div>
+                    <div style="flex: 1; min-width: 120px;">
+                        <label style="font-size: 0.75rem; color: #3730a3;">Minuti al giorno</label>
+                        <input type="number" class="seqex-minuti" placeholder="Es. 30" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #a5b4fc; font-size: 0.85rem;">
+                    </div>
+                </div>
+                <label style="font-size: 0.75rem; color: #3730a3; margin-top: 5px; display:block;">Programmi SEQEX (Multiselezionabili):</label>
+                <div class="seqex-programmi-list" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px;"></div>
+            </div>
+
             <div class="form-group" style="margin-bottom: 10px;">
                 <label style="font-size: 0.8rem; color: #475569;">Matricola / Note Extra</label>
                 <div style="display: flex; gap: 8px;">
@@ -604,6 +622,10 @@ function initDynamicBlocks(containerId, addBtnId) {
         const dispSelectNode = block.querySelector('.block-disp');
         const accContainer = block.querySelector('.accessori-container');
         const accList = block.querySelector('.accessori-list');
+        const seqexContainer = block.querySelector('.seqex-container');
+        const seqexProgList = block.querySelector('.seqex-programmi-list');
+        const seqexVolte = block.querySelector('.seqex-volte');
+        const seqexMinuti = block.querySelector('.seqex-minuti');
         
         const renderAccessoriForDisp = (selectedDispId, preselectedAccArray = []) => {
             accList.innerHTML = '';
@@ -626,12 +648,45 @@ function initDynamicBlocks(containerId, addBtnId) {
             }
         };
 
+        const renderSeqexForDisp = (selectedDispId, savedData = null) => {
+            const listDispositivi = window.antimoDropdownLists?.dispositivi || [];
+            const dev = listDispositivi.find(d => d.id === selectedDispId);
+            const devDesc = dev ? dev.desc : selectedDispId;
+            const isSeqex = devDesc && devDesc.toUpperCase().includes('SEQEX');
+            
+            if (isSeqex) {
+                seqexContainer.style.display = 'block';
+                seqexProgList.innerHTML = '';
+                const listProg = window.antimoDropdownLists?.programmi_seqex || [];
+                const preselectedProg = savedData && savedData.seqex_programmiStr ? savedData.seqex_programmiStr.split(',').map(s=>s.trim()) : [];
+                
+                listProg.forEach(p => {
+                    const isChecked = preselectedProg.includes(p.desc) ? 'checked' : '';
+                    seqexProgList.innerHTML += `
+                        <label style="display:flex; align-items:center; gap:5px; font-size:0.85rem; background:white; border:1px solid #a5b4fc; padding:4px 8px; border-radius:6px; cursor:pointer;">
+                            <input type="checkbox" class="seqex-chkbox" value="${p.desc.replace(/"/g, '&quot;')}" ${isChecked}>
+                            ${p.desc}
+                        </label>
+                    `;
+                });
+                
+                if (savedData) {
+                    seqexVolte.value = savedData.seqex_volte || '';
+                    seqexMinuti.value = savedData.seqex_minuti || '';
+                }
+            } else {
+                seqexContainer.style.display = 'none';
+            }
+        };
+
         dispSelectNode.addEventListener('change', (e) => {
             renderAccessoriForDisp(e.target.value, []);
+            renderSeqexForDisp(e.target.value, null);
         });
 
         if (data && data.disp) {
             renderAccessoriForDisp(data.disp, data.accessori || []);
+            renderSeqexForDisp(data.disp, data);
         }
         
         // Logica Barcode Scanner
@@ -668,7 +723,18 @@ function extractDynamicBlocksData(containerId) {
         let es = b.querySelector('.block-esito') ? b.querySelector('.block-esito').value.trim() : "";
         let st = b.querySelector('.block-stato-valutazione') ? b.querySelector('.block-stato-valutazione').value.trim() : "";
         
-        if(t || d || m || op || es || st || acc.length > 0) blocks.push({ tipo: t, disp: d, mat: m, accessori: acc, accessoriStr: accJoin, operatoreValutazione: op, esito: es, statoValutazione: st });
+        let seqexCheckboxes = b.querySelectorAll('.seqex-chkbox:checked');
+        let seqexProgStr = Array.from(seqexCheckboxes).map(c => c.value).join(', ');
+        let seqexVolteVal = b.querySelector('.seqex-volte') ? b.querySelector('.seqex-volte').value.trim() : "";
+        let seqexMinutiVal = b.querySelector('.seqex-minuti') ? b.querySelector('.seqex-minuti').value.trim() : "";
+        
+        if(t || d || m || op || es || st || acc.length > 0 || seqexProgStr || seqexVolteVal || seqexMinutiVal) {
+            blocks.push({ 
+                tipo: t, disp: d, mat: m, accessori: acc, accessoriStr: accJoin, 
+                seqex_programmiStr: seqexProgStr, seqex_volte: seqexVolteVal, seqex_minuti: seqexMinutiVal,
+                operatoreValutazione: op, esito: es, statoValutazione: st 
+            });
+        }
     });
     
     return {
@@ -677,6 +743,7 @@ function extractDynamicBlocksData(containerId) {
         dispStr: blocks.map(b => b.disp).filter(x=>x).join(', '),
         matStr: blocks.map(b => b.mat).filter(x=>x).join('; '),
         accStr: blocks.map(b => b.accessoriStr).filter(x=>x).join('; '),
+        seqexProgrammiStr: blocks.map(b => b.seqex_programmiStr).filter(x=>x).join('; '),
         operatoreValutazioneStr: blocks.map(b => b.operatoreValutazione).filter(x=>x).join(', '),
         esitoStr: blocks.map(b => b.esito).filter(x=>x).join('; '),
         statoValutazioneStr: blocks.map(b => b.statoValutazione).filter(x=>x).join(', ')

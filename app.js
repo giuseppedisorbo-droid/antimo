@@ -44,7 +44,7 @@ if (isFirebaseConfigured) {
 // =====================================
 
 // Liste Dinamiche Dropdown
-window.antimoDropdownLists = { interventi: [], dispositivi: [], ruoli: [] };
+window.antimoDropdownLists = { interventi: [], dispositivi: [], ruoli: [], programmi_seqex: [] };
 window.decodeCodeToLabel = function(codeRaw, type = 'interventi') {
     if(!codeRaw) return "";
     let codes = codeRaw.split(',').map(c => c.trim());
@@ -65,7 +65,8 @@ async function loadDropdownLists() {
     let baseDropdownLists = {
         interventi: defaultTypes.map(t => ({ id: t, desc: t })),
         dispositivi: defaultDevices.map(d => ({ id: d, desc: d })),
-        ruoli: defaultRoles.map(r => ({ id: r, desc: r }))
+        ruoli: defaultRoles.map(r => ({ id: r, desc: r })),
+        programmi_seqex: []
     };
     
     window.antimoDropdownLists = baseDropdownLists;
@@ -81,6 +82,7 @@ async function loadDropdownLists() {
                 if(!cloudData.interventi) { cloudData.interventi = baseDropdownLists.interventi; needsUpdate = true; }
                 if(!cloudData.dispositivi) { cloudData.dispositivi = baseDropdownLists.dispositivi; needsUpdate = true; }
                 if(!cloudData.ruoli) { cloudData.ruoli = baseDropdownLists.ruoli; needsUpdate = true; }
+                if(!cloudData.programmi_seqex) { cloudData.programmi_seqex = baseDropdownLists.programmi_seqex; needsUpdate = true; }
                 
                 window.antimoDropdownLists = cloudData;
                 
@@ -99,6 +101,7 @@ async function loadDropdownLists() {
             if(cached) {
                 window.antimoDropdownLists = JSON.parse(cached);
                 if(!window.antimoDropdownLists.ruoli) window.antimoDropdownLists.ruoli = baseDropdownLists.ruoli;
+                if(!window.antimoDropdownLists.programmi_seqex) window.antimoDropdownLists.programmi_seqex = baseDropdownLists.programmi_seqex;
             }
         }
         
@@ -526,6 +529,22 @@ function createInterventionBlockHTML() {
                 <div class="accessori-list" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px;"></div>
             </div>
 
+            <div class="seqex-container form-group" style="margin-bottom: 10px; display: none; background: #e0e7ff; padding: 10px; border-radius: 8px; border: 1px dashed #6366f1;">
+                <label style="font-size: 0.85rem; color: #4338ca; font-weight: bold; width: 100%; display: block; margin-bottom: 8px;">Dettagli Terapia SEQEX</label>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px;">
+                    <div style="flex: 1; min-width: 120px;">
+                        <label style="font-size: 0.75rem; color: #3730a3;">Volte al giorno</label>
+                        <input type="number" class="seqex-volte" placeholder="Es. 2" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #a5b4fc; font-size: 0.85rem;">
+                    </div>
+                    <div style="flex: 1; min-width: 120px;">
+                        <label style="font-size: 0.75rem; color: #3730a3;">Minuti al giorno</label>
+                        <input type="number" class="seqex-minuti" placeholder="Es. 30" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #a5b4fc; font-size: 0.85rem;">
+                    </div>
+                </div>
+                <label style="font-size: 0.75rem; color: #3730a3; margin-top: 5px; display:block;">Programmi SEQEX (Multiselezionabili):</label>
+                <div class="seqex-programmi-list" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px;"></div>
+            </div>
+
             <div class="form-group" style="margin-bottom: 10px;">
                 <label style="font-size: 0.8rem; color: #475569;">Matricola / Note Extra</label>
                 <div style="display: flex; gap: 8px;">
@@ -623,6 +642,10 @@ function initDynamicBlocks(containerId, addBtnId) {
         const dispSelectNode = block.querySelector('.block-disp');
         const accContainer = block.querySelector('.accessori-container');
         const accList = block.querySelector('.accessori-list');
+        const seqexContainer = block.querySelector('.seqex-container');
+        const seqexProgList = block.querySelector('.seqex-programmi-list');
+        const seqexVolte = block.querySelector('.seqex-volte');
+        const seqexMinuti = block.querySelector('.seqex-minuti');
         
         const renderAccessoriForDisp = (selectedDispId, preselectedAccArray = []) => {
             accList.innerHTML = '';
@@ -645,14 +668,47 @@ function initDynamicBlocks(containerId, addBtnId) {
             }
         };
 
+        const renderSeqexForDisp = (selectedDispId, savedData = null) => {
+            const listDispositivi = window.antimoDropdownLists?.dispositivi || [];
+            const dev = listDispositivi.find(d => d.id === selectedDispId);
+            const devDesc = dev ? dev.desc : selectedDispId;
+            const isSeqex = devDesc && devDesc.toUpperCase().includes('SEQEX');
+            
+            if (isSeqex) {
+                seqexContainer.style.display = 'block';
+                seqexProgList.innerHTML = '';
+                const listProg = window.antimoDropdownLists?.programmi_seqex || [];
+                const preselectedProg = savedData && savedData.seqex_programmiStr ? savedData.seqex_programmiStr.split(',').map(s=>s.trim()) : [];
+                
+                listProg.forEach(p => {
+                    const isChecked = preselectedProg.includes(p.desc) ? 'checked' : '';
+                    seqexProgList.innerHTML += `
+                        <label style="display:flex; align-items:center; gap:5px; font-size:0.85rem; background:white; border:1px solid #a5b4fc; padding:4px 8px; border-radius:6px; cursor:pointer;">
+                            <input type="checkbox" class="seqex-chkbox" value="${p.desc.replace(/"/g, '&quot;')}" ${isChecked}>
+                            ${p.desc}
+                        </label>
+                    `;
+                });
+                
+                if (savedData) {
+                    seqexVolte.value = savedData.seqex_volte || '';
+                    seqexMinuti.value = savedData.seqex_minuti || '';
+                }
+            } else {
+                seqexContainer.style.display = 'none';
+            }
+        };
+
         // Aggiorna dinamicamente all'onchange
         dispSelectNode.addEventListener('change', (e) => {
             renderAccessoriForDisp(e.target.value, []);
+            renderSeqexForDisp(e.target.value, null);
         });
 
         // Avvio iniziale (es. in Modifica)
         if (data && data.disp) {
             renderAccessoriForDisp(data.disp, data.accessori || []);
+            renderSeqexForDisp(data.disp, data);
         }
         
         // Logica Barcode Scanner
@@ -690,12 +746,21 @@ function extractDynamicBlocksData(containerId) {
         let acc = Array.from(accCheckboxes).map(c => c.value);
         let accJoin = acc.join(' + ');
         
+        let seqexCheckboxes = b.querySelectorAll('.seqex-chkbox:checked');
+        let seqexProgStr = Array.from(seqexCheckboxes).map(c => c.value).join(', ');
+        let seqexVolteVal = b.querySelector('.seqex-volte') ? b.querySelector('.seqex-volte').value.trim() : "";
+        let seqexMinutiVal = b.querySelector('.seqex-minuti') ? b.querySelector('.seqex-minuti').value.trim() : "";
+        
         let op = b.querySelector('.block-operatore') ? b.querySelector('.block-operatore').value.trim() : "";
         let es = b.querySelector('.block-esito') ? b.querySelector('.block-esito').value.trim() : "";
         let st = b.querySelector('.block-stato-valutazione') ? b.querySelector('.block-stato-valutazione').value.trim() : "";
         
-        if(t || d || m || op || es || st || acc.length > 0) {
-            blocks.push({ tipo: t, disp: d, mat: m, accessori: acc, accessoriStr: accJoin, operatoreValutazione: op, esito: es, statoValutazione: st });
+        if(t || d || m || op || es || st || acc.length > 0 || seqexProgStr || seqexVolteVal || seqexMinutiVal) {
+            blocks.push({ 
+                tipo: t, disp: d, mat: m, accessori: acc, accessoriStr: accJoin, 
+                seqex_programmiStr: seqexProgStr, seqex_volte: seqexVolteVal, seqex_minuti: seqexMinutiVal,
+                operatoreValutazione: op, esito: es, statoValutazione: st 
+            });
         }
     });
     
@@ -705,6 +770,7 @@ function extractDynamicBlocksData(containerId) {
         dispStr: blocks.map(b => b.disp).filter(x=>x).join(', '),
         matStr: blocks.map(b => b.mat).filter(x=>x).join('; '),
         accStr: blocks.map(b => b.accessoriStr).filter(x=>x).join('; '),
+        seqexProgrammiStr: blocks.map(b => b.seqex_programmiStr).filter(x=>x).join('; '),
         operatoreValutazioneStr: blocks.map(b => b.operatoreValutazione).filter(x=>x).join(', '),
         esitoStr: blocks.map(b => b.esito).filter(x=>x).join('; '),
         statoValutazioneStr: blocks.map(b => b.statoValutazione).filter(x=>x).join(', ')
@@ -3929,6 +3995,11 @@ function updateListsTabUI() {
         btnTabRuoli.className = currentListTab === 'ruoli' ? 'btn btn-primary' : 'btn btn-secondary';
         btnTabRuoli.style.background = currentListTab === 'ruoli' ? 'var(--blue-primary)' : '';
     }
+    const btnTabSeqex = document.getElementById('btnTabSeqex');
+    if(btnTabSeqex) {
+        btnTabSeqex.className = currentListTab === 'programmi_seqex' ? 'btn btn-primary' : 'btn btn-secondary';
+        btnTabSeqex.style.background = currentListTab === 'programmi_seqex' ? 'var(--blue-primary)' : '';
+    }
     renderListsSetupTable();
 }
 
@@ -3963,6 +4034,14 @@ const btnTabRuoli = document.getElementById('btnTabRuoli');
 if(btnTabRuoli) {
     btnTabRuoli.addEventListener('click', () => {
         currentListTab = 'ruoli';
+        updateListsTabUI();
+    });
+}
+
+const btnTabSeqex = document.getElementById('btnTabSeqex');
+if(btnTabSeqex) {
+    btnTabSeqex.addEventListener('click', () => {
+        currentListTab = 'programmi_seqex';
         updateListsTabUI();
     });
 }
@@ -4179,6 +4258,7 @@ if(btnAddListItem) {
         if (currentListTab === 'interventi') prefix = 'INT_';
         else if (currentListTab === 'dispositivi') prefix = 'DEV_';
         else if (currentListTab === 'ruoli') prefix = 'RUO_';
+        else if (currentListTab === 'programmi_seqex') prefix = 'SQX_';
         const newId = prefix + Date.now().toString();
         
         let newItem = { id: newId, desc: desc };
@@ -4602,4 +4682,264 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// ==========================================
+// STAMPA MODULO MAGAZZINO / PDF (SEQEX & GLOBAL)
+// ==========================================
+window.stampaModuloMagazzinoPDF = async function(id, collectionName = 'programmati') {
+    try {
+        const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        const docSnap = await getDoc(doc(db, collectionName, id));
+        if (!docSnap.exists()) {
+            alert("Documento non trovato nel database.");
+            return;
+        }
+        const task = docSnap.data();
+        
+        let htmlStr = \`
+            <!DOCTYPE html>
+            <html><head><title>Preparazione Magazzino - \${task.paziente}</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #333; margin: 0; padding: 20px; font-size: 14px; }
+                h1 { color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; font-size: 24px; text-align: center; margin-top: 0; }
+                .section { margin-bottom: 20px; }
+                .section-title { font-weight: bold; background: #f1f5f9; padding: 8px; border-left: 4px solid #3b82f6; margin-bottom: 10px; font-size: 16px; page-break-after: avoid; }
+                .grid { display: flex; flex-wrap: wrap; gap: 10px; }
+                .grid-item { flex: 1; min-width: 200px; background: #fff; border: 1px solid #e2e8f0; padding: 10px; border-radius: 4px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                th { background: #e2e8f0; text-align: left; padding: 8px; font-size: 14px; border: 1px solid #cbd5e1; }
+                td { padding: 8px; border: 1px solid #cbd5e1; font-size: 13px; }
+                .print-btn { display: block; width: 100%; padding: 15px; background: #16a34a; color: white; text-align: center; text-decoration: none; font-size: 18px; font-weight: bold; margin-bottom: 20px; cursor: pointer; border: none; border-radius: 8px; }
+                @media print { .print-btn { display: none; } body { padding: 0; } }
+            </style>
+            </head><body>
+                <button class="print-btn" onclick="window.print()">🖨️ STAMPA DOCUMENTO FOGLIO PREPARAZIONE</button>
+                <h1>Bolla di Preparazione Interna</h1>
+                
+                <div class="section">
+                    <div class="section-title">👤 Dati Paziente & Intervento</div>
+                    <div class="grid">
+                        <div class="grid-item"><strong>Paziente / Ente:</strong><br>\${task.paziente || 'N/D'}</div>
+                        <div class="grid-item"><strong>Indirizzo:</strong><br>\${task.localita || ''} \${task.indirizzo ? '- '+task.indirizzo : ''}</div>
+                        <div class="grid-item"><strong>Telefono:</strong><br>\${task.telefono || 'N/D'}</div>
+                    </div>
+                </div>
+        \`;
+        
+        if (task.interventiList && task.interventiList.length > 0) {
+            htmlStr += \`
+                <div class="section">
+                    <div class="section-title">📦 Dispositivi, Matricole e Accessori</div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 20%;">Tipo Intervento</th>
+                                <th style="width: 30%;">Dispositivo</th>
+                                <th style="width: 25%;">Accessori a Corredo</th>
+                                <th style="width: 25%;">Matricola Letta</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            \`;
+            task.interventiList.forEach(inv => {
+                const tipoInt = window.decodeCodeToLabel ? window.decodeCodeToLabel(inv.tipo, 'interventi') : inv.tipo;
+                const disp = window.decodeCodeToLabel ? window.decodeCodeToLabel(inv.disp, 'dispositivi') : inv.disp;
+                
+                let seqexHtml = '';
+                if (disp && disp.toUpperCase().includes('SEQEX')) {
+                    seqexHtml = \`<div style="margin-top:8px; padding:6px; background:#e0e7ff; border:1px solid #a5b4fc; border-radius:4px;">
+                                    <strong>⚙️ SETUP TERAPIA SEQEX:</strong><br>
+                                    - Frequenza: \${inv.seqex_volte || '?'} volte al dì per \${inv.seqex_minuti || '?'} min.<br>
+                                    - Programmi Selezionati: <strong>\${inv.seqex_programmiStr || 'Nessuno'}</strong>
+                                 </div>\`;
+                }
+
+                htmlStr += \`
+                    <tr>
+                        <td><strong>\${tipoInt || ''}</strong></td>
+                        <td>
+                            <strong style="color: #1d4ed8; font-size: 1.1em;">\${disp || 'Nessuno'}</strong>
+                            \${seqexHtml}
+                        </td>
+                        <td>\${inv.accessoriStr || '-'}</td>
+                        <td style="font-family: monospace; font-size: 1.1em;"><strong>\${inv.mat || '___________'}</strong></td>
+                    </tr>
+                \`;
+            });
+            htmlStr += \`</tbody></table></div>\`;
+        } else {
+            // Logica Retrocompatibile
+            const tipoInt = window.decodeCodeToLabel ? window.decodeCodeToLabel(task.tipo, 'interventi') : task.tipo;
+            const disp = window.decodeCodeToLabel ? window.decodeCodeToLabel(task.dispositivi, 'dispositivi') : task.dispositivi;
+            htmlStr += \`
+                <div class="section">
+                    <div class="section-title">📦 Dispositivi</div>
+                    <div style="padding: 10px; border: 1px solid #cbd5e1;">
+                        <strong>Intervento:</strong> \${tipoInt || ''} <br>
+                        <strong>Dispositivo:</strong> \${disp || ''} <br>
+                        <strong>Accessori:</strong> \${task.accessoriStr || ''} <br>
+                        <strong>Matricola:</strong> \${task.matricola || ''}
+                    </div>
+                </div>
+            \`;
+        }
+
+        if (task.note) {
+            htmlStr += \`
+                <div class="section">
+                    <div class="section-title">📝 Note e Indicazioni</div>
+                    <div style="border: 1px solid #cbd5e1; padding: 10px; background: #f8fafc; border-radius: 4px; white-space: pre-wrap;">\${task.note}</div>
+                </div>
+            \`;
+        }
+        
+        let headerTe = task.tecnicoAssegnato || '';
+        if(headerTe === "MAGAZZINO") headerTe = "________________";
+        htmlStr += \`
+                <div style="margin-top: 50px; display: flex; justify-content: space-around;">
+                    <div style="text-align: center; border-top: 1px solid #333; width: 35%; padding-top: 5px;">Firma Magazziniere</div>
+                    <div style="text-align: center; border-top: 1px solid #333; width: 35%; padding-top: 5px;">Tecnico: \${headerTe}</div>
+                </div>
+            </body></html>
+        \`;
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert("Il browser ha bloccato il popup di stampa. Consenti i popup per questo sito.");
+            return;
+        }
+        printWindow.document.write(htmlStr);
+        printWindow.document.close();
+        
+        setTimeout(() => {
+            printWindow.document.title = "Preparazione_" + (task.paziente || 'Doc').replace(/ /g, '_');
+        }, 100);
+
+    } catch (e) {
+        console.error("Print Error", e);
+        alert("Errore durante la generazione del PDF.");
+    }
+};
+
+window.stampaListoneMagazzinoPDF = async function() {
+    if(!isFirebaseConfigured) return alert("Firebase non configurato.");
+    
+    try {
+        const clBtn = document.getElementById('btnStampaListone');
+        if(clBtn) clBtn.innerHTML = "⏳ Generazione in corso...";
+        
+        const { collection, getDocs, query, where } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        
+        const q1 = query(collection(db, "programmati"), where("status", "==", "in_attesa"));
+        const q2 = query(collection(db, "programmati"), where("status", "==", "programmato"));
+        
+        const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+        let allTasks = [];
+        snap1.forEach(d => allTasks.push({id: d.id, ...d.data()}));
+        snap2.forEach(d => allTasks.push({id: d.id, ...d.data()}));
+        
+        if (typeof passesIncarichiFilter === 'function') {
+            allTasks = allTasks.filter(inv => passesIncarichiFilter(inv));
+        }
+
+        if(allTasks.length === 0) {
+            if(clBtn) clBtn.innerHTML = "🖨️ Stampa Riepilogo Interventi";
+            return alert("Non ci sono attività da stampare con i filtri attuali.");
+        }
+
+        allTasks.sort((a,b) => {
+            let tA = a.dataPrevista ? new Date(a.dataPrevista).getTime() : (a.timestamp ? (a.timestamp.seconds ? a.timestamp.seconds*1000 : a.timestamp) : 0);
+            let tB = b.dataPrevista ? new Date(b.dataPrevista).getTime() : (b.timestamp ? (b.timestamp.seconds ? b.timestamp.seconds*1000 : b.timestamp) : 0);
+            return tA - tB;
+        });
+
+        let htmlStr = \`
+            <!DOCTYPE html>
+            <html><head><title>Riepilogo Attività Magazzino</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #333; margin: 0; padding: 20px; font-size: 12px; }
+                h1 { color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 5px; font-size: 20px; text-align: center; margin-top: 0; }
+                table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                th { background: #e2e8f0; text-align: left; padding: 6px; font-size: 12px; border: 1px solid #cbd5e1; }
+                td { padding: 6px; border: 1px solid #cbd5e1; font-size: 11px; vertical-align: top; }
+                .print-btn { display: block; width: 100%; padding: 15px; background: #ea580c; color: white; text-align: center; text-decoration: none; font-size: 18px; font-weight: bold; margin-bottom: 20px; cursor: pointer; border: none; border-radius: 8px; }
+                @media print { .print-btn { display: none; } body { padding: 0; } }
+            </style>
+            </head><body>
+                <button class="print-btn" onclick="window.print()">🖨️ PROCEDI ALLA STAMPA DELLA LISTA</button>
+                <h1>Elenco Massivo Attività da Evadere / Preparare</h1>
+                <p>Data Stampa: \${new Date().toLocaleString('it-IT')}</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 15%;">Paziente / Ente</th>
+                            <th style="width: 15%;">Indirizzo</th>
+                            <th style="width: 35%;">Dispositivi & Accessori & SEQEX</th>
+                            <th style="width: 15%;">Matricole</th>
+                            <th style="width: 10%;">Stato / Asseg.</th>
+                            <th style="width: 10%;">Spunta</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        \`;
+
+        allTasks.forEach(task => {
+            let dispListBlock = "";
+            let matListBlock = "";
+            
+            if (task.interventiList && task.interventiList.length > 0) {
+                dispListBlock = task.interventiList.map(i => {
+                    const dispLabel = window.decodeCodeToLabel ? window.decodeCodeToLabel(i.disp, 'dispositivi') : i.disp;
+                    const typeLabel = window.decodeCodeToLabel ? window.decodeCodeToLabel(i.tipo, 'interventi') : i.tipo;
+                    let line = \`<div style="margin-bottom: 4px;"><strong>\${typeLabel}: \${dispLabel}</strong>\`;
+                    if(i.accessoriStr) line += \` <br><span style="color:#666; font-size:10px;">Acc: \${i.accessoriStr}</span>\`;
+                    if(dispLabel && dispLabel.toUpperCase().includes('SEQEX')) {
+                         line += \` <br><span style="color:#4338ca; font-size:10px;">SEQEX: \${i.seqex_volte||'?'}x\${i.seqex_minuti||'?'}min (\${i.seqex_programmiStr||'Setup vuoto'})</span>\`;
+                    }
+                    line += \`</div>\`;
+                    return line;
+                }).join('');
+                
+                matListBlock = task.interventiList.map(i => \`<div style="margin-bottom: 4px;">\${i.mat || '___'}</div>\`).join('');
+            } else {
+                dispListBlock = \`<strong>\${window.decodeCodeToLabel ? window.decodeCodeToLabel(task.tipo, 'interventi') : task.tipo}: \${window.decodeCodeToLabel ? window.decodeCodeToLabel(task.dispositivi, 'dispositivi') : task.dispositivi}</strong>\`;
+                if(task.accessoriStr) dispListBlock += \`<br><span style="color:#666; font-size:10px;">Acc: \${task.accessoriStr}</span>\`;
+                matListBlock = task.matricola || '___';
+            }
+
+            let asse = task.tecnicoAssegnato || (task.programmatoDa ? \`Da: \${task.programmatoDa}\` : '-');
+
+            htmlStr += \`
+                <tr>
+                    <td><strong>\${task.paziente}</strong><br><span style="font-size:10px; color:#666;">\${task.telefono || ''}</span></td>
+                    <td>\${task.localita || ''}<br><span style="font-size:10px; color:#666;">\${task.indirizzo || ''}</span></td>
+                    <td>\${dispListBlock}</td>
+                    <td style="font-family: monospace;"><strong>\${matListBlock}</strong></td>
+                    <td>\${task.status==='in_attesa' ? '⏳ ATTESA' : '📅 PROG.'}<br><span style="color:#ea580c; font-weight:bold; font-size:10px;">\${asse}</span></td>
+                    <td style="text-align: center;"><div style="width:20px; height:20px; border:2px solid #333; display:inline-block; border-radius:3px;"></div></td>
+                </tr>
+            \`;
+        });
+
+        htmlStr += \`</tbody></table></body></html>\`;
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert("Il browser ha bloccato il popup di stampa. Consenti i popup per questo sito.");
+            if(clBtn) clBtn.innerHTML = "🖨️ Stampa Riepilogo Interventi";
+            return;
+        }
+        printWindow.document.write(htmlStr);
+        printWindow.document.close();
+        if(clBtn) clBtn.innerHTML = "🖨️ Stampa Riepilogo Interventi";
+
+    } catch (e) {
+        console.error("Print List Error", e);
+        alert("Errore durante l'estrazione combinata.");
+        const clBtn = document.getElementById('btnStampaListone');
+        if(clBtn) clBtn.innerHTML = "🖨️ Stampa Riepilogo Interventi";
+    }
+};
 
