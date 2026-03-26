@@ -379,6 +379,9 @@ if(btnMostraNP) btnMostraNP.addEventListener('click', () => toggleTarget('np'));
 if(btnMostraEseguiti) btnMostraEseguiti.addEventListener('click', () => toggleTarget('eseguiti'));
 if(btnMostraNeseguiti) btnMostraNeseguiti.addEventListener('click', () => toggleTarget('neseg'));
 
+const btnCloseActivitiesList = document.getElementById('btnCloseActivitiesList');
+if(btnCloseActivitiesList) btnCloseActivitiesList.addEventListener('click', () => { if(typeof toggleTarget === 'function') toggleTarget('eseguiti'); });
+
 if(btnToggleMessages) {
     btnToggleMessages.addEventListener('click', () => {
         messagesContainer.classList.toggle('hidden');
