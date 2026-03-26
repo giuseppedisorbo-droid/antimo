@@ -446,68 +446,6 @@
             </div>
         </div>
 
-        <!-- MODAL MODIFICA ATTIVITA PROGRAMMATA -->
-        <div id="editInterventionModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
-            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
-                    <span><span class="btn-icon">✏️</span> Modifica Attività</span>
-                    <button id="btnCancelEdit" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
-                </h3>
-                <form id="editInterventionForm">
-                    <input type="hidden" id="editItemIndex">
-                    <div class="form-group">
-                        <label>Paziente / Ente</label>
-                        <input type="text" id="editPaziente" list="assistitiDatalist" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Tecnico Assegnato</label>
-                        <select id="editTecnicoAssegnato" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.9rem; font-family: inherit;">
-                            <option value="">Seleziona Tecnico...</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Località</label>
-                        <input type="text" id="editLocalita" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Indirizzo</label>
-                        <input type="text" id="editIndirizzo" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Telefono</label>
-                        <input type="tel" id="editTelefono">
-                    </div>
-                    <div class="form-group">
-                        <label>Tipo Intervento</label>
-                        <textarea id="editTipo" rows="2"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>Dispositivi</label>
-                        <textarea id="editDispositivi" rows="2"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>Matricole</label>
-                        <textarea id="editMatricola" rows="2"></textarea>
-                    </div>
-                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                        <div style="flex: 1;">
-                            <label>Data Prevista</label>
-                            <input type="date" id="editDataPrevista" style="width: 100%;">
-                        </div>
-                        <div style="flex: 1;">
-                            <label>Ora Prevista</label>
-                            <input type="time" id="editOraPrevista" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Note</label>
-                        <textarea id="editNote" rows="2"></textarea>
-                    </div>
-                    <button type="button" id="btnSaveEdit" class="btn btn-primary btn-large" style="width: 100%; margin-top: 10px;">SALVA MODIFICHE</button>
-                </form>
-            </div>
-        </div>
-
         <!-- MODAL DATA BACKUP -->
         <div id="dataBackupModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2100; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
             <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 600px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">

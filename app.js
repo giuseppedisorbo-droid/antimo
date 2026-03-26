@@ -1486,75 +1486,18 @@ async function deleteProgrammatoAppJs(index) {
 }
 
 let currentEditProgIndex = null;
-function editProgrammatoAppJs(index) {
+window.editProgrammatoAppJs = function(index) {
     const p = plannedInterventions[index];
     if(!p) return;
-    currentEditProgIndex = index;
-    
-    document.getElementById('editItemIndex').value = index;
-    document.getElementById('editPaziente').value = p.paziente || "";
-    if (document.getElementById('editTecnicoAssegnato')) document.getElementById('editTecnicoAssegnato').value = p.tecnicoAssegnato || "";
-    document.getElementById('editLocalita').value = p.localita || p.destinazione || "";
-    document.getElementById('editIndirizzo').value = p.indirizzo || "";
-    document.getElementById('editTelefono').value = p.telefono || "";
-    document.getElementById('editTipo').value = p.tipo || "";
-    document.getElementById('editDispositivi').value = p.dispositivi || "";
-    document.getElementById('editMatricola').value = p.matricola || "";
-    document.getElementById('editDataPrevista').value = p.dataPrevista || "";
-    document.getElementById('editOraPrevista').value = p.oraPrevista || "";
-    document.getElementById('editNote').value = p.note || "";
-    
-    editInterventionModal.classList.remove('hidden');
-}
+    const fbId = p.idFb || p.id;
+    window.location.href = `programmati.html?editId=${fbId}`;
+};
 
-if(btnCancelEdit) btnCancelEdit.addEventListener('click', () => editInterventionModal.classList.add('hidden'));
+// Modal removed
+if(btnCancelEdit) btnCancelEdit.addEventListener('click', () => {});
 
 if(btnSaveEdit) {
-    btnSaveEdit.addEventListener('click', async () => {
-        if(currentEditProgIndex === null) return;
-        const p = plannedInterventions[currentEditProgIndex];
-        
-        btnSaveEdit.textContent = "Salvataggio...";
-        btnSaveEdit.disabled = true;
-        
-        p.paziente = document.getElementById('editPaziente').value;
-        if (document.getElementById('editTecnicoAssegnato')) p.tecnicoAssegnato = document.getElementById('editTecnicoAssegnato').value;
-        p.localita = document.getElementById('editLocalita').value;
-        p.indirizzo = document.getElementById('editIndirizzo').value;
-        p.telefono = document.getElementById('editTelefono').value;
-        p.tipo = document.getElementById('editTipo').value;
-        p.dispositivi = document.getElementById('editDispositivi').value;
-        p.matricola = document.getElementById('editMatricola').value;
-        p.dataPrevista = document.getElementById('editDataPrevista').value;
-        p.oraPrevista = document.getElementById('editOraPrevista').value;
-        p.note = document.getElementById('editNote').value;
-        p.status = p.dataPrevista ? 'planned' : 'in_attesa';
-        
-        saveState();
-        
-        if (isFirebaseConfigured && (p.idFb || p.id)) {
-            try {
-                const { doc, updateDoc, collection, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                const payload = { ...p };
-                delete payload.idFb; // non salviamo la chiave fb se presente
-                
-                if (p.idFb) {
-                    await updateDoc(doc(db, "programmati", p.idFb), payload);
-                } else {
-                    const q = query(collection(db, "programmati"), where("id", "==", p.id));
-                    const snaps = await getDocs(q);
-                    snaps.forEach(async d => await updateDoc(doc(db, "programmati", d.id), payload));
-                }
-            } catch(e) { console.error("Errore aggiornamento cloud", e); }
-        }
-        
-        editInterventionModal.classList.add('hidden');
-        btnSaveEdit.textContent = "SALVA MODIFICHE";
-        btnSaveEdit.disabled = false;
-        
-        updateUI();
-        updateInterventiCount();
-    });
+    btnSaveEdit.addEventListener('click', async () => {});
 }
 
 function initApp() {

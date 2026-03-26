@@ -543,7 +543,7 @@ function initDynamicBlocks(containerId, addBtnId) {
     
     if(!container || !btnAdd) return;
 
-    const addBlock = (data = null) => {
+    window.addDynamicProgBlock = (data = null) => {
         const div = document.createElement('div');
         div.innerHTML = createInterventionBlockHTML();
         const block = div.firstElementChild;
@@ -574,9 +574,9 @@ function initDynamicBlocks(containerId, addBtnId) {
     };
 
     container.innerHTML = '';
-    addBlock();
+    window.addDynamicProgBlock();
 
-    btnAdd.addEventListener('click', () => addBlock());
+    btnAdd.addEventListener('click', () => window.addDynamicProgBlock());
 }
 
 function extractDynamicBlocksData(containerId) {
@@ -800,8 +800,17 @@ form.addEventListener('submit', async (e) => {
 
     try {
         if (db) {
-            await addDoc(collection(db, "programmati"), planned);
-            console.log("Programmato salvato su Cloud");
+            if (window.currentEditFbId) {
+                const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                await updateDoc(doc(db, "programmati", window.currentEditFbId), planned);
+                console.log("Programmato aggiornato su Cloud");
+                alert("Aggiornamento completato!");
+                window.location.href = "programmati.html"; // Rimuove param e resetta
+                return;
+            } else {
+                await addDoc(collection(db, "programmati"), planned);
+                console.log("Programmato salvato su Cloud");
+            }
         }
         
         // Pulisci
@@ -886,7 +895,15 @@ btnSaveWaiting.addEventListener('click', async () => {
 
     try {
         if (db) {
-            await addDoc(collection(db, "programmati"), waitingEvent);
+            if (window.currentEditFbId) {
+                const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                await updateDoc(doc(db, "programmati", window.currentEditFbId), waitingEvent);
+                alert("Aggiornamento In Attesa completato!");
+                window.location.href = "programmati.html";
+                return;
+            } else {
+                await addDoc(collection(db, "programmati"), waitingEvent);
+            }
         }
         form.reset();
         currentProgNoteAttachments = [];
@@ -943,78 +960,61 @@ window.deleteProgrammato = async function(idFb) {
 };
 
 window.editProgrammato = function(idFb) {
-    let p = plannedInterventions.find(x => x.idFb === idFb);
-    if (!p) p = waitingInterventions.find(x => x.idFb === idFb);
-    if(!p) return;
-    
-    document.getElementById('editProgFbId').value = idFb;
-    document.getElementById('editProgPaziente').value = p.paziente || "";
-    document.getElementById('editProgLocalita').value = p.localita || p.destinazione || "";
-    document.getElementById('editProgIndirizzo').value = p.indirizzo || "";
-    document.getElementById('editProgTelefono').value = p.telefono || "";
-    document.getElementById('editProgTipo').value = p.tipo || "";
-    document.getElementById('editProgDispositivi').value = p.dispositivi || p.note || "";
-    document.getElementById('editProgMatricola').value = p.matricola || "";
-    document.getElementById('editProgData').value = p.dataPrevista || "";
-    document.getElementById('editProgOra').value = p.oraPrevista || "";
-    if (document.getElementById('editProgTecnicoAssegnato')) document.getElementById('editProgTecnicoAssegnato').value = p.tecnicoAssegnato || "";
-    
-    let opSel = document.getElementById('editProgOperatoreValutazione');
-    if(opSel) {
-        opSel.innerHTML = '<option value="">Nessuno</option>' + (window.operatoriSanitari || []).map(o => `<option value="${o.nome}">${o.nome}</option>`).join('');
-        opSel.value = p.operatoreValutazione || "";
-    }
-    document.getElementById('editProgEsito').value = p.esito || "";
-    document.getElementById('editProgStatoValutazione').value = p.statoValutazione || "";
-    
-    document.getElementById('editProgrammatoModal').classList.remove('hidden');
+    window.location.href = `programmati.html?editId=${idFb}`;
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Gestione Modal
-    const modal = document.getElementById('editProgrammatoModal');
-    const btnCancel = document.getElementById('btnCancelEditProg');
-    const btnSave = document.getElementById('btnSaveEditProg');
-    
-    if (btnCancel) btnCancel.addEventListener('click', () => modal.classList.add('hidden'));
-    
-    if (btnSave) btnSave.addEventListener('click', async () => {
-        const idFb = document.getElementById('editProgFbId').value;
-        const newD = document.getElementById('editProgData').value;
+    // BOOTSTRAP EDIT MODE
+    const urlParams = new URLSearchParams(window.location.search);
+    const editId = urlParams.get('editId');
+    if (editId) {
+        document.querySelector('h2').innerHTML = '<span class="btn-icon">✏️</span> Modifica Programmazione';
+        const btnPlan = document.getElementById('btnPlanIntervention');
+        if(btnPlan) btnPlan.innerHTML = '<span class="btn-icon">💾</span> AGGIORNA PROGRAMMAZIONE';
+        const btnWait = document.getElementById('btnSaveWaiting');
+        if(btnWait) btnWait.innerHTML = '<span class="btn-icon">⏳</span> AGGIORNA IN ATTESA';
         
-        try {
-            btnSave.textContent = "Salvataggio...";
-            btnSave.disabled = true;
-            await updateDoc(doc(db, "programmati", idFb), {
-                paziente: document.getElementById('editProgPaziente').value,
-                localita: document.getElementById('editProgLocalita').value,
-                indirizzo: document.getElementById('editProgIndirizzo').value,
-                telefono: document.getElementById('editProgTelefono').value,
-                tipo: document.getElementById('editProgTipo').value,
-                dispositivi: document.getElementById('editProgDispositivi').value,
-                matricola: document.getElementById('editProgMatricola').value,
-                operatoreValutazione: document.getElementById('editProgOperatoreValutazione').value,
-                esito: document.getElementById('editProgEsito').value,
-                statoValutazione: document.getElementById('editProgStatoValutazione').value,
-                dataPrevista: newD,
-                oraPrevista: document.getElementById('editProgOra').value,
-                tecnicoAssegnato: document.getElementById('editProgTecnicoAssegnato') ? document.getElementById('editProgTecnicoAssegnato').value : "",
-                status: newD ? 'planned' : 'in_attesa' // revaluta status in base a se c'è data o no
-            });
-            modal.classList.add('hidden');
-            await fetchProgrammati();
-        } catch(e) {
-            alert("Errore salvataggio: " + e.message);
-        } finally {
-            btnSave.textContent = "SALVA MODIFICHE";
-            btnSave.disabled = false;
-        }
-    });
+        setTimeout(async () => {
+            if(!db) return;
+            try {
+                const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                const docSnap = await getDoc(doc(db, "programmati", editId));
+                if (docSnap.exists()) {
+                    const p = docSnap.data();
+                    window.currentEditFbId = editId;
+                    
+                    document.getElementById('paziente').value = p.paziente || "";
+                    if (document.getElementById('progTecnicoAssegnato')) document.getElementById('progTecnicoAssegnato').value = p.tecnicoAssegnato || "";
+                    document.getElementById('localita').value = p.localita || p.destinazione || "";
+                    document.getElementById('indirizzo').value = p.indirizzo || "";
+                    if(document.getElementById('telefono')) document.getElementById('telefono').value = p.telefono || "";
+                    
+                    document.getElementById('dataProgrammata').value = p.dataPrevista || "";
+                    if(document.getElementById('oraProgrammata')) document.getElementById('oraProgrammata').value = p.oraPrevista || "";
+                    
+                    if(document.getElementById('progNoteInput')) document.getElementById('progNoteInput').value = p.note || "";
+                    
+                    if(p.interventiList && p.interventiList.length > 0) {
+                        const container = document.getElementById('dynamicProgInterventionsContainer');
+                        if (container) container.innerHTML = '';
+                        p.interventiList.forEach(inv => {
+                            if(window.addDynamicProgBlock) window.addDynamicProgBlock(inv);
+                        });
+                    } else if (p.tipo) {
+                        // Legacy support per interventi salvati prima della patch dei blocchi multipli
+                        const container = document.getElementById('dynamicProgInterventionsContainer');
+                        if (container) container.innerHTML = '';
+                        if(window.addDynamicProgBlock) window.addDynamicProgBlock({tipo: p.tipo, disp: p.dispositivi, mat: p.matricola, operatoreValutazione: p.operatoreValutazione, esito: p.esito, statoValutazione: p.statoValutazione});
+                    }
+                }
+            } catch(e) { console.error("Errore fetch edit doc", e); }
+        }, 1500);
+    }
 
     // Di default impostiamo la data a domani
     let domani = new Date();
     domani.setDate(domani.getDate() + 1);
-    iData.value = domani.toISOString().split('T')[0];
+    if(iData && !iData.value) iData.value = domani.toISOString().split('T')[0];
 
     fetchProgrammati();
 });
