@@ -213,7 +213,7 @@ function renderWaitingTable() {
     waitingInterventions.forEach(p => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td style="font-weight: bold;">${p.paziente} <br><small style="color:#64748b;">(Prog. da: ${p.programmatoDa || 'N/D'})</small></td>
+            <td style="font-weight: bold;">${p.paziente} <br><div style="color:#64748b; font-size:0.8rem; margin-top:4px;">Prog. da: <strong>${p.programmatoDa || 'N/D'}</strong><br>Tecnico: <strong>${p.tecnicoAssegnato || 'Da Assegnare'}</strong></div></td>
             <td>${p.localita || p.destinazione || 'N/D'}</td>
             <td>${p.indirizzo || ''} <br><small style="color:gray;">${p.telefono || ''}</small></td>
             <td>
@@ -253,7 +253,7 @@ function renderTable() {
 
         tr.innerHTML = `
             <td style="font-weight: 600; color: var(--blue-primary);">${dateStr}</td>
-            <td style="font-weight: bold;">${p.paziente} <br><small style="color:#64748b;">(Prog. da: ${p.programmatoDa || 'N/D'})</small></td>
+            <td style="font-weight: bold;">${p.paziente} <br><div style="color:#64748b; font-size:0.8rem; margin-top:4px;">Prog. da: <strong>${p.programmatoDa || 'N/D'}</strong><br>Tecnico: <strong>${p.tecnicoAssegnato || 'Da Assegnare'}</strong></div></td>
             <td>${p.localita || p.destinazione || 'N/D'}</td>
             <td>${p.indirizzo || ''} <br><small style="color:gray;">${p.telefono || ''}</small></td>
             <td><span class="status-badge" style="background-color: #f1f5f9; color: var(--text-main); font-size: 0.8rem; padding: 4px 8px;">${window.decodeCodeToLabel(p.tipo, 'interventi') || 'Non spec.'}</span><br>${badgeVal}</td>

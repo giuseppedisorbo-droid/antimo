@@ -1737,7 +1737,18 @@ function updateUI() {
     }
 
     // Le attività programmate
-    const visibiliProg = plannedInterventions.filter(p => !p.status || p.status === 'planned');
+    let visibiliProg = plannedInterventions.filter(p => !p.status || p.status === 'planned');
+    
+    // Gestione Multi-Tenant (Tutti vs MIO)
+    const targetFilter = filterTecnicoOggi ? filterTecnicoOggi.value : "MIO";
+    const myName = localStorage.getItem('antimo_user_name') || "";
+    
+    if (targetFilter === "MIO" || targetFilter === "") {
+        visibiliProg = visibiliProg.filter(p => p.tecnicoAssegnato === myName || p.programmatoDa === myName || p.operatore === myName);
+    } else if (targetFilter !== "TUTTI") {
+        visibiliProg = visibiliProg.filter(p => p.tecnicoAssegnato === targetFilter || p.programmatoDa === targetFilter || p.operatore === targetFilter);
+    }
+
     updateHeaderFiltersUI();
     
     if (selectedCalendarDate) {
@@ -1779,13 +1790,20 @@ function updateUI() {
     renderPlannedInterventions(visibiliProg, oggiProg, domaniProg);
 
     // NP (SE isNpVisible è true)
-    const visibiliNP = plannedInterventions.filter(p => p.status === 'in_attesa');
+    let visibiliNP = plannedInterventions.filter(p => p.status === 'in_attesa');
+    
+    if (targetFilter === "MIO" || targetFilter === "") {
+        visibiliNP = visibiliNP.filter(p => p.tecnicoAssegnato === myName || p.programmatoDa === myName || p.operatore === myName);
+    } else if (targetFilter !== "TUTTI") {
+        visibiliNP = visibiliNP.filter(p => p.tecnicoAssegnato === targetFilter || p.programmatoDa === targetFilter || p.operatore === targetFilter);
+    }
+
     if(visibiliNP.length > 0 && isNpVisible) {
         npInterventionsSection.classList.remove('hidden');
     } else {
         npInterventionsSection.classList.add('hidden');
     }
-    renderNpInterventions();
+    renderNpInterventions(visibiliNP);
 }
 
 function padZ(num) { return num.toString().padStart(2, '0'); }
@@ -1934,6 +1952,7 @@ function renderSpecialPlannedList(container, filteredData) {
             <div class="card-compact-view">
                 <div style="flex:1;">
                     <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${p.paziente} ${attachBadge}</div>
+                    <div style="font-size:0.75rem; color:#64748b; margin-top:2px;">👤 Da: <strong>${p.programmatoDa || 'N/D'}</strong> &rarr; 👨‍🔧 <strong>${p.tecnicoAssegnato || 'Da Assegnare'}</strong></div>
                     <div style="font-size:0.85rem; color:#555;">📍 ${p.localita || p.destinazione} | 🔧 ${p.tipo}</div>
                     <div style="font-size:0.80rem; color:var(--orange); font-weight:600; margin-top:4px;">🗓 Data Prevista: ${dateStr}</div>
                 </div>
@@ -2026,12 +2045,12 @@ function renderPlannedInterventions(tuttiProg = [], oggiProg = [], domaniProg = 
     if(domaniList) renderSpecialPlannedList(domaniList, domaniProg);
 }
 
-function renderNpInterventions() {
+function renderNpInterventions(visibiliCustom) {
     if(!npList) return;
     npList.innerHTML = '';
     
-    // Filtra solo quelli in attesa
-    const visibili = plannedInterventions.filter(p => p.status === 'in_attesa');
+    // Filtra solo quelli in attesa se non passato
+    const visibili = visibiliCustom || plannedInterventions.filter(p => p.status === 'in_attesa');
     
     visibili.forEach((p, indexOriginalArray) => {
         // Cerchiamo l'indice reale nell'array globale
@@ -2056,6 +2075,7 @@ function renderNpInterventions() {
             <div class="card-compact-view">
                 <div style="flex:1;">
                     <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${p.paziente} ${attachBadge}</div>
+                    <div style="font-size:0.75rem; color:#64748b; margin-top:2px;">👤 Da: <strong>${p.programmatoDa || 'N/D'}</strong> &rarr; 👨‍🔧 <strong>${p.tecnicoAssegnato || 'Da Assegnare'}</strong></div>
                     <div style="font-size:0.85rem; color:#555;">📍 ${p.localita || p.destinazione} | 🔧 ${p.tipo}</div>
                     <div style="font-size:0.80rem; color:#ef4444; font-weight:600; margin-top:4px;">⏳ Da Programmare</div>
                 </div>
@@ -2645,6 +2665,7 @@ btnPlanIntervention.addEventListener('click', async () => {
         esito: blocksData.esitoStr,
         statoValutazione: blocksData.statoValutazioneStr,
         tecnicoAssegnato: document.getElementById('tecnicoAssegnato') ? document.getElementById('tecnicoAssegnato').value : "",
+        programmatoDa: localStorage.getItem('antimo_user_name') || "Sconosciuto",
         interventiList: blocksData.array, // Nuovo payload strutturato
         note: iNote.value,
         dataPrevista: dProgrammata,
