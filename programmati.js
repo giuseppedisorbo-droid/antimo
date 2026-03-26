@@ -154,7 +154,109 @@ const btnToggleWaiting = document.getElementById('btnToggleWaiting');
 const waitingContainer = document.getElementById('waitingContainer');
 const waitingTableBody = document.getElementById('waitingTableBody');
 
+// Note Elementi
+const progNoteInput = document.getElementById('progNoteInput');
+const btnExpandNote = document.getElementById('btnExpandNote');
+const progNoteFileInput = document.getElementById('progNoteFileInput');
+const progNotePreviewContainer = document.getElementById('progNotePreviewContainer');
+
 let currentProgAttachments = [];
+let currentProgNoteAttachments = [];
+
+// Gestione Anteprime Note
+function renderNotePreviews() {
+    progNotePreviewContainer.innerHTML = '';
+    if (currentProgNoteAttachments.length > 0) {
+        progNotePreviewContainer.classList.remove('hidden');
+    } else {
+        progNotePreviewContainer.classList.add('hidden');
+        return;
+    }
+
+    currentProgNoteAttachments.forEach((att, idx) => {
+        const wrapper = document.createElement('div');
+        wrapper.style.width = '70px';
+        wrapper.style.height = '70px';
+        wrapper.style.border = '1px solid #ccc';
+        wrapper.style.borderRadius = '6px';
+        wrapper.style.overflow = 'hidden';
+        wrapper.style.display = 'flex';
+        wrapper.style.alignItems = 'center';
+        wrapper.style.justifyContent = 'center';
+        wrapper.style.backgroundColor = '#fff';
+        wrapper.style.position = 'relative';
+
+        // Tasto rimuovi allegato
+        const btnRemove = document.createElement('button');
+        btnRemove.innerHTML = '&times;';
+        btnRemove.style.cssText = 'position:absolute; top:2px; right:2px; background:red; color:white; border:none; border-radius:50%; width:16px; height:16px; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;';
+        btnRemove.onclick = (e) => {
+            e.preventDefault();
+            currentProgNoteAttachments.splice(idx, 1);
+            renderNotePreviews();
+        };
+
+        if (att.type.startsWith('image/')) {
+            wrapper.innerHTML = `<img src="${att.data}" style="max-width:100%; max-height:100%; object-fit:cover;">`;
+        } else if (att.type === 'application/pdf') {
+            wrapper.innerHTML = `<span style="font-size:1.5rem; color:#e11d48;">📄</span>`;
+        } else if (att.type.startsWith('video/')) {
+            wrapper.innerHTML = `<span style="font-size:1.5rem; color:#3b82f6;">🎥</span>`;
+        } else if (att.type.startsWith('audio/')) {
+            wrapper.innerHTML = `<span style="font-size:1.5rem; color:#f59e0b;">🎵</span>`;
+        } else {
+            wrapper.innerHTML = `<span style="font-size:1.5rem;">📎</span>`;
+        }
+        
+        wrapper.appendChild(btnRemove);
+        progNotePreviewContainer.appendChild(wrapper);
+    });
+}
+
+// Lettore file generico (Cattura Paste + Upload Cliccato)
+function readFilesAndAddNoteAttachments(filesArr) {
+    if (!filesArr || filesArr.length === 0) return;
+    Array.from(filesArr).forEach(f => {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            currentProgNoteAttachments.push({ name: f.name || `Pasted_Image_${Date.now()}.png`, type: f.type, data: evt.target.result });
+            renderNotePreviews();
+        };
+        reader.readAsDataURL(f);
+    });
+}
+
+if (progNoteFileInput) {
+    progNoteFileInput.addEventListener('change', function(e) {
+        readFilesAndAddNoteAttachments(this.files);
+        this.value = ''; // reseta l'input
+    });
+}
+
+if (progNoteInput) {
+    // Incolla da Clipboard (Immagini)
+    progNoteInput.addEventListener('paste', (e) => {
+        if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
+            readFilesAndAddNoteAttachments(e.clipboardData.files);
+        }
+    });
+}
+
+if (btnExpandNote) {
+    let isExpanded = false;
+    btnExpandNote.addEventListener('click', () => {
+        isExpanded = !isExpanded;
+        if (isExpanded) {
+            progNoteInput.rows = 10;
+            btnExpandNote.innerHTML = 'Riduci ↕';
+            btnExpandNote.style.background = '#cbd5e1';
+        } else {
+            progNoteInput.rows = 3;
+            btnExpandNote.innerHTML = 'Espandi ↕';
+            btnExpandNote.style.background = '#e2e8f0';
+        }
+    });
+}
 
 // Gestione Anteprima Allegati "TERMINA ATTIVITA'"
 if (progAllegatoFile) {
@@ -502,7 +604,28 @@ function extractDynamicBlocksData(containerId) {
         statoValutazioneStr: blocks.map(b => b.statoValutazione).filter(x=>x).join(', ')
     };
 }
-// --- FINE LOGICA BLOCCHI DINAMICI ---
+// Helper function to upload attachments
+async function uploadAttachmentsToStorage(attachmentsArray, docId, pathPrefix) {
+    if (!attachmentsArray || attachmentsArray.length === 0) return [];
+    const urls = [];
+    const { getStorage, ref, uploadString, getDownloadURL } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js");
+    const storage = getStorage(app);
+    
+    for (let i = 0; i < attachmentsArray.length; i++) {
+        const att = attachmentsArray[i];
+        let ext = "jpg";
+        if (att.name) ext = att.name.split('.').pop();
+        else if (att.type === "application/pdf") ext = "pdf";
+        else if (att.type && att.type.startsWith("video/")) ext = "mp4";
+        else if (att.type && att.type.startsWith("audio/")) ext = "webm";
+
+        const storageRef = ref(storage, `${pathPrefix}/${docId}_${Date.now()}_${i}.${ext}`);
+        await uploadString(storageRef, att.data, 'data_url');
+        const url = await getDownloadURL(storageRef);
+        urls.push(url);
+    }
+    return urls;
+}
 
 // === NUOVA LOGICA: TERMINA ATTIVITA' DIRETTAMENTE DAL CALENDARIO ===
 if (btnProgStartIntervention) {
@@ -521,6 +644,10 @@ if (btnProgStartIntervention) {
         btnProgStartIntervention.innerHTML = `<span class="btn-icon">⏳</span> SALVATAGGIO IN CORSO...`;
         btnProgStartIntervention.disabled = true;
 
+        // Uniamo gli allegati normali con quelli delle note (se presenti)
+        const allAttachments = [...(currentProgAttachments || []), ...(currentProgNoteAttachments || [])];
+        const noteText = progNoteInput && progNoteInput.value.trim() ? progNoteInput.value.trim() : "Completato da Calendario";
+
         const invToSave = {
             id: Date.now().toString(),
             dataObj: new Date().getTime(),
@@ -536,9 +663,9 @@ if (btnProgStartIntervention) {
             statoValutazione: blocksData.statoValutazioneStr,
             tecnicoAssegnato: document.getElementById('progTecnicoAssegnato') ? document.getElementById('progTecnicoAssegnato').value : (localStorage.getItem('antimo_user_name') || "Sconosciuto"),
             interventiList: blocksData.array,
-            note: "Completato da Calendario", // Default note if missing
+            note: noteText,
             operatore: localStorage.getItem('antimo_user_name') || "Sconosciuto",
-            attachments: currentProgAttachments,
+            attachments: allAttachments,
             startTime: new Date().getTime(),
             endTime: new Date().getTime(),
             kmPercorsi: "0"
@@ -549,23 +676,7 @@ if (btnProgStartIntervention) {
         try {
             if (db) {
                 // 1. Upload Attachments to Storage
-                if (invToSave.attachments && invToSave.attachments.length > 0) {
-                    const { getStorage, ref, uploadString, getDownloadURL } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js");
-                    const storage = getStorage(app);
-                    
-                    for (let i = 0; i < invToSave.attachments.length; i++) {
-                        const att = invToSave.attachments[i];
-                        let ext = "jpg";
-                        if (att.name) ext = att.name.split('.').pop();
-                        else if (att.type === "application/pdf") ext = "pdf";
-                        else if (att.type && att.type.startsWith("video/")) ext = "mp4";
-
-                        const storageRef = ref(storage, `allegati/${invToSave.id}_${i}.${ext}`);
-                        await uploadString(storageRef, att.data, 'data_url');
-                        const url = await getDownloadURL(storageRef);
-                        uploadedUrls.push(url);
-                    }
-                }
+                uploadedUrls = await uploadAttachmentsToStorage(invToSave.attachments, invToSave.id, "allegati");
                 
                 // 2. Save directly to `interventi` completely skipping `programmati`
                 const { serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
@@ -611,7 +722,19 @@ if (btnProgStartIntervention) {
                     progFilePreviewContainer.innerHTML = '';
                     progFilePreviewContainer.classList.add('hidden');
                 }
+                if (progNotePreviewContainer) {
+                    progNotePreviewContainer.innerHTML = '';
+                    progNotePreviewContainer.classList.add('hidden');
+                }
+                if (progNoteInput) {
+                    progNoteInput.rows = 3;
+                    if (btnExpandNote) {
+                        btnExpandNote.innerHTML = 'Espandi ↕';
+                        btnExpandNote.style.background = '#e2e8f0';
+                    }
+                }
                 currentProgAttachments = [];
+                currentProgNoteAttachments = [];
 
                 alert("✅ ATTIVITA' TERMINATA CORRETTAMENTE!");
                 window.location.href = "index.html"; // Ritorniamo alla dashboard
@@ -643,6 +766,15 @@ form.addEventListener('submit', async (e) => {
     btn.disabled = true;
 
     const plannedId = "plan_" + Date.now().toString();
+    
+    // Upload allegati note se presenti
+    let uploadedUrls = [];
+    try {
+        uploadedUrls = await uploadAttachmentsToStorage(currentProgNoteAttachments, plannedId, "allegati_programmati");
+    } catch(e) {
+        console.error("Errore upload allegati note", e);
+    }
+    
     const planned = {
         id: plannedId,
         tipo: blocksData.tipoStr,
@@ -658,6 +790,8 @@ form.addEventListener('submit', async (e) => {
         interventiList: blocksData.array,
         dataPrevista: iData.value,
         oraPrevista: document.getElementById('oraProgrammata') ? document.getElementById('oraProgrammata').value : "",
+        note: progNoteInput ? progNoteInput.value.trim() : "",
+        fileUrlsProgrammati: uploadedUrls.length > 0 ? uploadedUrls : null,
         tecnicoAssegnato: document.getElementById('progTecnicoAssegnato') ? document.getElementById('progTecnicoAssegnato').value : "",
         programmatoDa: localStorage.getItem('antimo_user_name') || "Sconosciuto",
         status: 'planned',
@@ -672,6 +806,18 @@ form.addEventListener('submit', async (e) => {
         
         // Pulisci
         form.reset();
+        currentProgNoteAttachments = [];
+        if (progNotePreviewContainer) {
+            progNotePreviewContainer.innerHTML = '';
+            progNotePreviewContainer.classList.add('hidden');
+        }
+        if (progNoteInput) {
+            progNoteInput.rows = 3;
+            if (btnExpandNote) {
+                btnExpandNote.innerHTML = 'Espandi ↕';
+                btnExpandNote.style.background = '#e2e8f0';
+            }
+        }
         
         // Per riaprire sul mese giusto
         if(calendar) {
@@ -708,6 +854,15 @@ btnSaveWaiting.addEventListener('click', async () => {
     btnSaveWaiting.disabled = true;
 
     const plannedId = "plan_" + Date.now().toString();
+    
+    // Upload allegati note se presenti
+    let uploadedUrls = [];
+    try {
+        uploadedUrls = await uploadAttachmentsToStorage(currentProgNoteAttachments, plannedId, "allegati_programmati");
+    } catch(e) {
+        console.error("Errore upload allegati note", e);
+    }
+
     const waitingEvent = {
         id: plannedId,
         tipo: blocksData.tipoStr,
@@ -721,6 +876,8 @@ btnSaveWaiting.addEventListener('click', async () => {
         esito: blocksData.esitoStr,
         statoValutazione: blocksData.statoValutazioneStr,
         interventiList: blocksData.array,
+        note: progNoteInput ? progNoteInput.value.trim() : "",
+        fileUrlsProgrammati: uploadedUrls.length > 0 ? uploadedUrls : null,
         tecnicoAssegnato: document.getElementById('progTecnicoAssegnato') ? document.getElementById('progTecnicoAssegnato').value : "",
         programmatoDa: localStorage.getItem('antimo_user_name') || "Sconosciuto",
         status: 'in_attesa',
@@ -732,6 +889,18 @@ btnSaveWaiting.addEventListener('click', async () => {
             await addDoc(collection(db, "programmati"), waitingEvent);
         }
         form.reset();
+        currentProgNoteAttachments = [];
+        if (progNotePreviewContainer) {
+            progNotePreviewContainer.innerHTML = '';
+            progNotePreviewContainer.classList.add('hidden');
+        }
+        if (progNoteInput) {
+            progNoteInput.rows = 3;
+            if (btnExpandNote) {
+                btnExpandNote.innerHTML = 'Espandi ↕';
+                btnExpandNote.style.background = '#e2e8f0';
+            }
+        }
         await fetchProgrammati();
         waitingContainer.classList.remove('hidden'); // Apriamo per mostrare che è entrato in lista
     } catch(err) {

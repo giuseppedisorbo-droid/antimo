@@ -74,7 +74,7 @@
     <main class="container" style="max-width: 900px;">
         
         <!-- IMPORT ASSISTITI BUTTON & DATALIST -->
-        <div style="text-align: right; margin-bottom: 15px;">
+        <div style="text-align: right; margin-bottom: 15px; display: none;">
             <input type="file" id="uploadAssistitiExcel" accept=".csv, .xls, .xlsx" style="display:none;" />
             <button id="btnImportAssistiti" class="btn btn-secondary" style="background:#10b981; border:none; color:white; font-weight:bold;"><span class="btn-icon">👥</span> Importa Rubrica Assistiti (Excel)</button>
         </div>
@@ -122,6 +122,29 @@
                             <label for="oraProgrammata">Ora Prevista</label>
                             <input type="time" id="oraProgrammata" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
                         </div>
+                    </div>
+
+                    <!-- NOTE PROGRAMMAZIONE CON SUPPORTO ALLEGATI E INCOLLA -->
+                    <div class="form-group" style="margin-top: 15px; margin-bottom: 0; position: relative;" id="progNoteContainer">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <label for="progNoteInput" style="margin-bottom: 0;">Note Essenziali (es. Problema) *</label>
+                            <button type="button" id="btnExpandNote" class="btn btn-sm" style="padding: 2px 8px; font-size: 0.75rem; background: #e2e8f0; color: #333; border: 1px solid #cbd5e1; border-radius: 4px;">Espandi ↕</button>
+                        </div>
+                        
+                        <div style="position: relative; border: 1px solid #ccc; border-radius: 6px; background: white; padding-bottom: 30px;">
+                            <textarea id="progNoteInput" rows="3" placeholder="Scrivi note o incolla un'immagine (Ctrl+V)..." style="width: 100%; border: none; outline: none; padding: 10px; font-family: inherit; font-size: 0.9rem; resize: none; background: transparent; transition: height 0.3s;"></textarea>
+                            
+                            <!-- Pulsantiera incollata sul fondo della textarea -->
+                            <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 30px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 10px; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;">
+                                <label for="progNoteFileInput" style="cursor: pointer; display: flex; align-items: center; gap: 5px; color: var(--blue-primary); font-size: 0.8rem; font-weight: bold;">
+                                    📎 Allega File (PDF, Immagini, Video, Audio)
+                                </label>
+                                <input type="file" id="progNoteFileInput" accept="image/*,video/*,audio/*,application/pdf" multiple style="display: none;">
+                            </div>
+                        </div>
+
+                        <!-- Anteprime file note -->
+                        <div id="progNotePreviewContainer" class="hidden" style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; background: rgba(255,255,255,0.5); padding: 8px; border-radius: 8px; border: 1px dashed #ccc;"></div>
                     </div>
                 </div>
 
