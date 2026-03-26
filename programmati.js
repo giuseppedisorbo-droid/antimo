@@ -351,6 +351,13 @@ async function fetchProgrammati() {
     }
 }
 
+function passesIncarichiFilter(inv, selectedArr) {
+    if (!selectedArr || selectedArr.length === 0 || selectedArr.includes("TUTTI")) return true;
+    let roleName = inv.tecnicoAssegnato || inv.operatore;
+    if (!roleName) roleName = (inv.programmatoDa || "Sconosciuto") + " (Assegnante)";
+    return selectedArr.includes(roleName);
+}
+
 function renderTutto() {
     renderTable();
     renderWaitingTable();
@@ -360,12 +367,15 @@ function renderTutto() {
 function renderWaitingTable() {
     waitingTableBody.innerHTML = '';
     
-    if(waitingInterventions.length === 0) {
+    const selectedIncarichi = JSON.parse(localStorage.getItem('antimo_incarichi_filter')) || ["TUTTI"];
+    const filteredWaiting = waitingInterventions.filter(p => passesIncarichiFilter(p, selectedIncarichi));
+
+    if(filteredWaiting.length === 0) {
         waitingTableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px;">Nessun intervento in attesa.</td></tr>';
         return;
     }
 
-    waitingInterventions.forEach(p => {
+    filteredWaiting.forEach(p => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="font-weight: bold;">${p.paziente} <br><div style="color:#64748b; font-size:0.8rem; margin-top:4px;">Prog. da: <strong>${p.programmatoDa || 'N/D'}</strong><br>Tecnico: <strong>${p.tecnicoAssegnato || 'Da Assegnare'}</strong></div></td>
@@ -387,12 +397,15 @@ function renderWaitingTable() {
 function renderTable() {
     tableBody.innerHTML = '';
     
-    if(plannedInterventions.length === 0) {
+    const selectedIncarichi = JSON.parse(localStorage.getItem('antimo_incarichi_filter')) || ["TUTTI"];
+    const filteredPlanned = plannedInterventions.filter(p => passesIncarichiFilter(p, selectedIncarichi));
+
+    if(filteredPlanned.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">Nessun intervento programmato.</td></tr>';
         return;
     }
 
-    plannedInterventions.forEach(p => {
+    filteredPlanned.forEach(p => {
         const tr = document.createElement('tr');
         
         const dateStr = p.dataPrevista ? p.dataPrevista.split('-').reverse().join('/') : 'N/D';
@@ -459,8 +472,11 @@ function renderCalendar() {
     // Pulisci vecchi eventi
     calendar.removeAllEvents();
     
-    // Aggiungi nuovi da plannedInterventions
-    plannedInterventions.forEach(p => {
+    const selectedIncarichi = JSON.parse(localStorage.getItem('antimo_incarichi_filter')) || ["TUTTI"];
+    const filteredPlanned = plannedInterventions.filter(p => passesIncarichiFilter(p, selectedIncarichi));
+
+    // Aggiungi nuovi da plannedInterventions filtrati
+    filteredPlanned.forEach(p => {
         if(p.dataPrevista) {
             calendar.addEvent({
                 title: p.paziente + ' (' + (p.tipo || 'N/D') + ')',

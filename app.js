@@ -139,21 +139,6 @@ async function loadDropdownLists() {
                 }
             }
             
-            // Popolamento dinamico Modal Incarichi (Multi-select)
-            const incContainer = document.getElementById('incarichiListContainer');
-            if (incContainer) {
-                incContainer.innerHTML = '';
-                window.tecniciAssegnati.forEach(t => {
-                    const isChecked = window.selectedIncarichi && (window.selectedIncarichi.includes("TUTTI") || window.selectedIncarichi.includes(t.nome)) ? 'checked' : '';
-                    incContainer.innerHTML += `
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px; border-radius: 6px; background: rgba(0,0,0,0.02); transition: background 0.2s;">
-                            <input type="checkbox" class="cbx-incarico" value="${t.nome}" style="width: 18px; height: 18px; cursor: pointer;" ${isChecked}>
-                            <span style="font-size: 0.95rem; color: #334155;">${t.nome}</span>
-                        </label>
-                    `;
-                });
-            }
-            
         } catch(e) { console.error("Errore fetch tecnici", e); }
     } else {
         let cached = localStorage.getItem('antimo_dropdown_lists');
@@ -168,6 +153,61 @@ loadDropdownLists().then(() => {
 
 // Stato App (Incarichi Filter & Interventions)
 window.selectedIncarichi = JSON.parse(localStorage.getItem('antimo_incarichi_filter')) || ["TUTTI"];
+
+window.passesIncarichiFilter = function(inv, selectedArr) {
+    if (!selectedArr || selectedArr.length === 0 || selectedArr.includes("TUTTI")) return true;
+    let roleName = inv.tecnicoAssegnato || inv.operatore;
+    if (!roleName) roleName = (inv.programmatoDa || "Sconosciuto") + " (Assegnante)";
+    return selectedArr.includes(roleName);
+};
+
+window.buildIncarichiModalList = function() {
+    const incContainer = document.getElementById('incarichiListContainer');
+    if (!incContainer) return;
+    
+    // Raccogli nomi unici
+    const roles = new Set();
+    // 1. Dal database anagrafiche (fallback base)
+    if(window.tecniciAssegnati) window.tecniciAssegnati.forEach(t => roles.add(t.nome));
+    
+    // 2. Dai tasks attuali
+    const allTasks = [...(plannedInterventions||[]), ...(completedInterventions||[])];
+    allTasks.forEach(inv => {
+        let roleName = inv.tecnicoAssegnato || inv.operatore;
+        if (!roleName) roleName = (inv.programmatoDa || "Sconosciuto") + " (Assegnante)";
+        roles.add(roleName);
+    });
+
+    const rolesArr = Array.from(roles).sort();
+    
+    // Mantieni stato UI se il modale è aperto interattivamente
+    const currentChecks = {};
+    document.querySelectorAll('.cbx-incarico').forEach(c => currentChecks[c.value] = c.checked);
+
+    incContainer.innerHTML = '';
+    rolesArr.forEach(r => {
+        let isChecked = false;
+        if (Object.keys(currentChecks).length > 0) {
+           isChecked = currentChecks[r] || false;
+        } else {
+           isChecked = window.selectedIncarichi && (window.selectedIncarichi.includes("TUTTI") || window.selectedIncarichi.includes(r));
+        }
+        
+        // Evidenzia "(Assegnante)"
+        let displayHtml = r;
+        const replaceStr = " (Assegnante)";
+        if (r.includes(replaceStr)) {
+            displayHtml = r.replace(replaceStr, " <span style='font-size:0.75rem; color:#ef4444; font-weight:bold; background:#fee2e2; padding:2px 6px; border-radius:4px;'>Assegnante</span>");
+        }
+        
+        incContainer.innerHTML += `
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px; border-radius: 6px; background: rgba(0,0,0,0.02); transition: background 0.2s;">
+                <input type="checkbox" class="cbx-incarico" value="${r}" style="width: 18px; height: 18px; cursor: pointer;" ${isChecked ? 'checked' : ''}>
+                <span style="font-size: 0.95rem; color: #334155;">${displayHtml}</span>
+            </label>
+        `;
+    });
+};
 
 window.stringToColorData = function(str) {
     if(!str) str = "Unknown";
@@ -1760,6 +1800,9 @@ function updateUI() {
         visibiliProg = visibiliProg.filter(p => p.tecnicoAssegnato === targetFilter || p.programmatoDa === targetFilter || p.operatore === targetFilter);
     }
 
+    // Applica logic Incarichi (Multi-select)
+    visibiliProg = visibiliProg.filter(p => window.passesIncarichiFilter(p, window.selectedIncarichi));
+
     updateHeaderFiltersUI();
     
     if (selectedCalendarDate) {
@@ -1808,6 +1851,9 @@ function updateUI() {
     } else if (targetFilter !== "TUTTI") {
         visibiliNP = visibiliNP.filter(p => p.tecnicoAssegnato === targetFilter || p.programmatoDa === targetFilter || p.operatore === targetFilter);
     }
+    
+    // Applica logic Incarichi (Multi-select)
+    visibiliNP = visibiliNP.filter(p => window.passesIncarichiFilter(p, window.selectedIncarichi));
 
     if(visibiliNP.length > 0 && isNpVisible) {
         npInterventionsSection.classList.remove('hidden');
@@ -1825,6 +1871,8 @@ function formatTime(ms) {
 }
 
 async function updateInterventiCount() { 
+    if(typeof window.buildIncarichiModalList === 'function') window.buildIncarichiModalList();
+
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
@@ -1842,9 +1890,7 @@ async function updateInterventiCount() {
     }
 
     // Applica logic Incarichi (Multi-select)
-    if (window.selectedIncarichi && window.selectedIncarichi.length > 0 && !window.selectedIncarichi.includes("TUTTI")) {
-        soloPlanned = soloPlanned.filter(p => window.selectedIncarichi.includes(p.tecnicoAssegnato) || window.selectedIncarichi.includes(p.programmatoDa) || window.selectedIncarichi.includes(p.operatore));
-    }
+    soloPlanned = soloPlanned.filter(p => window.passesIncarichiFilter(p, window.selectedIncarichi));
 
     let cOggi = 0, cDomani = 0, cNeseg = 0;
     soloPlanned.forEach(p => {
@@ -1861,9 +1907,7 @@ async function updateInterventiCount() {
     } else if (targetFilter !== "TUTTI") {
         soloNP = soloNP.filter(p => p.tecnicoAssegnato === targetFilter || p.programmatoDa === targetFilter || p.operatore === targetFilter);
     }
-    if (window.selectedIncarichi && window.selectedIncarichi.length > 0 && !window.selectedIncarichi.includes("TUTTI")) {
-        soloNP = soloNP.filter(p => window.selectedIncarichi.includes(p.tecnicoAssegnato) || window.selectedIncarichi.includes(p.programmatoDa) || window.selectedIncarichi.includes(p.operatore));
-    }
+    soloNP = soloNP.filter(p => window.passesIncarichiFilter(p, window.selectedIncarichi));
 
     if (programmatiCount) programmatiCount.textContent = soloPlanned.length;
     if (oggiCount) oggiCount.textContent = cOggi;
@@ -1880,9 +1924,7 @@ async function updateInterventiCount() {
     let doneToday = completedInterventions.filter(inv => inv.startTime >= startOfToday.getTime() && inv.startTime <= endOfToday);
     
     if (targetFilter === "MIO" || targetFilter === "" || !isFirebaseConfigured) {
-        if (window.selectedIncarichi && window.selectedIncarichi.length > 0 && !window.selectedIncarichi.includes("TUTTI")) {
-            doneToday = doneToday.filter(p => window.selectedIncarichi.includes(p.operatore) || window.selectedIncarichi.includes(p.tecnicoAssegnato));
-        }
+        doneToday = doneToday.filter(p => window.passesIncarichiFilter(p, window.selectedIncarichi));
         if (interventiCount) interventiCount.textContent = doneToday.length;
     } else {
         // Fetch dal DB chiunque oppure un utente specifico
@@ -1896,15 +1938,11 @@ async function updateInterventiCount() {
             if (targetFilter !== "TUTTI") {
                 fbDone = fbDone.filter(x => x.operatore === targetFilter || x.tecnicoAssegnato === targetFilter);
             }
-            if (window.selectedIncarichi && window.selectedIncarichi.length > 0 && !window.selectedIncarichi.includes("TUTTI")) {
-                fbDone = fbDone.filter(x => window.selectedIncarichi.includes(x.operatore) || window.selectedIncarichi.includes(x.tecnicoAssegnato));
-            }
+            fbDone = fbDone.filter(x => window.passesIncarichiFilter(x, window.selectedIncarichi));
             if (interventiCount) interventiCount.textContent = fbDone.length;
         } catch(e) {
             console.error("Errore fetch firebase eseguiti:", e);
-            if (window.selectedIncarichi && window.selectedIncarichi.length > 0 && !window.selectedIncarichi.includes("TUTTI")) {
-                doneToday = doneToday.filter(p => window.selectedIncarichi.includes(p.operatore) || window.selectedIncarichi.includes(p.tecnicoAssegnato));
-            }
+            doneToday = doneToday.filter(p => window.passesIncarichiFilter(p, window.selectedIncarichi));
             if (interventiCount) interventiCount.textContent = doneToday.length; // fallback
         }
     }
