@@ -1159,23 +1159,23 @@ if(btnCalculateValuation) {
             }
 
 
-            const { collection, getDocs, query, where, doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
             
             // Esposizione per funzione Elimina Test
             window.deleteValuationIntervention = async function(id) {
                 if(!confirm("⚠️ Vuoi eliminare DEFINITIVAMENTE questo intervento su Cloud? Non potrà essere recuperato.")) return;
                 try {
                     await deleteDoc(doc(db, "interventi", id));
-                    // Rimuove la riga visualmente o ricalcola
+                    // Ricalcoliamo ricaricando i dati prima
+                    await loadData();
                     btnCalculateValuation.click(); 
                 } catch(e) {
                     alert("Errore durante l'eliminazione: " + e.message);
                 }
             };
 
-            // Filtra su Firestore con limite Date
-            const q = query(collection(db, "interventi"), where("startTime", ">=", startTs), where("startTime", "<=", endTs));
-            const snaps = await getDocs(q);
+            // Filtra localmente su tuttiGliInterventi scaricati al caricamento pagina
+            const snaps = tuttiGliInterventi.filter(item => item.startTime >= startTs && item.startTime <= endTs);
 
             // Mappa ruoli 
             let cacheRuoliApp = {};
@@ -1215,8 +1215,7 @@ if(btnCalculateValuation) {
                 window.antimoDropdownLists.interventi.forEach(i => valInterventi[i.id] = parseFloat(i.val || 0));
             }
 
-            snaps.forEach(documentSnapshot => {
-                const data = documentSnapshot.data();
+            snaps.forEach(data => {
                 // User requirement: if operator is completely unknown, it defaults to the inserter or "Pietro Cammarota"
                 let opStr = data.operatore || data.user || data.inseritoDa || "Pietro Cammarota";
                 let rStr = cacheRuoliApp[opStr] || "Ruolo Non Definito";
@@ -1245,7 +1244,7 @@ if(btnCalculateValuation) {
                     <td style="padding: 10px; text-align: right; color: #64748b;">€ ${curVal.toFixed(2)}</td>
                     <td style="padding: 10px; text-align: right; font-weight: bold; color: #15803d;">€ ${curVal.toFixed(2)}</td>
                     <td style="padding: 10px; text-align: center;">
-                        <button onclick="deleteValuationIntervention('${documentSnapshot.id}')" style="background:none; border:none; cursor:pointer; font-size:1.1rem;" title="Elimina definitivamente">🗑️</button>
+                        <button onclick="deleteValuationIntervention('${data.fbId}')" style="background:none; border:none; cursor:pointer; font-size:1.1rem;" title="Elimina definitivamente">🗑️</button>
                     </td>
                 </tr>`;
 
