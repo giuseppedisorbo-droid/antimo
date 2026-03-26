@@ -4696,9 +4696,9 @@ window.stampaModuloMagazzinoPDF = async function(id, collectionName = 'programma
         }
         const task = docSnap.data();
         
-        let htmlStr = \`
+        let htmlStr = `
             <!DOCTYPE html>
-            <html><head><title>Preparazione Magazzino - \${task.paziente}</title>
+            <html><head><title>Preparazione Magazzino - ${task.paziente}</title>
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
                 body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #333; margin: 0; padding: 20px; font-size: 14px; }
@@ -4720,15 +4720,15 @@ window.stampaModuloMagazzinoPDF = async function(id, collectionName = 'programma
                 <div class="section">
                     <div class="section-title">👤 Dati Paziente & Intervento</div>
                     <div class="grid">
-                        <div class="grid-item"><strong>Paziente / Ente:</strong><br>\${task.paziente || 'N/D'}</div>
-                        <div class="grid-item"><strong>Indirizzo:</strong><br>\${task.localita || ''} \${task.indirizzo ? '- '+task.indirizzo : ''}</div>
-                        <div class="grid-item"><strong>Telefono:</strong><br>\${task.telefono || 'N/D'}</div>
+                        <div class="grid-item"><strong>Paziente / Ente:</strong><br>${task.paziente || 'N/D'}</div>
+                        <div class="grid-item"><strong>Indirizzo:</strong><br>${task.localita || ''} ${task.indirizzo ? '- '+task.indirizzo : ''}</div>
+                        <div class="grid-item"><strong>Telefono:</strong><br>${task.telefono || 'N/D'}</div>
                     </div>
                 </div>
-        \`;
+        `;
         
         if (task.interventiList && task.interventiList.length > 0) {
-            htmlStr += \`
+            htmlStr += `
                 <div class="section">
                     <div class="section-title">📦 Dispositivi, Matricole e Accessori</div>
                     <table>
@@ -4741,68 +4741,68 @@ window.stampaModuloMagazzinoPDF = async function(id, collectionName = 'programma
                             </tr>
                         </thead>
                         <tbody>
-            \`;
+            `;
             task.interventiList.forEach(inv => {
                 const tipoInt = window.decodeCodeToLabel ? window.decodeCodeToLabel(inv.tipo, 'interventi') : inv.tipo;
                 const disp = window.decodeCodeToLabel ? window.decodeCodeToLabel(inv.disp, 'dispositivi') : inv.disp;
                 
                 let seqexHtml = '';
                 if (disp && disp.toUpperCase().includes('SEQEX')) {
-                    seqexHtml = \`<div style="margin-top:8px; padding:6px; background:#e0e7ff; border:1px solid #a5b4fc; border-radius:4px;">
+                    seqexHtml = `<div style="margin-top:8px; padding:6px; background:#e0e7ff; border:1px solid #a5b4fc; border-radius:4px;">
                                     <strong>⚙️ SETUP TERAPIA SEQEX:</strong><br>
-                                    - Frequenza: \${inv.seqex_volte || '?'} volte al dì per \${inv.seqex_minuti || '?'} min.<br>
-                                    - Programmi Selezionati: <strong>\${inv.seqex_programmiStr || 'Nessuno'}</strong>
-                                 </div>\`;
+                                    - Frequenza: ${inv.seqex_volte || '?'} volte al dì per ${inv.seqex_minuti || '?'} min.<br>
+                                    - Programmi Selezionati: <strong>${inv.seqex_programmiStr || 'Nessuno'}</strong>
+                                 </div>`;
                 }
 
-                htmlStr += \`
+                htmlStr += `
                     <tr>
-                        <td><strong>\${tipoInt || ''}</strong></td>
+                        <td><strong>${tipoInt || ''}</strong></td>
                         <td>
-                            <strong style="color: #1d4ed8; font-size: 1.1em;">\${disp || 'Nessuno'}</strong>
-                            \${seqexHtml}
+                            <strong style="color: #1d4ed8; font-size: 1.1em;">${disp || 'Nessuno'}</strong>
+                            ${seqexHtml}
                         </td>
-                        <td>\${inv.accessoriStr || '-'}</td>
-                        <td style="font-family: monospace; font-size: 1.1em;"><strong>\${inv.mat || '___________'}</strong></td>
+                        <td>${inv.accessoriStr || '-'}</td>
+                        <td style="font-family: monospace; font-size: 1.1em;"><strong>${inv.mat || '___________'}</strong></td>
                     </tr>
-                \`;
+                `;
             });
-            htmlStr += \`</tbody></table></div>\`;
+            htmlStr += `</tbody></table></div>`;
         } else {
             // Logica Retrocompatibile
             const tipoInt = window.decodeCodeToLabel ? window.decodeCodeToLabel(task.tipo, 'interventi') : task.tipo;
             const disp = window.decodeCodeToLabel ? window.decodeCodeToLabel(task.dispositivi, 'dispositivi') : task.dispositivi;
-            htmlStr += \`
+            htmlStr += `
                 <div class="section">
                     <div class="section-title">📦 Dispositivi</div>
                     <div style="padding: 10px; border: 1px solid #cbd5e1;">
-                        <strong>Intervento:</strong> \${tipoInt || ''} <br>
-                        <strong>Dispositivo:</strong> \${disp || ''} <br>
-                        <strong>Accessori:</strong> \${task.accessoriStr || ''} <br>
-                        <strong>Matricola:</strong> \${task.matricola || ''}
+                        <strong>Intervento:</strong> ${tipoInt || ''} <br>
+                        <strong>Dispositivo:</strong> ${disp || ''} <br>
+                        <strong>Accessori:</strong> ${task.accessoriStr || ''} <br>
+                        <strong>Matricola:</strong> ${task.matricola || ''}
                     </div>
                 </div>
-            \`;
+            `;
         }
 
         if (task.note) {
-            htmlStr += \`
+            htmlStr += `
                 <div class="section">
                     <div class="section-title">📝 Note e Indicazioni</div>
-                    <div style="border: 1px solid #cbd5e1; padding: 10px; background: #f8fafc; border-radius: 4px; white-space: pre-wrap;">\${task.note}</div>
+                    <div style="border: 1px solid #cbd5e1; padding: 10px; background: #f8fafc; border-radius: 4px; white-space: pre-wrap;">${task.note}</div>
                 </div>
-            \`;
+            `;
         }
         
         let headerTe = task.tecnicoAssegnato || '';
         if(headerTe === "MAGAZZINO") headerTe = "________________";
-        htmlStr += \`
+        htmlStr += `
                 <div style="margin-top: 50px; display: flex; justify-content: space-around;">
                     <div style="text-align: center; border-top: 1px solid #333; width: 35%; padding-top: 5px;">Firma Magazziniere</div>
-                    <div style="text-align: center; border-top: 1px solid #333; width: 35%; padding-top: 5px;">Tecnico: \${headerTe}</div>
+                    <div style="text-align: center; border-top: 1px solid #333; width: 35%; padding-top: 5px;">Tecnico: ${headerTe}</div>
                 </div>
             </body></html>
-        \`;
+        `;
 
         const printWindow = window.open('', '_blank');
         if (!printWindow) {
@@ -4854,7 +4854,7 @@ window.stampaListoneMagazzinoPDF = async function() {
             return tA - tB;
         });
 
-        let htmlStr = \`
+        let htmlStr = `
             <!DOCTYPE html>
             <html><head><title>Riepilogo Attività Magazzino</title>
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -4870,7 +4870,7 @@ window.stampaListoneMagazzinoPDF = async function() {
             </head><body>
                 <button class="print-btn" onclick="window.print()">🖨️ PROCEDI ALLA STAMPA DELLA LISTA</button>
                 <h1>Elenco Massivo Attività da Evadere / Preparare</h1>
-                <p>Data Stampa: \${new Date().toLocaleString('it-IT')}</p>
+                <p>Data Stampa: ${new Date().toLocaleString('it-IT')}</p>
                 <table>
                     <thead>
                         <tr>
@@ -4883,7 +4883,7 @@ window.stampaListoneMagazzinoPDF = async function() {
                         </tr>
                     </thead>
                     <tbody>
-        \`;
+        `;
 
         allTasks.forEach(task => {
             let dispListBlock = "";
@@ -4893,37 +4893,37 @@ window.stampaListoneMagazzinoPDF = async function() {
                 dispListBlock = task.interventiList.map(i => {
                     const dispLabel = window.decodeCodeToLabel ? window.decodeCodeToLabel(i.disp, 'dispositivi') : i.disp;
                     const typeLabel = window.decodeCodeToLabel ? window.decodeCodeToLabel(i.tipo, 'interventi') : i.tipo;
-                    let line = \`<div style="margin-bottom: 4px;"><strong>\${typeLabel}: \${dispLabel}</strong>\`;
-                    if(i.accessoriStr) line += \` <br><span style="color:#666; font-size:10px;">Acc: \${i.accessoriStr}</span>\`;
+                    let line = `<div style="margin-bottom: 4px;"><strong>${typeLabel}: ${dispLabel}</strong>`;
+                    if(i.accessoriStr) line += ` <br><span style="color:#666; font-size:10px;">Acc: ${i.accessoriStr}</span>`;
                     if(dispLabel && dispLabel.toUpperCase().includes('SEQEX')) {
-                         line += \` <br><span style="color:#4338ca; font-size:10px;">SEQEX: \${i.seqex_volte||'?'}x\${i.seqex_minuti||'?'}min (\${i.seqex_programmiStr||'Setup vuoto'})</span>\`;
+                         line += ` <br><span style="color:#4338ca; font-size:10px;">SEQEX: ${i.seqex_volte||'?'}x${i.seqex_minuti||'?'}min (${i.seqex_programmiStr||'Setup vuoto'})</span>`;
                     }
-                    line += \`</div>\`;
+                    line += `</div>`;
                     return line;
                 }).join('');
                 
-                matListBlock = task.interventiList.map(i => \`<div style="margin-bottom: 4px;">\${i.mat || '___'}</div>\`).join('');
+                matListBlock = task.interventiList.map(i => `<div style="margin-bottom: 4px;">${i.mat || '___'}</div>`).join('');
             } else {
-                dispListBlock = \`<strong>\${window.decodeCodeToLabel ? window.decodeCodeToLabel(task.tipo, 'interventi') : task.tipo}: \${window.decodeCodeToLabel ? window.decodeCodeToLabel(task.dispositivi, 'dispositivi') : task.dispositivi}</strong>\`;
-                if(task.accessoriStr) dispListBlock += \`<br><span style="color:#666; font-size:10px;">Acc: \${task.accessoriStr}</span>\`;
+                dispListBlock = `<strong>${window.decodeCodeToLabel ? window.decodeCodeToLabel(task.tipo, 'interventi') : task.tipo}: ${window.decodeCodeToLabel ? window.decodeCodeToLabel(task.dispositivi, 'dispositivi') : task.dispositivi}</strong>`;
+                if(task.accessoriStr) dispListBlock += `<br><span style="color:#666; font-size:10px;">Acc: ${task.accessoriStr}</span>`;
                 matListBlock = task.matricola || '___';
             }
 
-            let asse = task.tecnicoAssegnato || (task.programmatoDa ? \`Da: \${task.programmatoDa}\` : '-');
+            let asse = task.tecnicoAssegnato || (task.programmatoDa ? `Da: ${task.programmatoDa}` : '-');
 
-            htmlStr += \`
+            htmlStr += `
                 <tr>
-                    <td><strong>\${task.paziente}</strong><br><span style="font-size:10px; color:#666;">\${task.telefono || ''}</span></td>
-                    <td>\${task.localita || ''}<br><span style="font-size:10px; color:#666;">\${task.indirizzo || ''}</span></td>
-                    <td>\${dispListBlock}</td>
-                    <td style="font-family: monospace;"><strong>\${matListBlock}</strong></td>
-                    <td>\${task.status==='in_attesa' ? '⏳ ATTESA' : '📅 PROG.'}<br><span style="color:#ea580c; font-weight:bold; font-size:10px;">\${asse}</span></td>
+                    <td><strong>${task.paziente}</strong><br><span style="font-size:10px; color:#666;">${task.telefono || ''}</span></td>
+                    <td>${task.localita || ''}<br><span style="font-size:10px; color:#666;">${task.indirizzo || ''}</span></td>
+                    <td>${dispListBlock}</td>
+                    <td style="font-family: monospace;"><strong>${matListBlock}</strong></td>
+                    <td>${task.status==='in_attesa' ? '⏳ ATTESA' : '📅 PROG.'}<br><span style="color:#ea580c; font-weight:bold; font-size:10px;">${asse}</span></td>
                     <td style="text-align: center;"><div style="width:20px; height:20px; border:2px solid #333; display:inline-block; border-radius:3px;"></div></td>
                 </tr>
-            \`;
+            `;
         });
 
-        htmlStr += \`</tbody></table></body></html>\`;
+        htmlStr += `</tbody></table></body></html>`;
 
         const printWindow = window.open('', '_blank');
         if (!printWindow) {
