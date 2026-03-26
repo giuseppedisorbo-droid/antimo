@@ -217,6 +217,7 @@ const btnMsgTabAll = document.getElementById('btnMsgTabAll');
 const btnMsgTabReceived = document.getElementById('btnMsgTabReceived');
 const btnMsgTabSent = document.getElementById('btnMsgTabSent');
 const btnMsgTabUnread = document.getElementById('btnMsgTabUnread');
+const btnMsgTabRead = document.getElementById('btnMsgTabRead');
 const btnMsgTabDeleted = document.getElementById('btnMsgTabDeleted');
 const btnMsgTabInCharge = document.getElementById('btnMsgTabInCharge');
 const btnMsgTabReplied = document.getElementById('btnMsgTabReplied');
@@ -224,7 +225,7 @@ const btnEmptyTrash = document.getElementById('btnEmptyTrash');
 const msgSearchText = document.getElementById('msgSearchText');
 const msgSearchUser = document.getElementById('msgSearchUser');
 const msgSearchDate = document.getElementById('msgSearchDate');
-let currentMsgTab = 'all'; // 'all', 'received', 'sent', 'unread', 'in_charge', 'replied', 'resolved', 'deleted'
+let currentMsgTab = 'all'; // 'all', 'received', 'sent', 'unread', 'read', 'in_charge', 'replied', 'resolved', 'deleted'
 
 // Nuovi Toggles Logic
 let isPlannedVisible = false;
@@ -571,6 +572,7 @@ function updateMsgTabsUI() {
     if(btnMsgTabReceived) btnMsgTabReceived.className = (currentMsgTab === 'received') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
     if(btnMsgTabSent) btnMsgTabSent.className = (currentMsgTab === 'sent') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
     if(btnMsgTabUnread) btnMsgTabUnread.className = (currentMsgTab === 'unread') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
+    if(btnMsgTabRead) btnMsgTabRead.className = (currentMsgTab === 'read') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
     if(btnMsgTabDeleted) btnMsgTabDeleted.className = (currentMsgTab === 'deleted') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
     if(btnMsgTabResolved) btnMsgTabResolved.className = (currentMsgTab === 'resolved') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
     if(btnMsgTabInCharge) btnMsgTabInCharge.className = (currentMsgTab === 'in_charge') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
@@ -581,6 +583,7 @@ if(btnMsgTabAll) btnMsgTabAll.addEventListener('click', (e) => { e.preventDefaul
 if(btnMsgTabReceived) btnMsgTabReceived.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'received'; updateMsgTabsUI(); renderMessagesUI(); });
 if(btnMsgTabSent) btnMsgTabSent.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'sent'; updateMsgTabsUI(); renderMessagesUI(); });
 if(btnMsgTabUnread) btnMsgTabUnread.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'unread'; updateMsgTabsUI(); renderMessagesUI(); });
+if(btnMsgTabRead) btnMsgTabRead.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'read'; updateMsgTabsUI(); renderMessagesUI(); });
 if(btnMsgTabDeleted) btnMsgTabDeleted.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'deleted'; updateMsgTabsUI(); renderMessagesUI(); });
 if(btnMsgTabResolved) btnMsgTabResolved.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'resolved'; updateMsgTabsUI(); renderMessagesUI(); });
 if(btnMsgTabInCharge) btnMsgTabInCharge.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'in_charge'; updateMsgTabsUI(); renderMessagesUI(); });
@@ -664,7 +667,15 @@ function renderMessagesUI() {
     const searchDate = (msgSearchDate && msgSearchDate.value) ? msgSearchDate.value : "";
     
     // Calculate counts for categories
-    let countAll = 0, countUnread = 0, countReceived = 0, countSent = 0, countDeleted = 0, countResolved = 0, countInCharge = 0, countReplied = 0;
+    let countAll = 0;
+    let countUnread = 0;
+    let countRead = 0;
+    let countReceived = 0;
+    let countSent = 0;
+    let countDeleted = 0;
+    let countResolved = 0;
+    let countInCharge = 0;
+    let countReplied = 0;
     
     messagesDataCache.forEach(item => {
         const d = item.data;
@@ -691,6 +702,8 @@ function renderMessagesUI() {
         }
 
         // Tally categories mutually exclusive funnel
+        const isReadByMe = d.lettiDa && d.lettiDa.includes(currentUser);
+
         if (d.eliminato === true) {
             countDeleted++;
         } else if (d.isResolved === true) {
@@ -702,8 +715,12 @@ function renderMessagesUI() {
             countInCharge++;
             countAll++;
         } else {
-            countAll++;
-            if (d.letto !== true) countUnread++;
+            if (!isReadByMe) {
+                countAll++;
+                countUnread++;
+            } else {
+                countRead++;
+            }
             if ((rN === "Bacheca (Tutti)" || rN.includes(currentUser))) countReceived++;
             if (sN === currentUser) countSent++;
         }
@@ -729,6 +746,7 @@ function renderMessagesUI() {
 
     if(btnMsgTabAll) { btnMsgTabAll.innerHTML = `Tutti (${countAll})`; applyCountStyle(btnMsgTabAll, countAll, false); }
     if(btnMsgTabUnread) { btnMsgTabUnread.innerHTML = `Non Letti (${countUnread})`; applyCountStyle(btnMsgTabUnread, countUnread, false); }
+    if(btnMsgTabRead) { btnMsgTabRead.innerHTML = `👁️ Letti (${countRead})`; applyCountStyle(btnMsgTabRead, countRead, false); }
     if(btnMsgTabReceived) { btnMsgTabReceived.innerHTML = `Ricevuti (${countReceived})`; applyCountStyle(btnMsgTabReceived, countReceived, false); }
     if(btnMsgTabSent) { btnMsgTabSent.innerHTML = `Inviati (${countSent})`; applyCountStyle(btnMsgTabSent, countSent, false); }
     if(btnMsgTabInCharge) { btnMsgTabInCharge.innerHTML = `👷 Presi in Carico (${countInCharge})`; applyCountStyle(btnMsgTabInCharge, countInCharge, false); }
@@ -758,17 +776,22 @@ function renderMessagesUI() {
             if (d.haRisposto !== true || d.isResolved || d.eliminato) return false;
         } else if (currentMsgTab === 'in_charge') {
             if (d.presoInCarico !== true || d.haRisposto || d.isResolved || d.eliminato) return false;
+        } else if (currentMsgTab === 'read') {
+            const isReadByMe = d.lettiDa && d.lettiDa.includes(currentUser);
+            if (!isReadByMe || d.eliminato) return false;
         } else if (currentMsgTab === 'all') {
-            if (d.eliminato || d.isResolved) return false;
+            const isReadByMe = d.lettiDa && d.lettiDa.includes(currentUser);
+            if (d.eliminato || d.isResolved || isReadByMe) return false;
         } else {
             // received, sent, unread
-            if (d.eliminato || d.isResolved || d.haRisposto || d.presoInCarico) return false;
+            const isReadByMe = d.lettiDa && d.lettiDa.includes(currentUser);
+            if (d.eliminato || d.isResolved || d.haRisposto || d.presoInCarico || isReadByMe) return false;
             if (currentMsgTab === 'received') {
                 if (rN !== "Bacheca (Tutti)" && !rN.includes(currentUser)) return false;
             } else if (currentMsgTab === 'sent') {
                 if (sN !== currentUser) return false;
             } else if (currentMsgTab === 'unread') {
-                if (d.letto === true) return false;
+                // Già escluso da isReadByMe sopra
             }
         }
 
@@ -799,8 +822,10 @@ function renderMessagesUI() {
             const data = item.data;
             const docSnapId = item.id;
             
+            const isReadByMe = data.lettiDa && data.lettiDa.includes(currentUser);
+
             // Notification badge condition: only brand new untouched messages
-            if(data.isNotification && !data.eliminato && !data.letto && !data.presoInCarico) {
+            if(data.isNotification && !data.eliminato && !isReadByMe && !data.presoInCarico) {
                 activeNotes.push(data.text);
             }
             
@@ -808,7 +833,7 @@ function renderMessagesUI() {
             div.setAttribute('data-id', docSnapId);
             div.style.padding = "10px";
             div.style.borderRadius = "8px";
-            div.style.backgroundColor = data.isNotification ? "#fffbeb" : (data.letto ? "#f8fafc" : "#f1f5f9");
+            div.style.backgroundColor = data.isNotification ? "#fffbeb" : (isReadByMe ? "#f8fafc" : "#f1f5f9");
             if (data.eliminato) div.style.backgroundColor = "#fee2e2";
             div.style.borderLeft = data.isNotification ? "4px solid #f59e0b" : "4px solid #cbd5e1";
             if (data.eliminato) div.style.borderLeft = "4px solid #ef4444";
@@ -817,7 +842,7 @@ function renderMessagesUI() {
             div.style.flexDirection = "column";
             div.style.gap = "5px";
             div.style.transition = "background-color 1s ease";
-            if(data.letto && !data.isNotification && !data.eliminato) div.style.opacity = "0.6";
+            if(isReadByMe && !data.isNotification && !data.eliminato) div.style.opacity = "0.6";
             if(data.eliminato) div.style.opacity = "0.8";
 
             let timeStr = "--/--/---- --:--";
@@ -852,7 +877,7 @@ function renderMessagesUI() {
                 <div style="margin-top:5px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; font-size: 0.8rem; color: var(--blue-dark);">
                     <strong>Da:</strong> ${sN} &nbsp;|&nbsp; <strong>A:</strong> ${rN}
                 </div>
-                <div style="color: #333; line-height: 1.4; white-space: pre-wrap; margin-top:5px; ${(data.letto || data.eliminato) ? 'text-decoration: line-through; color: #777;' : ''}">${data.text}</div>
+                <div style="color: #333; line-height: 1.4; white-space: pre-wrap; margin-top:5px; ${(isReadByMe || data.eliminato) ? 'text-decoration: line-through; color: #777;' : ''}">${data.text}</div>
                 ${attHtml}
             `;
             
@@ -960,12 +985,18 @@ function renderMessagesUI() {
                 actionDiv.appendChild(replyAllBtn);
 
                 const toggleReadBtn = document.createElement('button');
-                toggleReadBtn.innerHTML = data.letto ? "📖 Da Leggere" : "✔️ Letto";
+                toggleReadBtn.innerHTML = isReadByMe ? "📖 Da Leggere" : "✔️ Segna Letto";
                 toggleReadBtn.style.cssText = "background: none; border: 1px solid #b8b8b8; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #555; background-color: rgba(255,255,255,0.5);";
                 toggleReadBtn.onclick = async () => {
                     try {
                         const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await updateDoc(doc(db, "messaggi", docSnapId), { letto: !data.letto });
+                        let newLettiDa = data.lettiDa ? [...data.lettiDa] : [];
+                        if (isReadByMe) {
+                            newLettiDa = newLettiDa.filter(u => u !== currentUser);
+                        } else {
+                            newLettiDa.push(currentUser);
+                        }
+                        await updateDoc(doc(db, "messaggi", docSnapId), { lettiDa: newLettiDa, letto: newLettiDa.length > 0 }); // Mantengo anche 'letto: true' per compatibilità globale passata
                     } catch(err) { console.error("Errore letto", err); }
                 };
                 actionDiv.appendChild(toggleReadBtn);

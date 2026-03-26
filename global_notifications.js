@@ -42,53 +42,48 @@ if(db) {
             }
         });
         
-        let badge = document.getElementById('globalFloatingNotification');
-        if(!badge) {
-            badge = document.createElement('div');
-            badge.id = 'globalFloatingNotification';
-        badge.style.cssText = `
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            background-color: var(--orange);
-            color: white;
-            padding: 15px 20px;
-            border-radius: 8px;
-            font-weight: bold;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            z-index: 10000;
-            display: flex; align-items: center; gap: 10px; max-width: 300px; cursor: pointer; border: 2px solid white;`;
-            
-            badge.onclick = () => {
-                if(window.location.pathname.endsWith('index.html') || window.location.pathname.endsWith('/') || window.location.pathname === '') {
-                    const msgSec = document.getElementById('messagesSection');
-                    const msgContainer = document.getElementById('messagesContainer');
-                    const btnTgg = document.getElementById('btnToggleMessages');
-                    if(msgContainer && msgContainer.classList.contains('hidden')) {
-                        msgContainer.classList.remove('hidden');
-                        if (btnTgg) btnTgg.textContent = 'Nascondi';
-                    }
-                    if(msgSec) msgSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                } else {
-                    window.location.href = "index.html#messagesSection";
-                }
-            };
-            
-            document.body.appendChild(badge);
-        }
+        // Nascondi la scheda floating in index.html perché c'è già quella rossa
+        const p = window.location.pathname.toLowerCase();
+        const onMainPage = p.endsWith('index.html') || p.endsWith('/') || p === '' || p.includes('index');
         
-        if(activeNotes.length > 0) {
-            badge.style.display = 'flex';
-            badge.innerHTML = `
-                <div style="font-size: 1.5rem; animation: pulse 2s infinite;">🔔</div>
-                <div style="font-size: 0.85rem; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                    ${activeNotes.length > 1 ? `(${activeNotes.length}) ` : ''}${activeNotes[0]}
-                </div>
-            `;
-            if (navigator.setAppBadge) navigator.setAppBadge(activeNotes.length).catch(e => console.error("AppBadge error", e));
-        } else {
-            badge.style.display = 'none';
-            if (navigator.clearAppBadge) navigator.clearAppBadge().catch(e => console.error("AppBadge error", e));
+        if (!onMainPage) {
+            let badge = document.getElementById('globalFloatingNotification');
+            if(!badge) {
+                badge = document.createElement('div');
+                badge.id = 'globalFloatingNotification';
+            badge.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 20px;
+                background-color: var(--orange);
+                color: white;
+                padding: 15px 20px;
+                border-radius: 8px;
+                font-weight: bold;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                z-index: 10000;
+                display: flex; align-items: center; gap: 10px; max-width: 300px; cursor: pointer; border: 2px solid white;`;
+                
+                badge.onclick = () => {
+                    window.location.href = "index.html#messagesSection";
+                };
+                
+                document.body.appendChild(badge);
+            }
+            
+            if(activeNotes.length > 0) {
+                badge.style.display = 'flex';
+                badge.innerHTML = `
+                    <div style="font-size: 1.5rem; animation: pulse 2s infinite;">🔔</div>
+                    <div style="font-size: 0.85rem; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        ${activeNotes.length > 1 ? `(${activeNotes.length}) ` : ''}${activeNotes[0]}
+                    </div>
+                `;
+                if (navigator.setAppBadge) navigator.setAppBadge(activeNotes.length).catch(e => console.error("AppBadge error", e));
+            } else {
+                badge.style.display = 'none';
+                if (navigator.clearAppBadge) navigator.clearAppBadge().catch(e => console.error("AppBadge error", e));
+            }
         }
     });
 }
