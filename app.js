@@ -2529,7 +2529,7 @@ if(btnOpenBackup) {
         
         // Version Update Dinamico
         const currentVersionEl = document.getElementById('appVersionStamp');
-        let currentVersion = "v24.3"; 
+        let currentVersion = "v61.3"; 
         if(currentVersionEl) {
             let fullText = currentVersionEl.innerText || currentVersionEl.textContent;
             currentVersion = fullText.split(' - ')[0].trim();
@@ -2541,10 +2541,10 @@ if(btnOpenBackup) {
         const backupOggiVersionTxt = document.getElementById('backupOggiVersionTxt');
         if(backupOggiVersionTxt) backupOggiVersionTxt.innerText = currentVersion + " (Attuale)";
         
-        document.querySelectorAll('.btn-desc-version[data-version="v24.3"]').forEach(b => b.setAttribute('data-version', currentVersion));
-        document.querySelectorAll('.btn-reinstall-version[data-version="v24.3"]').forEach(b => b.setAttribute('data-version', currentVersion));
-        document.querySelectorAll('.btn-desc-version[data-version="v24.3-manual"]').forEach(b => b.setAttribute('data-version', currentVersion + "-manual"));
-        document.querySelectorAll('.btn-reinstall-version[data-version="v24.3-manual"]').forEach(b => b.setAttribute('data-version', currentVersion + "-manual"));
+        document.querySelectorAll('.btn-desc-version[data-version="v61.3"]').forEach(b => b.setAttribute('data-version', currentVersion));
+        document.querySelectorAll('.btn-reinstall-version[data-version="v61.3"]').forEach(b => b.setAttribute('data-version', currentVersion));
+        document.querySelectorAll('.btn-desc-version[data-version="v61.3-manual"]').forEach(b => b.setAttribute('data-version', currentVersion + "-manual"));
+        document.querySelectorAll('.btn-reinstall-version[data-version="v61.3-manual"]').forEach(b => b.setAttribute('data-version', currentVersion + "-manual"));
 
         // Calcola le date da mostrare
         const today = new Date();
@@ -2587,18 +2587,18 @@ document.querySelectorAll('.btn-desc-version').forEach(btn => {
         let contentHtml = "";
         
         const currentVersionEl = document.getElementById('appVersionStamp');
-        const currentVersion = currentVersionEl ? (currentVersionEl.innerText || currentVersionEl.textContent).split(' - ')[0].trim() : "v24.3";
+        const currentVersion = currentVersionEl ? (currentVersionEl.innerText || currentVersionEl.textContent).split(' - ')[0].trim() : "v61.3";
         const isCurrent = (version === currentVersion || version === currentVersion + "-manual");
 
         // Genera il changelog
-        if(isCurrent && version !== "v24.3" && version !== "v24.3-manual") {
+        if(isCurrent && version !== "v61.3" && version !== "v61.3-manual") {
             contentHtml = `
                 <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px;">🌟 Ultima Versione</h4>
                 <div style="padding: 10px; background: #e0f2fe; color: #0284c7; border-left: 4px solid #0ea5e9; border-radius: 4px; font-size: 0.9rem;">
                     <strong>${version}</strong>: Aggiornamento automatico con ottimizzazioni alle logiche di sistema ed interfaccia utente.
                 </div>
             `;
-        } else if(version === "v24.3" || version === "v24.3-manual") {
+        } else if(version === "v61.3" || version === "v61.3-manual") {
             contentHtml = `
                 <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px;">🌟 Novità Principali</h4>
                 <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 15px;">
@@ -2612,7 +2612,7 @@ document.querySelectorAll('.btn-desc-version').forEach(btn => {
                     <li>Implementazione Event Listeners asincroni protetti.</li>
                 </ul>
             `;
-        } else if(version === "v24.2") {
+        } else if(version === "v61.2") {
             contentHtml = `
                 <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px;">🌟 Novità Principali</h4>
                 <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 15px;">
@@ -2624,7 +2624,7 @@ document.querySelectorAll('.btn-desc-version').forEach(btn => {
                     <li>Riparato lo scorrimento e il caricamento dei modali da mobile iOS/Android.</li>
                 </ul>
             `;
-        } else if(version === "v24.0") {
+        } else if(version === "v61.0") {
             contentHtml = `
                 <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px;">🚀 Lancio Major Update</h4>
                 <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 15px;">
@@ -2671,7 +2671,7 @@ if(btnAllVersions) {
         
         // 2. Oggi
         const currentVersionEl = document.getElementById('appVersionStamp');
-        const currentVersion = currentVersionEl ? (currentVersionEl.innerText || currentVersionEl.textContent).split(' - ')[0].trim() : "v24.3";
+        const currentVersion = currentVersionEl ? (currentVersionEl.innerText || currentVersionEl.textContent).split(' - ')[0].trim() : "v61.3";
         
         contentHtml += `<div style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px dashed #eee;">
                             <h3 style="margin:0 0 10px; color:#ea580c; font-size: 1.1rem;">📅 Oggi (${formatDateDMY(now)} - Mattina) - ${currentVersion}</h3>
@@ -2685,7 +2685,7 @@ if(btnAllVersions) {
                         
         // 3. 2 Giorni fa
         contentHtml += `<div style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px dashed #eee;">
-                            <h3 style="margin:0 0 10px; color:#ea580c; font-size: 1.1rem;">📅 ${formatDateDMY(d2)} - v24.2</h3>
+                            <h3 style="margin:0 0 10px; color:#ea580c; font-size: 1.1rem;">📅 ${formatDateDMY(d2)} - v61.2</h3>
                             <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top:5px;">🌟 Novità Principali</h4>
                             <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 10px;">
                                 <li><strong>Modulo Interventi Rapido:</strong> Fusione di 'in corso' e 'nuovo', con modulo chilometri incluso sin da subito.</li>
@@ -2695,7 +2695,7 @@ if(btnAllVersions) {
                         
         // 4. 1 Settimana fa
         contentHtml += `<div>
-                            <h3 style="margin:0 0 10px; color:#ea580c; font-size: 1.1rem;">📅 ${formatDateDMY(d7)} - v24.0</h3>
+                            <h3 style="margin:0 0 10px; color:#ea580c; font-size: 1.1rem;">📅 ${formatDateDMY(d7)} - v61.0</h3>
                             <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top:5px;">🚀 Lancio Major Update</h4>
                             <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 10px;">
                                 <li><strong>Architettura Firebase Firestore:</strong> Passaggio da Google Sheets a sistema real-time in Cloud Firebase.</li>
