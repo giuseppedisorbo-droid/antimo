@@ -2277,38 +2277,7 @@ function renderSpecialPlannedList(container, filteredData) {
         
         div.querySelector('button[data-action="avvia"]').addEventListener('click', (e) => {
             const idx = e.target.getAttribute('data-index');
-            const dataToLoad = plannedInterventions[idx];
-            
-            // Popoliamo il form coi blocchi dinamici
-            const container = document.getElementById('dynamicInterventionsContainer');
-            if (container) {
-                const hooks = initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
-                container.innerHTML = '';
-                if (dataToLoad.interventiList && dataToLoad.interventiList.length > 0) {
-                    dataToLoad.interventiList.forEach(item => hooks.addBlock(item));
-                } else {
-                    hooks.addBlock({ tipo: dataToLoad.tipo, disp: dataToLoad.dispositivi, mat: dataToLoad.matricola||"" });
-                }
-            }
-            
-            iPaziente.value = dataToLoad.paziente || "";
-            if(iLocalita) iLocalita.value = dataToLoad.localita || dataToLoad.destinazione || "";
-            if(iIndirizzo) iIndirizzo.value = dataToLoad.indirizzo || "";
-            if(iTelefono) iTelefono.value = dataToLoad.telefono || "";
-            
-            iNote.value = dataToLoad.note || "";
-            pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
-
-            // plannedInterventions.splice(idx, 1);
-            // saveState();
-            
-            // Trapping the origin ID so we can formally close it in DB upon Save only (prevents data loss if aborted)
-            activeProgFbId = dataToLoad.idFb || dataToLoad.id || null;
-            activeProgItem = dataToLoad;
-
-            updateUI();
-            interventionSection.classList.remove('hidden');
-            interventionSection.scrollIntoView({ behavior: 'smooth' });
+            editProgrammatoAppJs(idx);
         });
         
         div.querySelector('button[data-action="justify"]').addEventListener('click', (e) => {
@@ -2389,39 +2358,7 @@ function renderNpInterventions(visibiliCustom) {
         
         div.querySelector('button[data-action="avvia"]').addEventListener('click', (e) => {
             const idx = e.target.getAttribute('data-index');
-            const dataToLoad = plannedInterventions[idx];
-            
-            // Popoliamo il form coi blocchi dinamici
-            const container = document.getElementById('dynamicInterventionsContainer');
-            if (container) {
-                const hooks = initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
-                container.innerHTML = '';
-                if (dataToLoad.interventiList && dataToLoad.interventiList.length > 0) {
-                    dataToLoad.interventiList.forEach(item => hooks.addBlock(item));
-                } else {
-                    hooks.addBlock({ tipo: dataToLoad.tipo, disp: dataToLoad.dispositivi, mat: dataToLoad.matricola||"" });
-                }
-            }
-
-            iPaziente.value = dataToLoad.paziente || "";
-            if(iLocalita) iLocalita.value = dataToLoad.localita || dataToLoad.destinazione || "";
-            if(iIndirizzo) iIndirizzo.value = dataToLoad.indirizzo || "";
-            if(iTelefono) iTelefono.value = dataToLoad.telefono || "";
-            
-            iNote.value = dataToLoad.note || "";
-            pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
-
-            // plannedInterventions.splice(idx, 1);
-            // saveState();
-            
-            // Trapping the origin ID so we can formally close it in DB upon Save only (prevents data loss if aborted)
-            activeProgFbId = dataToLoad.idFb || dataToLoad.id || null;
-            activeProgItem = dataToLoad;
-
-            updateUI();
-            updateInterventiCount();
-            interventionSection.classList.remove('hidden');
-            interventionSection.scrollIntoView({ behavior: 'smooth' });
+            editProgrammatoAppJs(idx);
         });
 
         npList.appendChild(div);
@@ -3430,41 +3367,7 @@ function renderActivitiesList() {
             setupAccordionCard(div);
             
             div.querySelector('button[data-action="avvia"]').addEventListener('click', () => {
-                const dataToLoad = plannedInterventions[origIndex];
-                
-                // Trapping the origin ID so we can formally close it in DB upon Save
-                activeProgFbId = dataToLoad.idFb || dataToLoad.id || null;
-                activeProgItem = dataToLoad;
-            
-            // Popoliamo il form coi blocchi dinamici
-            const container = document.getElementById('dynamicInterventionsContainer');
-            if (container) {
-                const hooks = initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
-                container.innerHTML = '';
-                if (dataToLoad.interventiList && dataToLoad.interventiList.length > 0) {
-                    dataToLoad.interventiList.forEach(item => hooks.addBlock(item));
-                } else {
-                    hooks.addBlock({ tipo: dataToLoad.tipo, disp: dataToLoad.dispositivi, mat: dataToLoad.matricola||"" });
-                }
-            }
-
-            iPaziente.value = dataToLoad.paziente || "";
-            if(iLocalita) iLocalita.value = dataToLoad.localita || dataToLoad.destinazione || "";
-            if(iIndirizzo) iIndirizzo.value = dataToLoad.indirizzo || "";
-            if(iTelefono) iTelefono.value = dataToLoad.telefono || "";
-            
-            if(iNote) iNote.value = dataToLoad.note || "";
-            pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
-
-                // NO MORE IMMEDIATE SPLICING HERE
-                // plannedInterventions.splice(origIndex, 1);
-                // saveState();
-                updateUI();
-                activitiesListContainer.classList.add('hidden');
-                btnViewActivities.innerHTML = `<span class="btn-icon">📅</span> INTERVENTI DELLA GIORNATA`;
-                interventionSection.classList.remove('hidden');
-                interventionSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                alert("Dati caricati nel form! Adesso clicca su 'TERMINA ATTIVITA'' quando finisci il lavoro.");
+                editProgrammatoAppJs(origIndex);
             });
             
             activitiesList.appendChild(div);
