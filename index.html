@@ -77,7 +77,11 @@
                     <div style="font-size: 0.6rem; text-transform: uppercase;">Eseg</div>
                     <div style="font-size: 1rem; font-weight: 700;"><strong id="interventiCount">0</strong></div>
                 </div>
-                <!-- 8th spot is deliberately left empty perfectly aligning the grid layout -->
+                <!-- Pulsante AI AUDIO (Generatore Bozze) -->
+                <div id="btnOpenAiGenerator" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset; background-color: #6366f1; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+                    <div style="font-size: 0.65rem; text-transform: uppercase; color: #ffffff; font-weight: 900;">AUDIO</div>
+                    <div style="font-size: 1rem; font-weight: 700; color: #ffffff;">🎙️</div>
+                </div>
             </div>
         </div>
 
@@ -115,6 +119,13 @@
             
             <button class="btn btn-primary btn-blue hidden" id="btnShareCSV" style="width: 100%; margin-top: 15px; padding: 12px;">
                  <span class="btn-icon">📤</span> ESTRAI & CONDIVIDI CSV
+            </button>
+        </div>
+
+        <!-- BOZZE AI - DA APPROVARE -->
+        <div id="aiDraftsContainer" style="margin-bottom: 20px;">
+            <button id="btnOpenAiDrafts" class="btn btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; background: linear-gradient(135deg, #a855f7, #6366f1); border: none; font-size: 1rem; padding: 12px; font-weight: 800; box-shadow: 0 4px 10px rgba(99,102,241,0.3); border-radius: 12px;">
+                <span style="font-size: 1.2rem;">✨</span> ARCHIVIO PROPOSTE AI (<strong id="aiDraftsCount" style="color:#ffeb3b;">0</strong>)
             </button>
         </div>
 
@@ -800,6 +811,78 @@
                     </div>
                 </div>
             </div>
+        <!-- MODAL AI GENERATOR -->
+        <div id="aiGeneratorModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 5000; overflow-y: auto; padding: 15px; display: flex; align-items: flex-start; justify-content: center; backdrop-filter: blur(5px);">
+            <div style="background: white; padding: 25px; border-radius: 16px; width: 100%; max-width: 500px; box-shadow: 0 15px 35px rgba(0,0,0,0.3); margin-top: 30px; position: relative;">
+                <button id="btnCloseAiGenerator" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 1.8rem; color: #64748b; cursor: pointer;">&times;</button>
+                <h2 style="color: #4f46e5; margin-top: 0; margin-bottom: 5px; display: flex; align-items: center; gap: 10px;">
+                    <span>🎙️</span> Generatore AI 
+                </h2>
+                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 20px;">Registra un memo vocale o allega documenti. L'AI estrarrà i dati creando una bozza pronta per essere salvata in Programmati.</p>
+
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <!-- Sezione Registrazione Audio -->
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; text-align: center;">
+                        <div id="aiAudioStatusLabel" style="font-size: 0.9rem; font-weight: 600; color: #334155; margin-bottom: 10px;">Pronto per registrare</div>
+                        
+                        <button id="btnAiRecordAudio" style="background: #ef4444; color: white; border: none; border-radius: 50%; width: 60px; height: 60px; font-size: 1.5rem; cursor: pointer; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4); display: flex; align-items: center; justify-content: center; margin: 0 auto; transition: transform 0.2s;">
+                            🎤
+                        </button>
+                        
+                        <div id="aiRecordingIndicator" class="hidden" style="margin-top: 15px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #ef4444; font-weight: bold; animation: pulse 1s infinite;">
+                            <span style="width: 10px; height: 10px; background: #ef4444; border-radius: 50%; display: inline-block;"></span>
+                            Registrazione in corso... (<span id="aiRecordingTime">00:00</span>)
+                        </div>
+
+                        <!-- Player Anteprima Audio Registrato -->
+                        <div id="aiAudioPreviewContainer" class="hidden" style="margin-top: 15px;">
+                            <audio id="aiAudioPlayer" controls style="width: 100%; height: 40px; border-radius: 20px;"></audio>
+                            <button id="btnAiDeleteAudio" style="background: none; border: none; color: #ef4444; font-size: 0.8rem; font-weight: bold; text-decoration: underline; cursor: pointer; margin-top: 5px;">Rimuovi Audio</button>
+                        </div>
+                    </div>
+
+                    <!-- Sezione Allegati Multipli -->
+                    <div style="background: #fff; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 15px; text-align: center;">
+                        <input type="file" id="aiGeneratorFileInput" accept="image/*,application/pdf" multiple style="display:none;">
+                        <button id="btnAiBrowseFiles" style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #475569; padding: 8px 15px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.9rem;">
+                            📎 Sfoglia Immagini / PDF
+                        </button>
+                        <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 5px;">Oppure INCOLLA dal blocco note (CTRL+V) in questa finestra</div>
+                        
+                        <!-- Griglia Anteprima File -->
+                        <div id="aiFilesPreviewGrid" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; justify-content: center;"></div>
+                    </div>
+
+                    <!-- Tasto Azione Finale -->
+                    <button id="btnAiGenerateFinal" class="btn btn-primary btn-large" style="background: linear-gradient(135deg, #a855f7, #6366f1); border: none; box-shadow: 0 4px 15px rgba(99,102,241,0.4); margin: 0;">
+                        <span class="btn-icon">🧠</span> ELABORA PROPOSTA
+                    </button>
+                </div>
+                
+                <!-- Loader Overlay -->
+                <div id="aiGeneratorLoaderOverlay" class="hidden" style="position: absolute; inset: 0; background: rgba(255,255,255,0.9); border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10;">
+                    <div class="dot-pulse" style="margin-bottom: 20px;"><i></i><i></i><i></i></div>
+                    <strong style="color: #4f46e5; text-align: center; padding: 0 20px;">L'Intelligenza Artificiale sta analizzando i documenti...</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL ARCHIVIO BOZZE AI -->
+        <div id="aiDraftsModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f8fafc; z-index: 5500; overflow-y: auto; display: flex; flex-direction: column;">
+            <div style="background: white; padding: 15px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10;">
+                <h2 style="margin: 0; color: #4f46e5; display: flex; align-items: center; gap: 10px; font-size:1.3rem;">
+                    <span class="btn-icon">✨</span> Archivio Bozze AI
+                </h2>
+                <button id="btnCloseAiDrafts" class="btn btn-secondary" style="margin: 0; border: none; font-size: 1.5rem; background: none; color: #64748b; padding: 0 10px;">&times;</button>
+            </div>
+            
+            <div style="padding: 20px; flex: 1; overflow-y: auto; max-width: 800px; margin: 0 auto; width: 100%;">
+                <p style="color: #64748b; font-size: 0.95rem; margin-top: 0; text-align:center;">Queste proposte sono state estratte dall'Intelligenza Artificiale ma <strong>non sono ancora ufficiali</strong>. Verificale e clicca "Approva" per trasferirle nel database reale di Antimo.</p>
+                <div id="aiDraftsCardsContainer" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
+                    <!-- Card delle bozze Popolate via JS -->
+                    <div style="text-align: center; color: #94a3b8; padding: 30px;">Caricamento in corso...</div>
+                </div>
+            </div>
         </div>
 
     </main>
@@ -900,6 +983,7 @@
 
     <script type="module" src="app.js?v=62"></script>
     <script type="module" src="ai_chat.js?v=62"></script>
+    <script type="module" src="ai_generator.js?v=62"></script>
     <script type="module" src="global_notifications.js?v=62"></script>
     <script>
       // Gestione layout PC
