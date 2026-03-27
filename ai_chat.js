@@ -533,8 +533,10 @@ async function toggleRecording() {
             isRecording = true;
             
             if(btnAiRecordAudio) {
-                btnAiRecordAudio.innerHTML = '⏹️';
-                btnAiRecordAudio.style.transform = 'scale(1.1)';
+                btnAiRecordAudio.innerHTML = '<span>⏹️</span> <span>FERMA REGISTRAZIONE</span>';
+                btnAiRecordAudio.style.transform = 'scale(1.05)';
+                btnAiRecordAudio.style.background = '#ef4444'; // Red recording
+                btnAiRecordAudio.style.boxShadow = '0 4px 15px rgba(239, 68, 68, 0.6)';
             }
             if(aiRecordingIndicator) aiRecordingIndicator.classList.remove('hidden');
             if(aiAudioStatusLabel) aiAudioStatusLabel.innerText = "Parla ora...";
@@ -558,8 +560,10 @@ async function toggleRecording() {
         clearInterval(recordInterval);
         
         if(btnAiRecordAudio) {
-            btnAiRecordAudio.innerHTML = '🎤';
+            btnAiRecordAudio.innerHTML = '<span>🎤</span> <span>PREMI PER PARLARE</span>';
             btnAiRecordAudio.style.transform = 'scale(1)';
+            btnAiRecordAudio.style.background = '#3b82f6'; // Blue idle
+            btnAiRecordAudio.style.boxShadow = '0 4px 10px rgba(59, 130, 246, 0.4)';
         }
         if(aiRecordingIndicator) aiRecordingIndicator.classList.add('hidden');
     }
@@ -661,21 +665,24 @@ if(btnAiGenerateFinal) {
         if(aiGeneratorLoaderOverlay) aiGeneratorLoaderOverlay.classList.remove('hidden');
 
         try {
-            const promptSpeciale = `In base all'audio trascritto e/o all'immagine fornita del documento (prescrizione medica, richiesta d'intervento ecc.), estrai i dati necessari per creare una scheda di intervento tecnico o sanitario di Home Care. 
-            
-I campi richiesti sono:
-- "paziente": nome/cognome.
+            const promptSpeciale = `SEI IL COORDINATORE LOGISTICO E MEDICO, ESPERTO NEL DECIFRARE AUDIO E PRESCRIZIONI. 
+Il tuo compito è analizzare la registrazione audio fornita e/o le immagini dei documenti (prescrizioni, impegnative cliniche, foto di macchinari). 
+MOLTO SPESSO L'AUDIO PUO' ESSERE STATO REGISTRATO DI FRETTA DA UN CELLULARE E QUINDI AVERE PAROLE TRONCATE O MAL PRONUNCIATE. DEVI USARE LA LOGICA E IL CONTESTO MEDICO/TECNICO (Home Care, Ossigenoterapia, Ventilatori, Ecografi, Letti Ortopedici) PER CORREGGERE EVENTUALI ERRORI DI RICONOSCIMENTO VOCALE.
+Estrai i dati esatti necessari per creare una scheda di intervento tecnico o sanitario.
+
+I campi JSON richiesti sono:
+- "paziente": nome/cognome. Se è sgrammaticato sistemane il senso se palese.
 - "indirizzo": via e numero.
 - "localita": città o provincia.
-- "telefono": recapito telefonico.
-- "tipo": la tipologia di intervento. Usare una parola chiave se capisci l'intento logico, altrimenti scrivi quello che capisci.
-- "dispositivi": l'apparecchio principale di cui si parla (es. Concentratore, Ventilatore, Ecografo...).
+- "telefono": recapito telefonico pulito da spazi.
+- "tipo": capisci l'intento logico (es. "Consegna", "Ritiro", "Manutenzione", "Guasto", "Urgenza") e scrivi qui la tipologia di intervento.
+- "dispositivi": l'apparecchio principale di cui si parla (es. Concentratore, Ventilatore, Ecografo, CPAP...).
 - "accessoriStr": accessori o maschere aggiuntive menzionate.
-- "matricola": eventuali numeri di serie o matricole.
-- "note": altre direttive, urgenze, e raccomandazioni extra.
-- "dataPrevista": una data *APPROSSIMATIVA O PRECISA* citata, possibilmente in formato YYYY-MM-DD. Metti "" se omessa.
+- "matricola": eventuali numeri di serie o codici alfanumerici.
+- "note": compila qui tutte le istruzioni cliniche extra, direttive aggiuntive o urgenze.
+- "dataPrevista": se citata una data (anche approssimativa come "per domani"), elaborala e trasformala in stringa es. YYYY-MM-DD. Metti "" se omessa.
 
-!!! ATTENZIONE: DEVI RISPONDERE SOLO ED ESCLUSIVAMENTE CON UN FILE JSON VALIDO !!! Nessun markdown, nessun \`\`\`json. Solo parentesi graffe. Se un campo manca usa "".`;
+!!! ATTENZIONE: DEVI RISPONDERE SOLO ED ESCLUSIVAMENTE CON UN FILE JSON PURO !!! Nessun markdown (no \`\`\`json), solo parentesi graffe iniziali e finali. Se un campo non è rilevato, usa stringa vuota "".`;
 
             let contentsList = [{ text: promptSpeciale }];
             
