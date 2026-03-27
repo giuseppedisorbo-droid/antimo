@@ -38,7 +38,7 @@
             <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
                 <a href="admin.html" id="btnOpenDashboard" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 6px 8px; color: white; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: inline-flex; align-items: center; width: fit-content; gap: 4px;">💻 Dashboard</a>
                 <div id="loggedInUserDisplay" style="font-size: 0.75rem; color: #fcd34d; font-weight: bold; line-height: 1.1; margin-top: 2px;"></div>
-                <div id="appVersionStamp" style="font-size: 0.65rem; color: rgba(255,255,255,0.7); cursor: pointer; line-height: 1.1;" onclick="nukeCache()">v26.0 - AutoSync v58</div>
+                <div id="appVersionStamp" style="font-size: 0.65rem; color: rgba(255,255,255,0.7); cursor: pointer; line-height: 1.1;" onclick="nukeCache()">v62.0 - AutoSync v62</div>
                 
                 <button id="btnTopNotification" class="hidden" style="margin-top: 2px; background: #e11d48; color: white; border-radius: 6px; padding: 4px 8px; border: 1px solid rgba(255,255,255,0.5); cursor: pointer; font-weight: 600; font-size: 0.7srem; align-items: center; max-width: 120px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
                     🔔 <span id="topNotificationText"></span>
@@ -429,7 +429,7 @@
                     </p>
                     <!-- Versione App -->
                     <div style="font-size: 0.85rem; color: #1e3a8a; font-weight: bold; margin-bottom: 5px;">
-                        v26.0 - Mass Delete & SyncFix
+                        v61.0 - Mass Delete & SyncFix
                     </div>
                     <p style="font-size: 0.85rem; color: #1e3a8a; margin-bottom: 0;">
                         <strong>In caso di disastro grave</strong>: Entra sul sito Firebase &gt; vai in <strong>Storage</strong> &gt; apri la cartellina <code>backups_giornalieri</code>, scarica sul PC il file .json del giorno sano precedente ed importalo qui sotto.
@@ -504,34 +504,34 @@
                         <tbody id="backupTableBody">
                             <tr style="border-bottom: 1px solid #eee; background-color: #f0fdf4;">
                                 <td style="padding: 10px; font-size: 0.9rem;" id="backupManualeDate">Oggi (Manuale) - --:--</td>
-                                <td style="padding: 10px; font-weight: bold; color: #15803d; font-size: 0.9rem;" id="backupManualeVersionTxt">v24.3 (Custom)</td>
+                                <td style="padding: 10px; font-weight: bold; color: #15803d; font-size: 0.9rem;" id="backupManualeVersionTxt">v61.3 (Custom)</td>
                                 <td style="padding: 10px;">
-                                    <button class="btn btn-sm btn-desc-version" data-version="v24.3-manual" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
-                                    <button class="btn btn-sm btn-reinstall-version" data-version="v24.3-manual" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
+                                    <button class="btn btn-sm btn-desc-version" data-version="v61.3-manual" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
+                                    <button class="btn btn-sm btn-reinstall-version" data-version="v61.3-manual" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
                                 </td>
                             </tr>
                             <tr style="border-bottom: 1px solid #eee;">
                                 <td style="padding: 10px; font-size: 0.9rem;" id="backupOggiDate">Oggi (Automatica)</td>
-                                <td style="padding: 10px; font-weight: bold; color: #166534; font-size: 0.9rem;" id="backupOggiVersionTxt">v24.3 (Attuale)</td>
+                                <td style="padding: 10px; font-weight: bold; color: #166534; font-size: 0.9rem;" id="backupOggiVersionTxt">v61.3 (Attuale)</td>
                                 <td style="padding: 10px;">
-                                    <button class="btn btn-sm btn-desc-version" data-version="v24.3" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
-                                    <button class="btn btn-sm btn-reinstall-version" data-version="v24.3" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
+                                    <button class="btn btn-sm btn-desc-version" data-version="v61.3" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
+                                    <button class="btn btn-sm btn-reinstall-version" data-version="v61.3" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
                                 </td>
                             </tr>
                             <tr style="border-bottom: 1px solid #eee;">
                                 <td style="padding: 10px; font-size: 0.9rem;" id="backup2giorniDate">2 Giorni Fa</td>
-                                <td style="padding: 10px; font-size: 0.9rem;">v24.2</td>
+                                <td style="padding: 10px; font-size: 0.9rem;">v61.2</td>
                                 <td style="padding: 10px;">
-                                    <button class="btn btn-sm btn-desc-version" data-version="v24.2" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
-                                    <button class="btn btn-sm btn-reinstall-version" data-version="v24.2" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
+                                    <button class="btn btn-sm btn-desc-version" data-version="v61.2" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
+                                    <button class="btn btn-sm btn-reinstall-version" data-version="v61.2" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
                                 </td>
                             </tr>
                             <tr style="border-bottom: 1px solid #eee;">
                                 <td style="padding: 10px; font-size: 0.9rem;" id="backup7giorniDate">1 Settimana Fa</td>
-                                <td style="padding: 10px; font-size: 0.9rem;">v24.0</td>
+                                <td style="padding: 10px; font-size: 0.9rem;">v61.0</td>
                                 <td style="padding: 10px;">
-                                    <button class="btn btn-sm btn-desc-version" data-version="v24.0" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
-                                    <button class="btn btn-sm btn-reinstall-version" data-version="v24.0" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
+                                    <button class="btn btn-sm btn-desc-version" data-version="v61.0" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
+                                    <button class="btn btn-sm btn-reinstall-version" data-version="v61.0" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
                                 </td>
                             </tr>
                         </tbody>
@@ -817,9 +817,9 @@
         </div>
     </div>
 
-    <script type="module" src="app.js?v=58"></script>
-    <script type="module" src="ai_chat.js?v=12"></script>
-    <script type="module" src="global_notifications.js?v=58"></script>
+    <script type="module" src="app.js?v=62"></script>
+    <script type="module" src="ai_chat.js?v=62"></script>
+    <script type="module" src="global_notifications.js?v=62"></script>
     <script>
       // Gestione layout PC
       document.addEventListener('DOMContentLoaded', () => {
