@@ -59,8 +59,11 @@
                     <div style="font-size: 0.6rem; text-transform: uppercase;">Domani</div>
                     <div style="font-size: 1rem; font-weight: 700;"><strong id="domaniCount">0</strong></div>
                 </div>
-                <!-- Spazio per allineamento griglia (ex calendario) -->
-                <div class="header-stat-box" style="visibility: hidden; padding: 4px; min-width: unset;"></div>
+                <!-- Pulsante Magazzino (MAG) -->
+                <div id="btnMostraMagazzino" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset; background-color: #ffffff; border: 2px solid #16a34a; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+                    <div style="font-size: 0.7rem; text-transform: uppercase; color: #16a34a; font-weight: 900;">MAG</div>
+                    <div style="font-size: 1rem; font-weight: 700; color: #15803d;">📦</div>
+                </div>
                 
                 <div id="btnMostraNP" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
                     <div style="font-size: 0.6rem; text-transform: uppercase;">NP</div>
@@ -717,6 +720,84 @@
                 <div style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Ricerca in tutto il cloud Storage per: <strong id="magicSearchTermDisplay" style="color: var(--blue-primary); font-size: 1rem;"></strong></div>
                 <div id="magicSearchResultsContainer" style="display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow-y: auto; padding-right: 5px;">
                     <!-- Risultati iniettati da JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL GESTIONE PREPARAZIONE MAGAZZINO (FILTRO) -->
+        <div id="magFilterModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 4100; overflow-y: auto; display: flex; align-items: center; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: #15803d; margin-top: 0; margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
+                    <span><span class="btn-icon">📦</span> Ricerca Magazzino</span>
+                    <button id="btnCloseMagFilter" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color: #666;">&times;</button>
+                </h3>
+                <p style="font-size: 0.9rem; color: #555; margin-bottom: 20px;">Scegli come filtrare le attività programmate già assegnate al magazzino.</p>
+                
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <!-- Pulsante Prossimi -->
+                    <button id="btnMagProssimi" class="btn btn-primary btn-large" style="background: #16a34a; border: none; margin: 0; box-shadow: 0 4px 6px rgba(22, 163, 74, 0.3);">
+                        <span class="btn-icon">📅</span> TUTTI I PROSSIMI
+                    </button>
+                    
+                    <div style="text-align: center; font-weight: bold; color: #94a3b8; font-size: 0.9rem;">— OPPURE —</div>
+                    
+                    <!-- Selezione per Date -->
+                    <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1;">
+                        <h4 style="margin-top: 0; margin-bottom: 10px; color: var(--blue-dark); text-align: center;">📅 Cerca Per Data</h4>
+                        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.8rem; font-weight: bold; color: #333;">Da:</label>
+                                <input type="date" id="magFilterDataDa" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                            </div>
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.8rem; font-weight: bold; color: #333;">A:</label>
+                                <input type="date" id="magFilterDataA" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                            </div>
+                        </div>
+                        <button id="btnMagCercaDate" class="btn btn-primary btn-blue" style="width: 100%; margin: 0;">CERCA DATE</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL LISTA PROGRAMMATI MAGAZZINO -->
+        <div id="magListModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f1f5f9; z-index: 4200; overflow-y: auto; display: flex; flex-direction: column;">
+            
+            <!-- Header Fissato -->
+            <div style="background: white; padding: 15px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10;">
+                <h2 style="margin: 0; color: var(--blue-dark); display: flex; align-items: center; gap: 10px;">
+                    <span class="btn-icon">📋</span> Elenco Programmati (MAG)
+                </h2>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button id="btnMagStampaRiepilogo" class="btn btn-primary btn-orange" style="margin: 0; padding: 10px 20px; font-weight: bold; box-shadow: 0 4px 6px rgba(249, 115, 22, 0.3);">
+                        🖨️ STAMPA RIEPILOGO MAGAZZINO
+                    </button>
+                    <button id="btnCloseMagList" class="btn btn-secondary" style="margin: 0; border: none; font-size: 1.5rem; background: none; color: #64748b; padding: 0 10px;">&times;</button>
+                </div>
+            </div>
+
+            <!-- Tabella/Griglia Contenuto -->
+            <div style="padding: 20px; flex: 1; overflow-y: auto;">
+                <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left; min-width: 1000px;">
+                            <thead>
+                                <tr style="background: var(--blue-dark); color: white;">
+                                    <th style="padding: 15px; font-weight: 600;">Data</th>
+                                    <th style="padding: 15px; font-weight: 600;">Paziente</th>
+                                    <th style="padding: 15px; font-weight: 600;">Località</th>
+                                    <th style="padding: 15px; font-weight: 600;">Indirizzo (Tel)</th>
+                                    <th style="padding: 15px; font-weight: 600;">Tipo</th>
+                                    <th style="padding: 15px; font-weight: 600;">Dispositivi / Note</th>
+                                    <th style="padding: 15px; font-weight: 600; text-align: center;">Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody id="magListTableBody">
+                                <!-- Righe iniettate da JS -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
