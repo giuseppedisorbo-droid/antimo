@@ -65,6 +65,7 @@ async function initAiAssistant() {
         console.error("AI Assistant Error:", err);
     }
 }
+initAiAssistant();
 
 // 2. Apri Modal e inizializza chat
 function openChatModal() {
@@ -581,8 +582,8 @@ if(btnAiDeleteAudio) {
 // Files Logic
 function handleGeneratorFiles(files) {
     for (let file of files) {
-        if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
-            alert("Formato non supportato: " + file.name + " (Solo Immagini o PDF)");
+        if (!file.type.startsWith('image/') && file.type !== 'application/pdf' && !file.type.startsWith('audio/')) {
+            alert("Formato non supportato: " + file.name + " (Solo Immagini, Audio o PDF)");
             continue;
         }
         const reader = new FileReader();
@@ -609,6 +610,8 @@ function renderGeneratorFilesPreview() {
             div.innerHTML = `<img src="data:${f.mimeType};base64,${f.data}" style="width:100%; height:100%; object-fit:cover;">`;
         } else if (f.mimeType === 'application/pdf') {
             div.innerHTML = `PDF<br>Doc`;
+        } else if (f.mimeType.startsWith('audio/')) {
+            div.innerHTML = `🎵<br>Audio`;
         }
         
         div.innerHTML += `<button onclick="window.removeAiGeneratorFile(${idx})" style="position:absolute; top: -5px; right: -5px; background: #ef4444; color: white; border: none; border-radius: 50%; font-size: 10px; width: 18px; height: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;">&times;</button>`;
