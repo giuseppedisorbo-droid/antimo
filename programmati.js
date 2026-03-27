@@ -851,6 +851,15 @@ if (btnProgStartIntervention) {
                 Object.keys(payloadToSave).forEach(k => payloadToSave[k] === undefined && delete payloadToSave[k]);
                 await addDoc(collection(db, "interventi"), payloadToSave);
 
+                // Nuova logica: Se eravamo in modifica di un programmato, ELIMINIAMOLO
+                if (window.currentEditFbId) {
+                    try {
+                        const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                        await deleteDoc(doc(db, "programmati", window.currentEditFbId));
+                        console.log("Programmato originario eliminato con successo post esecuzione.");
+                    } catch(e) { console.error("Errore rimozione programmato", e); }
+                }
+
                 // Nuova logica: se salvo un intervento per un paziente, chiudo in automatico i suoi vecchi N.ESEG.
                 try {
                     const qNeseg = query(
