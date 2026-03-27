@@ -2262,6 +2262,12 @@ function renderSpecialPlannedList(container, filteredData) {
                 <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Matricola:</strong> ${p.matricola || 'N/D'}</div>
                 <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${p.note || 'Nessuna'}</div>
                 ${attachHtml}
+                <div style="background: rgba(34,197,94,0.1); border: 1px solid #22c55e; border-radius: 6px; padding: 10px; margin-top: 10px; margin-bottom: 5px; display: flex; align-items: center; justify-content: space-between;">
+                    <label style="font-weight: bold; color: #15803d; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 8px; margin: 0;">
+                        <input type="checkbox" data-action="assegna-mag" data-index="${index}" style="width: 18px; height: 18px; cursor: pointer; accent-color: #16a34a;" ${p.assegnatoMagazzino ? 'checked' : ''}>
+                        📦 ASSEGNA MAG
+                    </label>
+                </div>
                 <div style="display:flex; gap:10px; margin-top: 15px;">
                     <button class="btn btn-primary btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="edit" data-index="${index}">✏ Modifica</button>
                     <button class="btn btn-danger btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="delete" data-index="${index}">🗑 Elimina</button>
@@ -2271,6 +2277,20 @@ function renderSpecialPlannedList(container, filteredData) {
         `;
         
         setupAccordionCard(div);
+        
+        const magCb1 = div.querySelector('input[data-action="assegna-mag"]');
+        if (magCb1) {
+            magCb1.addEventListener('change', async (e) => {
+                const idx = e.target.getAttribute('data-index');
+                const isChecked = e.target.checked;
+                const plannedItem = plannedInterventions[idx];
+                plannedItem.assegnatoMagazzino = isChecked;
+                try {
+                    const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                    await updateDoc(doc(db, "programmati", plannedItem.idFb || plannedItem.id), { assegnatoMagazzino: isChecked });
+                } catch(err) { e.target.checked = !isChecked; plannedItem.assegnatoMagazzino = !isChecked; }
+            });
+        }
         
         div.querySelector('button[data-action="edit"]')?.addEventListener('click', (e) => editProgrammatoAppJs(e.target.getAttribute('data-index')));
         div.querySelector('button[data-action="delete"]')?.addEventListener('click', (e) => deleteProgrammatoAppJs(e.target.getAttribute('data-index')));
@@ -2344,6 +2364,12 @@ function renderNpInterventions(visibiliCustom) {
                 <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Accessori:</strong> ${p.accessoriStr || 'Nessuno'}</div>
                 <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Matricola:</strong> ${p.matricola || 'N/D'}</div>
                 <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${noteStr}</div>
+                <div style="background: rgba(34,197,94,0.1); border: 1px solid #22c55e; border-radius: 6px; padding: 10px; margin-top: 10px; margin-bottom: 5px; display: flex; align-items: center; justify-content: space-between;">
+                    <label style="font-weight: bold; color: #15803d; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 8px; margin: 0;">
+                        <input type="checkbox" data-action="assegna-mag" data-index="${index}" style="width: 18px; height: 18px; cursor: pointer; accent-color: #16a34a;" ${p.assegnatoMagazzino ? 'checked' : ''}>
+                        📦 ASSEGNA MAG
+                    </label>
+                </div>
                 <div style="display:flex; gap:10px; margin-top: 15px;">
                     <button class="btn btn-primary btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="edit" data-index="${index}">✏ Modifica</button>
                     <button class="btn btn-danger btn-sm" style="flex:1; padding:8px; font-size:0.85rem; background:#b45309;" data-action="delete" data-index="${index}">🗑 Elimina</button>
@@ -2352,6 +2378,20 @@ function renderNpInterventions(visibiliCustom) {
         `;
         
         setupAccordionCard(div);
+        
+        const magCb2 = div.querySelector('input[data-action="assegna-mag"]');
+        if (magCb2) {
+            magCb2.addEventListener('change', async (e) => {
+                const idx = e.target.getAttribute('data-index');
+                const isChecked = e.target.checked;
+                const plannedItem = plannedInterventions[idx];
+                plannedItem.assegnatoMagazzino = isChecked;
+                try {
+                    const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                    await updateDoc(doc(db, "programmati", plannedItem.idFb || plannedItem.id), { assegnatoMagazzino: isChecked });
+                } catch(err) { e.target.checked = !isChecked; plannedItem.assegnatoMagazzino = !isChecked; }
+            });
+        }
         
         div.querySelector('button[data-action="edit"]')?.addEventListener('click', (e) => editProgrammatoAppJs(e.target.getAttribute('data-index')));
         div.querySelector('button[data-action="delete"]')?.addEventListener('click', (e) => deleteProgrammatoAppJs(e.target.getAttribute('data-index')));
@@ -3361,10 +3401,30 @@ function renderActivitiesList() {
                     <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:5px;"><strong>Note:</strong> ${inv.note || 'Nessuna'}</div>
                     <div style="font-size:0.85rem; color:#0f172a; margin-top:5px; padding-bottom:10px;"><strong>⏳ Prog. da:</strong> ${inv.programmatoDa || 'N/D'}</div>
                     ${attachHtml}
+                    <div style="background: rgba(34,197,94,0.1); border: 1px solid #22c55e; border-radius: 6px; padding: 10px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
+                        <label style="font-weight: bold; color: #15803d; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 8px; margin: 0;">
+                            <input type="checkbox" data-action="assegna-mag" data-index="${origIndex}" style="width: 18px; height: 18px; cursor: pointer; accent-color: #16a34a;" ${inv.assegnatoMagazzino ? 'checked' : ''}>
+                            📦 ASSEGNA MAG
+                        </label>
+                    </div>
                 </div>
             `;
             
             setupAccordionCard(div);
+            
+            const magCb3 = div.querySelector('input[data-action="assegna-mag"]');
+            if (magCb3) {
+                magCb3.addEventListener('change', async (e) => {
+                    const idx = e.target.getAttribute('data-index');
+                    const isChecked = e.target.checked;
+                    const plannedItem = plannedInterventions[idx];
+                    plannedItem.assegnatoMagazzino = isChecked;
+                    try {
+                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                        await updateDoc(doc(db, "programmati", plannedItem.idFb || plannedItem.id), { assegnatoMagazzino: isChecked });
+                    } catch(err) { e.target.checked = !isChecked; plannedItem.assegnatoMagazzino = !isChecked; }
+                });
+            }
             
             div.querySelector('button[data-action="avvia"]').addEventListener('click', () => {
                 editProgrammatoAppJs(origIndex);
@@ -4572,4 +4632,249 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ==========================================
+/* =========================================
+   LOGICA GESTIONE PREPARAZIONE MAGAZZINO E PDF
+   ========================================= */
+const btnMostraMagazzino = document.getElementById('btnMostraMagazzino');
+const magFilterModal = document.getElementById('magFilterModal');
+const btnCloseMagFilter = document.getElementById('btnCloseMagFilter');
+const btnMagProssimi = document.getElementById('btnMagProssimi');
+const btnMagCercaDate = document.getElementById('btnMagCercaDate');
+const magFilterDataDa = document.getElementById('magFilterDataDa');
+const magFilterDataA = document.getElementById('magFilterDataA');
 
+const magListModal = document.getElementById('magListModal');
+const btnCloseMagList = document.getElementById('btnCloseMagList');
+const magListTableBody = document.getElementById('magListTableBody');
+const btnMagStampaRiepilogo = document.getElementById('btnMagStampaRiepilogo');
+
+if (btnMostraMagazzino) {
+    btnMostraMagazzino.addEventListener('click', () => {
+        if(magFilterModal) magFilterModal.classList.remove('hidden');
+    });
+}
+if (btnCloseMagFilter) {
+    btnCloseMagFilter.addEventListener('click', () => {
+        magFilterModal.classList.add('hidden');
+    });
+}
+if (btnCloseMagList) {
+    btnCloseMagList.addEventListener('click', () => {
+        magListModal.classList.add('hidden');
+    });
+}
+
+if (btnMagProssimi) {
+    btnMagProssimi.addEventListener('click', () => {
+        // Mostra programmati futuri e odierni con assegnatoMagazzino == true
+        const filtered = plannedInterventions.filter(p => p.assegnatoMagazzino === true && p.status !== 'completed' && p.status !== 'justified_not_executed');
+        renderMagazzinoList(filtered);
+        magFilterModal.classList.add('hidden');
+        magListModal.classList.remove('hidden');
+    });
+}
+
+if (btnMagCercaDate) {
+    btnMagCercaDate.addEventListener('click', () => {
+        const da = magFilterDataDa.value;
+        const a = magFilterDataA.value;
+        if (!da || !a) return alert("Seleziona entrambe le date (Da e A).");
+
+        const dateDa = new Date(da);
+        dateDa.setHours(0,0,0,0);
+        const dateA = new Date(a);
+        dateA.setHours(23,59,59,999);
+        
+        const filtered = plannedInterventions.filter(p => {
+            if (p.assegnatoMagazzino !== true || p.status === 'completed' || p.status === 'justified_not_executed') return false;
+            if (!p.dataPrevista) return false;
+            const pDate = new Date(p.dataPrevista);
+            return pDate >= dateDa && pDate <= dateA;
+        });
+
+        renderMagazzinoList(filtered);
+        magFilterModal.classList.add('hidden');
+        magListModal.classList.remove('hidden');
+    });
+}
+
+let currentMagList = []; // Array salvato per export
+
+window.renderMagazzinoList = function(dataArray) {
+    currentMagList = dataArray;
+    
+    // Sort per data
+    dataArray.sort((a,b) => {
+        const da = a.dataPrevista ? new Date(a.dataPrevista).getTime() : 9999999999999;
+        const db = b.dataPrevista ? new Date(b.dataPrevista).getTime() : 9999999999999;
+        return da - db;
+    });
+
+    if(!magListTableBody) return;
+    magListTableBody.innerHTML = '';
+    
+    if (dataArray.length === 0) {
+        magListTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px; color: #666;">Nessuna attività programmata in magazzino per i filtri selezionati.</td></tr>';
+        return;
+    }
+
+    dataArray.forEach(p => {
+        // Cerchiamo l'indice reale nell'array globale per Modifica/Elimina
+        const index = plannedInterventions.findIndex(orig => orig.id === p.id);
+        
+        let dateStr = p.dataPrevista ? p.dataPrevista.split('-').reverse().join('/') : 'NP';
+        
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = "1px solid #e2e8f0";
+        tr.innerHTML = `
+            <td style="padding: 15px; font-weight: bold; color: var(--blue-dark);">${dateStr}</td>
+            <td style="padding: 15px;">
+                <div style="font-weight: bold; font-size: 1.05rem;">${p.paziente || 'Sconosciuto'}</div>
+                <div style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">
+                    Prog. da: <strong>${p.programmatoDa || 'N/D'}</strong><br>
+                    Tecnico: <strong>${p.tecnicoAssegnato || 'Da Assegnare'}</strong>
+                </div>
+            </td>
+            <td style="padding: 15px;">${p.localita || ''}</td>
+            <td style="padding: 15px;">
+                <div>${p.indirizzo || ''}</div>
+                <div style="font-size: 0.85rem; color: #64748b;">${p.telefono || ''}</div>
+            </td>
+            <td style="padding: 15px;">
+                <span style="background: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; border: 1px solid #cbd5e1;">${window.decodeCodeToLabel ? window.decodeCodeToLabel(p.tipo, 'interventi') : p.tipo || 'N/D'}</span>
+            </td>
+            <td style="padding: 15px; font-size: 0.9rem;">
+                <strong>Disp:</strong> ${window.decodeCodeToLabel ? window.decodeCodeToLabel(p.dispositivi, 'dispositivi') : p.dispositivi || 'Nessuno'}<br>
+                <strong>Matricola:</strong> ${p.matricola || 'N/D'}<br>
+                <strong>Accessori:</strong> ${p.accessoriStr || 'Nessuno'}<br>
+                <strong>Note:</strong> ${p.note || 'Nessuna nota'}
+            </td>
+            <td style="padding: 15px; text-align: center;">
+                <div style="display: flex; flex-direction: column; gap: 5px; align-items: center;">
+                    <button class="btn btn-sm" style="margin: 0; background: #f1f5f9; color: #333; font-weight: 600; width: 100%; border: 1px solid #ccc; padding: 6px;" onclick="window.editProgrammatoAppJs(${index})">Modifica</button>
+                    <button class="btn btn-danger btn-sm" style="margin: 0; background: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; font-weight: 600; width: 100%; padding: 6px;" onclick="window.deleteProgrammatoAppJs(${index})">Elimina</button>
+                    <button class="btn btn-primary btn-sm" style="margin: 0; background: #6366f1; border: none; color: white; font-weight: bold; width: 100%; padding: 6px; box-shadow: 0 2px 4px rgba(99,102,241,0.2);" onclick="window.stampaBollaMagazzinoSingola('${p.idFb || p.id}')">
+                        🖨️ Bolla Mag.
+                    </button>
+                </div>
+            </td>
+        `;
+        magListTableBody.appendChild(tr);
+    });
+};
+
+window.stampaBollaMagazzinoSingola = function(idFb) {
+    const item = currentMagList.find(p => p.idFb === idFb || p.id === idFb);
+    if(!item) return alert("Errore: Elemento non trovato in memoria.");
+    
+    const htmlContent = `
+        <html><head><title>Bolla Magazzino - ${item.paziente}</title>
+        <style>
+            body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 40px; color: #333; line-height: 1.5; }
+            h1 { color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; font-size: 24px; }
+            .box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 20px; margin-bottom: 20px; background: #f8fafc; }
+            .box h3 { margin-top: 0; color: #0f172a; font-size: 18px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 8px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+            th, td { text-align: left; padding: 12px; border-bottom: 1px solid #e2e8f0; }
+            th { font-weight: bold; color: #475569; width: 30%; }
+            .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #94a3b8; }
+        </style>
+        </head><body>
+            <h1>📦 BOLLA DI PREPARAZIONE MAGAZZINO</h1>
+            <div class="box">
+                <h3>Dati Destinazione (Paziente)</h3>
+                <table>
+                    <tr><th>Paziente / Ente</th><td><strong>${item.paziente || ''}</strong></td></tr>
+                    <tr><th>Data Prevista</th><td>${item.dataPrevista ? item.dataPrevista.split('-').reverse().join('/') : 'N/D'}</td></tr>
+                    <tr><th>Località</th><td>${item.localita || ''}</td></tr>
+                    <tr><th>Indirizzo</th><td>${item.indirizzo || ''}</td></tr>
+                    <tr><th>Telefono</th><td>${item.telefono || 'N/D'}</td></tr>
+                    <tr><th>Tecnico Assegnato</th><td>${item.tecnicoAssegnato || 'Da Assegnare'}</td></tr>
+                </table>
+            </div>
+            <div class="box">
+                <h3>Dettagli Materiale e Dispositivi</h3>
+                <table>
+                    <tr><th>Tipo Intervento</th><td>${window.decodeCodeToLabel ? window.decodeCodeToLabel(item.tipo, 'interventi') : item.tipo || 'N/D'}</td></tr>
+                    <tr><th>Dispositivo Base</th><td><strong>${window.decodeCodeToLabel ? window.decodeCodeToLabel(item.dispositivi, 'dispositivi') : item.dispositivi || 'Nessuno'}</strong></td></tr>
+                    <tr><th>Matricola Richiesta</th><td>${item.matricola || 'N/D'}</td></tr>
+                    <tr><th>Accessori Previsti</th><td><strong>${item.accessoriStr || 'Nessuno'}</strong></td></tr>
+                    <tr><th>Note Logistiche / Varie</th><td>${item.note || 'Nessuna'}</td></tr>
+                </table>
+            </div>
+            <div style="margin-top: 40px; display: flex; justify-content: space-between;">
+                <div style="width: 45%; border-top: 1px solid #333; padding-top: 10px; text-align: center;">Firma Preparatore Magazzino</div>
+                <div style="width: 45%; border-top: 1px solid #333; padding-top: 10px; text-align: center;">Firma Tecnico Ritirante</div>
+            </div>
+            <div class="footer">Generato automaticamente da Antimo Gestione Attività - ${new Date().toLocaleString()}</div>
+        </body></html>
+    `;
+    const printWindow = window.open('', '_blank');
+    if(printWindow) {
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        printWindow.onload = () => { setTimeout(() => printWindow.print(), 500); };
+    } else {
+        alert("Per favore abilita i pop-up per poter stampare il documento.");
+    }
+};
+
+if(btnMagStampaRiepilogo) {
+    btnMagStampaRiepilogo.addEventListener('click', () => {
+        if (currentMagList.length === 0) return alert("Nessun dato da stampare.");
+        
+        let trs = '';
+        currentMagList.forEach(item => {
+            const dateStr = item.dataPrevista ? item.dataPrevista.split('-').reverse().join('/') : 'N/D';
+            trs += `
+                <tr>
+                    <td><strong>${dateStr}</strong><br><span style="font-size:12px; color:#666;">${item.tecnicoAssegnato||'Da Assegnare'}</span></td>
+                    <td><strong>${item.paziente||''}</strong><br><span style="font-size:12px;">${item.localita||''} - ${item.indirizzo||''}</span></td>
+                    <td>${window.decodeCodeToLabel ? window.decodeCodeToLabel(item.tipo, 'interventi') : item.tipo || 'N/D'}</td>
+                    <td><strong>${window.decodeCodeToLabel ? window.decodeCodeToLabel(item.dispositivi, 'dispositivi') : item.dispositivi || 'Nessuno'}</strong><br><em style="font-size:12px;">Mat: ${item.matricola||'N/D'}</em></td>
+                    <td>${item.accessoriStr || 'Nessuno'}<br><span style="font-size:12px; color:#555;">Note: ${item.note||'-'}</span></td>
+                </tr>
+            `;
+        });
+
+        const htmlContent = `
+            <html><head><title>Riepilogo Magazzino</title>
+            <style>
+                body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 20px; color: #333; font-size: 14px; }
+                h1 { color: #d97706; border-bottom: 2px solid #d97706; padding-bottom: 10px; font-size: 24px; text-transform: uppercase; margin-bottom: 5px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { text-align: left; padding: 10px; border-bottom: 1px solid #cbd5e1; vertical-align: top; }
+                th { background: #f1f5f9; font-weight: bold; color: #334155; }
+                tr:nth-child(even) { background-color: #f8fafc; }
+                .footer { margin-top: 30px; text-align: center; font-size: 11px; color: #94a3b8; }
+            </style>
+            </head><body>
+                <h1>🖨️ RIEPILOGO PREPARAZIONE MAGAZZINO</h1>
+                <p style="margin:0; color:#475569;">Elenco delle attività programmate in attesa di preparazione magazzino. Totale elementi: <strong>${currentMagList.length}</strong>.</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 12%;">Data / Tec</th>
+                            <th style="width: 25%;">Paziente / Luogo</th>
+                            <th style="width: 15%;">Tipo Int.</th>
+                            <th style="width: 20%;">Dispositivo</th>
+                            <th style="width: 28%;">Accessori & Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${trs}
+                    </tbody>
+                </table>
+                <div class="footer">Documento Riepilogativo Generato il ${new Date().toLocaleString()}</div>
+            </body></html>
+        `;
+        const printWindow = window.open('', '_blank');
+        if(printWindow) {
+            printWindow.document.write(htmlContent);
+            printWindow.document.close();
+            printWindow.onload = () => { setTimeout(() => printWindow.print(), 500); };
+        } else {
+            alert("Per favore abilita i pop-up per poter stampare il documento.");
+        }
+    });
+}
