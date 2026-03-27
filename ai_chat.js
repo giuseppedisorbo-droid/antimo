@@ -496,6 +496,9 @@ let attachedFilesBase64 = [];
 async function toggleRecording() {
     if (!isRecording) {
         try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error("I moderni browser bloccano l'accesso al Microfono se apri la pagina come file locale sul PC (ossia con indirizzo che inizia per file:///...). Per usare questa funzione, Antimo deve essere prima pubblicato online (su Netlify o Firebase) o aperto con un simulatore server locale.");
+            }
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             mediaRecorder = new MediaRecorder(stream);
             audioChunks = [];
