@@ -203,13 +203,13 @@ async function callGemini(promptText, fileObj = null) {
             body: JSON.stringify(dataPayload)
         };
 
-        let response = await fetch(`https://generativelanguage.googleapis.com/v61beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, fetchOptions);
+        let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`, fetchOptions);
         let data = await response.json();
 
         if (data.error && data.error.message && data.error.message.includes("is not found")) {
             console.warn("Static model not found. Attempting dynamic discovery via ListModels...");
             try {
-                const listResp = await fetch(`https://generativelanguage.googleapis.com/v61beta/models?key=${geminiApiKey}`);
+                const listResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiApiKey}`);
                 const listData = await listResp.json();
                 
                 if (listData.models && listData.models.length > 0) {
@@ -219,7 +219,7 @@ async function callGemini(promptText, fileObj = null) {
                     if (bestModel) {
                         const actualModelName = bestModel.name.replace('models/', '');
                         console.log("Dynamically resolved to model:", actualModelName);
-                        response = await fetch(`https://generativelanguage.googleapis.com/v61beta/models/${actualModelName}:generateContent?key=${geminiApiKey}`, fetchOptions);
+                        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${actualModelName}:generateContent?key=${geminiApiKey}`, fetchOptions);
                         data = await response.json();
                     } else {
                         throw new Error("Nessun modello compatibile con 'generateContent' trovato per questa API Key.");
@@ -693,7 +693,7 @@ I campi richiesti sono:
 
             const dataPayload = { contents: [{ role: "user", parts: contentsList }] };
 
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(dataPayload)
