@@ -791,16 +791,25 @@ function renderDraftsList() {
                 <div><label style="font-size:0.8rem; font-weight:bold;">Data (YYYY-MM-DD)</label><input type="text" id="draft_data_${draft.idFb}" value="${draft.dataPrevista || ''}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; background:#fef08a;"></div>
                 <div style="grid-column: span 2;"><label style="font-size:0.8rem; font-weight:bold;">Dispositivi</label><input type="text" id="draft_disp_${draft.idFb}" value="${draft.dispositivi || ''}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;"></div>
                 <div style="grid-column: span 2;"><label style="font-size:0.8rem; font-weight:bold;">Accessori/Matricola</label><input type="text" id="draft_acc_${draft.idFb}" value="${draft.accessoriStr || ''} MATRICOLA: ${draft.matricola || 'N/D'}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;"></div>
-                <div style="grid-column: span 2;"><label style="font-size:0.8rem; font-weight:bold;">Note</label><textarea id="draft_note_${draft.idFb}" rows="2" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">${draft.note || ''}</textarea></div>
+                <div style="grid-column: span 2;"><label style="font-size:0.8rem; font-weight:bold;">Note</label><textarea id="draft_note_${draft.idFb}" rows="3" oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; resize:vertical; overflow:hidden;">${draft.note || ''}</textarea></div>
             </div>
 
             <div style="display: flex; gap: 10px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
-                <button onclick="window.approvaDraftAi('${draft.idFb}')" class="btn btn-primary" style="flex:1; background: #22c55e; border:none; margin:0; font-weight:bold;">✔️ APPROVA E SALVA IN PROGRAMMATI</button>
-                <button onclick="window.eliminaDraftAi('${draft.idFb}')" class="btn btn-danger" style="background: #ef4444; border:none; margin:0; font-weight:bold;">🗑 Elimina Boz</button>
+                <button onclick="window.approvaDraftAi('${draft.idFb}')" style="flex:1; background: #22c55e; color: white; padding: 12px; border:none; border-radius: 8px; margin:0; font-weight:bold; cursor: pointer;">✔️ APPROVA IN PROGRAMMATI</button>
+                <button onclick="window.eliminaDraftAi('${draft.idFb}')" style="flex:1; background: #ef4444; color: white; padding: 12px; border:none; border-radius: 8px; margin:0; font-weight:bold; cursor: pointer;">🗑 ELIMINA BOZZA</button>
             </div>
         `;
         aiDraftsCardsContainer.appendChild(div);
     });
+    
+    // Auto-ridimensiona tutte le textareas appena renderizzate
+    setTimeout(() => {
+        const textareas = aiDraftsCardsContainer.querySelectorAll('textarea');
+        textareas.forEach(ta => {
+            ta.style.height = 'auto';
+            ta.style.height = ta.scrollHeight + 'px';
+        });
+    }, 10);
 }
 
 window.approvaDraftAi = async function(idFb) {
