@@ -78,7 +78,7 @@
                     <div style="font-size: 1rem; font-weight: 700;"><strong id="interventiCount">0</strong></div>
                 </div>
                 <!-- Pulsante AI AUDIO (Generatore Bozze) -->
-                <div id="btnOpenAiGenerator" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset; background-color: #6366f1; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+                <div id="btnOpenAiGenerator" onclick="document.getElementById('aiGeneratorModal').classList.remove('hidden')" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset; background-color: #6366f1; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
                     <div style="font-size: 0.65rem; text-transform: uppercase; color: #ffffff; font-weight: 900;">AUDIO</div>
                     <div style="font-size: 1rem; font-weight: 700; color: #ffffff;">🎙️</div>
                 </div>
@@ -124,7 +124,7 @@
 
         <!-- BOZZE AI - DA APPROVARE -->
         <div id="aiDraftsContainer" style="margin-bottom: 20px;">
-            <button id="btnOpenAiDrafts" class="btn btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; background: linear-gradient(135deg, #a855f7, #6366f1); border: none; font-size: 1rem; padding: 12px; font-weight: 800; box-shadow: 0 4px 10px rgba(99,102,241,0.3); border-radius: 12px;">
+            <button id="btnOpenAiDrafts" onclick="document.getElementById('aiDraftsModal').classList.remove('hidden')" class="btn btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; background: linear-gradient(135deg, #a855f7, #6366f1); border: none; font-size: 1rem; padding: 12px; font-weight: 800; box-shadow: 0 4px 10px rgba(99,102,241,0.3); border-radius: 12px;">
                 <span style="font-size: 1.2rem;">✨</span> ARCHIVIO PROPOSTE AI (<strong id="aiDraftsCount" style="color:#ffeb3b;">0</strong>)
             </button>
         </div>
@@ -814,7 +814,7 @@
         <!-- MODAL AI GENERATOR -->
         <div id="aiGeneratorModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 5000; overflow-y: auto; padding: 15px; display: flex; align-items: flex-start; justify-content: center; backdrop-filter: blur(5px);">
             <div style="background: white; padding: 25px; border-radius: 16px; width: 100%; max-width: 500px; box-shadow: 0 15px 35px rgba(0,0,0,0.3); margin-top: 30px; position: relative;">
-                <button id="btnCloseAiGenerator" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 1.8rem; color: #64748b; cursor: pointer;">&times;</button>
+                <button id="btnCloseAiGenerator" onclick="document.getElementById('aiGeneratorModal').classList.add('hidden')" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 1.8rem; color: #64748b; cursor: pointer;">&times;</button>
                 <h2 style="color: #4f46e5; margin-top: 0; margin-bottom: 5px; display: flex; align-items: center; gap: 10px;">
                     <span>🎙️</span> Generatore AI 
                 </h2>
@@ -873,7 +873,7 @@
                 <h2 style="margin: 0; color: #4f46e5; display: flex; align-items: center; gap: 10px; font-size:1.3rem;">
                     <span class="btn-icon">✨</span> Archivio Bozze AI
                 </h2>
-                <button id="btnCloseAiDrafts" class="btn btn-secondary" style="margin: 0; border: none; font-size: 1.5rem; background: none; color: #64748b; padding: 0 10px;">&times;</button>
+                <button id="btnCloseAiDrafts" onclick="document.getElementById('aiDraftsModal').classList.add('hidden')" class="btn btn-secondary" style="margin: 0; border: none; font-size: 1.5rem; background: none; color: #64748b; padding: 0 10px;">&times;</button>
             </div>
             
             <div style="padding: 20px; flex: 1; overflow-y: auto; max-width: 800px; margin: 0 auto; width: 100%;">
