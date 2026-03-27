@@ -4813,7 +4813,8 @@ window.stampaBollaMagazzinoSingola = function(idFb) {
     if(printWindow) {
         printWindow.document.write(htmlContent);
         printWindow.document.close();
-        printWindow.onload = () => { setTimeout(() => printWindow.print(), 500); };
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 500);
     } else {
         alert("Per favore abilita i pop-up per poter stampare il documento.");
     }
@@ -4872,7 +4873,8 @@ if(btnMagStampaRiepilogo) {
         if(printWindow) {
             printWindow.document.write(htmlContent);
             printWindow.document.close();
-            printWindow.onload = () => { setTimeout(() => printWindow.print(), 500); };
+            printWindow.focus();
+            setTimeout(() => printWindow.print(), 500);
         } else {
             alert("Per favore abilita i pop-up per poter stampare il documento.");
         }
