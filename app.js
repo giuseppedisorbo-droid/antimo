@@ -2302,20 +2302,9 @@ function renderSpecialPlannedList(container, filteredData) {
             plannedInterventions.splice(idx, 1);
             saveState();
             
-            // Eliminiamo anche dal cloud (se si avvia, sparisce da programmati e diventerà intervento vero)
-            if (isFirebaseConfigured && dataToLoad.id) {
-                import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js").then(async ({ doc, deleteDoc }) => {
-                    try {
-                        // Supponendo che il doc id coincida oppure possiamo fare query, 
-                        // Ma per sicurezza lo lasciamo pendente, 
-                        // Oppure facciamo delete tramite query!
-                        const { collection, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        const q = query(collection(db, "programmati"), where("id", "==", dataToLoad.id));
-                        const snaps = await getDocs(q);
-                        snaps.forEach(async d => await deleteDoc(doc(db, "programmati", d.id)));
-                    } catch(err) { console.error("Errore rimozione cloud programmato", err); }
-                });
-            }
+            // Trapping the origin ID so we can formally close it in DB upon Save only (prevents data loss if aborted)
+            activeProgFbId = dataToLoad.idFb || dataToLoad.id || null;
+            activeProgItem = dataToLoad;
 
             updateUI();
             interventionSection.classList.remove('hidden');
@@ -2425,17 +2414,9 @@ function renderNpInterventions(visibiliCustom) {
             plannedInterventions.splice(idx, 1);
             saveState();
             
-            // Eliminiamo anche dal cloud (se si avvia, sparisce da programmati e diventerà intervento vero)
-            if (isFirebaseConfigured && dataToLoad.id) {
-                import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js").then(async ({ doc, deleteDoc }) => {
-                    try {
-                        const { collection, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        const q = query(collection(db, "programmati"), where("id", "==", dataToLoad.id));
-                        const snaps = await getDocs(q);
-                        snaps.forEach(async d => await deleteDoc(doc(db, "programmati", d.id)));
-                    } catch(err) { console.error("Errore rimozione cloud np", err); }
-                });
-            }
+            // Trapping the origin ID so we can formally close it in DB upon Save only (prevents data loss if aborted)
+            activeProgFbId = dataToLoad.idFb || dataToLoad.id || null;
+            activeProgItem = dataToLoad;
 
             updateUI();
             updateInterventiCount();
