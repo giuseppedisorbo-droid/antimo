@@ -2299,8 +2299,8 @@ function renderSpecialPlannedList(container, filteredData) {
             iNote.value = dataToLoad.note || "";
             pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
 
-            plannedInterventions.splice(idx, 1);
-            saveState();
+            // plannedInterventions.splice(idx, 1);
+            // saveState();
             
             // Trapping the origin ID so we can formally close it in DB upon Save only (prevents data loss if aborted)
             activeProgFbId = dataToLoad.idFb || dataToLoad.id || null;
@@ -2411,8 +2411,8 @@ function renderNpInterventions(visibiliCustom) {
             iNote.value = dataToLoad.note || "";
             pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
 
-            plannedInterventions.splice(idx, 1);
-            saveState();
+            // plannedInterventions.splice(idx, 1);
+            // saveState();
             
             // Trapping the origin ID so we can formally close it in DB upon Save only (prevents data loss if aborted)
             activeProgFbId = dataToLoad.idFb || dataToLoad.id || null;
@@ -3099,6 +3099,9 @@ newInterventionForm.addEventListener('submit', async (e) => {
             await addDoc(collection(db, "interventi"), payloadToSave);
             
             if (activeProgFbId) {
+                // Nuova aggiunta: rimuoviamo dall'array locale solo ora che il salvataggio è andato a buon fine
+                plannedInterventions = plannedInterventions.filter(p => (p.idFb || p.id) !== activeProgFbId);
+                
                 try {
                     const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
                     await deleteDoc(doc(db, "programmati", activeProgFbId));
@@ -3453,8 +3456,9 @@ function renderActivitiesList() {
             if(iNote) iNote.value = dataToLoad.note || "";
             pendingFileUrlsProgrammati = dataToLoad.fileUrlsProgrammati || [];
 
-                plannedInterventions.splice(origIndex, 1);
-                saveState();
+                // NO MORE IMMEDIATE SPLICING HERE
+                // plannedInterventions.splice(origIndex, 1);
+                // saveState();
                 updateUI();
                 activitiesListContainer.classList.add('hidden');
                 btnViewActivities.innerHTML = `<span class="btn-icon">📅</span> INTERVENTI DELLA GIORNATA`;
