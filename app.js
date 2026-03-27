@@ -2079,6 +2079,15 @@ async function updateInterventiCount() {
     soloPlanned = soloPlanned.filter(p => window.passesIncarichiFilter(p, window.selectedIncarichi));
 
     let cOggi = 0, cDomani = 0, cNeseg = 0;
+    let cMagDaPreparare = 0;
+
+    // Il badge magazzino deve riflettere globalmente tutte le attività da preparare
+    plannedInterventions.forEach(p => {
+        if (p.assegnatoMagazzino === true && p.status !== 'completed' && p.status !== 'justified_not_executed' && p.materialePronto !== true) {
+            cMagDaPreparare++;
+        }
+    });
+
     soloPlanned.forEach(p => {
         if(p.dataPrevista === todayStr) cOggi++;
         else if(p.dataPrevista === tomorrowStr) cDomani++;
@@ -2100,6 +2109,17 @@ async function updateInterventiCount() {
     if (domaniCount) domaniCount.textContent = cDomani;
     if (npCount) npCount.textContent = soloNP.length;
     if (nesegCount) nesegCount.textContent = cNeseg;
+    
+    // Aggiornamento Badge Magazzino
+    const badgeMagazzino = document.getElementById('badgeMagazzino');
+    if (badgeMagazzino) {
+        if (cMagDaPreparare > 0) {
+            badgeMagazzino.textContent = cMagDaPreparare;
+            badgeMagazzino.classList.remove('hidden');
+        } else {
+            badgeMagazzino.classList.add('hidden');
+        }
+    }
     
     // Calculate start and end of today
     const startOfToday = new Date();
@@ -4756,11 +4776,33 @@ window.renderMagazzinoList = function(dataArray) {
                     <button class="btn btn-primary btn-sm" style="margin: 0; background: #6366f1; border: none; color: white; font-weight: bold; width: 100%; padding: 6px; box-shadow: 0 2px 4px rgba(99,102,241,0.2);" onclick="window.stampaBollaMagazzinoSingola('${p.idFb || p.id}')">
                         🖨️ Bolla Mag.
                     </button>
+                    ${p.materialePronto 
+                        ? `<button class="btn btn-sm" style="margin: 0; margin-top: 5px; background: #dcfce7; color: #16a34a; border: 1px solid #86efac; font-weight: bold; width: 100%; padding: 6px; cursor: default;">✅ Materiale Preparato</button>
+                           <div style="text-align:center; margin-top:2px;"><a href="#" onclick="window.toggleMaterialePronto('${p.idFb || p.id}', false); return false" style="font-size:0.7rem; color:#94a3b8; text-decoration:underline;">Annulla</a></div>`
+                        : `<button class="btn btn-sm" style="margin: 0; margin-top: 5px; background: #22c55e; color: white; border: none; font-weight: bold; width: 100%; padding: 6px; box-shadow: 0 2px 4px rgba(34,197,94,0.3);" onclick="window.toggleMaterialePronto('${p.idFb || p.id}', true)">📦 Certifica Preparato</button>`
+                    }
                 </div>
             </td>
         `;
         magListTableBody.appendChild(tr);
     });
+};
+
+window.toggleMaterialePronto = async function(idFb, state) {
+    if(!idFb) return alert("Errore ID mancante per questo record.");
+    try {
+        // dynamic import just to be 100% sure we have access despite scoping
+        const { updateDoc, doc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        const dRef = doc(db, "programmati", idFb);
+        await updateDoc(dRef, { materialePronto: state });
+        
+        // Non occorre ricaricare: Firestore onSnapshot triggererà update counters e re-render
+        if (state) {
+            // Optional mini popup feedback
+        }
+    } catch(err) {
+        alert("Errore aggiornamento magazzino: " + err.message);
+    }
 };
 
 window.stampaBollaMagazzinoSingola = function(idFb) {
