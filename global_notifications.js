@@ -1,4 +1,4 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, collection, query, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -13,9 +13,10 @@ const firebaseConfig = {
 
 let app, db;
 try {
-    app = initializeApp(firebaseConfig);
+    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
     db = getFirestore(app);
-} catch(e) { console.error("Firebase init failed for global notifications"); }
+    console.log("Firebase Inizializzato (Shared) in Global Notifications.");
+} catch(e) { console.error("Firebase init failed for global notifications", e); }
 
 if(db) {
     const q = query(collection(db, "messaggi"));
