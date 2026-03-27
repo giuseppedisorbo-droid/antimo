@@ -4684,6 +4684,95 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ==========================================
+// FUNZIONE GLOBALE GENERAZIONE PDF NATIVO (BYPASS POPUP BLOCKER / PWA)
+// ==========================================
+window.downloadPdfFromHtml = async function(htmlContent, filename) {
+    if (!window.html2pdf) {
+        try {
+            await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        } catch(e) {
+            console.error("Errore caricamento html2pdf", e);
+            alert("Errore connessione: Impossibile caricare il generatore PDF.");
+            return;
+        }
+    }
+    
+    const container = document.createElement('div');
+    container.innerHTML = htmlContent;
+    container.style.padding = '20px';
+    container.style.width = '800px'; 
+    container.style.background = '#fff';
+    container.style.color = '#333';
+    
+    // Nasconde bottoni stampa inutili nel PDF finale
+    const btns = container.querySelectorAll('.print-btn');
+    btns.forEach(b => b.style.display = 'none');
+    
+    document.body.appendChild(container);
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    
+    // Mostra Toast di caricamento
+    const toastInfo = document.createElement('div');
+    toastInfo.innerText = "⏳ Generazione PDF in corso, attendere...";
+    toastInfo.style.cssText = "position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#3b82f6; color:white; padding:10px 20px; border-radius:8px; z-index:999999; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);";
+    document.body.appendChild(toastInfo);
+    
+    try {
+        const opt = {
+            margin:       10,
+            filename:     filename + '.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        
+        // Genera Blob
+        const pdfBlob = await html2pdf().set(opt).from(container).output('blob');
+        
+        // Condivisione Web Mobile (iOS PWA Safe)
+        if (navigator.share && navigator.canShare) {
+            const file = new File([pdfBlob], filename + '.pdf', { type: 'application/pdf' });
+            if (navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: filename,
+                        text: 'Ecco il documento PDF del Magazzino.'
+                    });
+                    return; // Condivisione riuscita / menu aperto
+                } catch (shareErr) {
+                    console.log("Condivisione Web annullata o fallita, passo al download diretto:", shareErr);
+                }
+            }
+        }
+        
+        // Download Diretto (PC o Fallback)
+        const url = URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename + '.pdf';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        
+    } catch(e) {
+        console.error("PDF generation err", e);
+        alert("Errore salvataggio PDF nativo.");
+    } finally {
+        if(document.body.contains(container)) document.body.removeChild(container);
+        if(document.body.contains(toastInfo)) document.body.removeChild(toastInfo);
+    }
+};
+
+// ==========================================
 // STAMPA MODULO MAGAZZINO / PDF (SEQEX & GLOBAL)
 // ==========================================
 window.stampaModuloMagazzinoPDF = async function(id, collectionName = 'programmati') {
@@ -4804,17 +4893,11 @@ window.stampaModuloMagazzinoPDF = async function(id, collectionName = 'programma
             </body></html>
         `;
 
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) {
-            alert("Il browser ha bloccato il popup di stampa. Consenti i popup per questo sito.");
-            return;
+        if (window.downloadPdfFromHtml) {
+            await window.downloadPdfFromHtml(htmlStr, "Preparazione_" + (task.paziente || 'Documento').replace(/ /g, '_'));
+        } else {
+            console.error("Funzione generazione PDF mancante");
         }
-        printWindow.document.write(htmlStr);
-        printWindow.document.close();
-        
-        setTimeout(() => {
-            printWindow.document.title = "Preparazione_" + (task.paziente || 'Doc').replace(/ /g, '_');
-        }, 100);
 
     } catch (e) {
         console.error("Print Error", e);
@@ -4925,15 +5008,13 @@ window.stampaListoneMagazzinoPDF = async function() {
 
         htmlStr += `</tbody></table></body></html>`;
 
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) {
-            alert("Il browser ha bloccato il popup di stampa. Consenti i popup per questo sito.");
-            if(clBtn) clBtn.innerHTML = "🖨️ Stampa Riepilogo Interventi";
-            return;
+        if (window.downloadPdfFromHtml) {
+            await window.downloadPdfFromHtml(htmlStr, "Elenco_Magazzino_" + Date.now());
+        } else {
+            console.error("Funzione generazione PDF mancante");
         }
-        printWindow.document.write(htmlStr);
-        printWindow.document.close();
-        if(clBtn) clBtn.innerHTML = "🖨️ Stampa Riepilogo Interventi";
+        
+        if(clBtn) clBtn.innerHTML = "🖨️ Stampa Riepilogo Magazzino";
 
     } catch (e) {
         console.error("Print List Error", e);
