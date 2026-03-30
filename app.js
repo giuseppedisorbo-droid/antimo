@@ -1,4924 +1,1768 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, updateDoc, serverTimestamp, enableIndexedDbPersistence, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, updateDoc, serverTimestamp, query, where, onSnapshot, orderBy, deleteDoc, deleteField, arrayUnion } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+const firebaseConfig = {apiKey: "AIzaSyAh7dwRs1j7Vxib7OlB7mVRB-MNthAo5NA", authDomain: "peppe-ai-platform.firebaseapp.com", projectId: "peppe-ai-platform", storageBucket: "peppe-ai-platform.firebasestorage.app", messagingSenderId: "214462018633", appId: "1:214462018633:web:f224407eba3b107e27fb98", measurementId: "G-54RQ3L1EDW"};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+let currentUser = null;
+const appCache = { locations: {}, families: {}, organizations: {}, people: {}, external_workers: {}, labor_rates: {} };
+let liveTasks = [], liveRequests = [], liveExpenses = [], liveCash = [], liveNotifications = [], liveLogs = [], liveWorkSessions = [];
 
-// ====== CONFIGURAZIONE FIREBASE ======
-// INSERISCI QUI I DATI DEL TUO PROGETTO FIREBASE. LI TROVI NELLE IMPOSTAZIONI DI FIREBASE CONSOLE.
-const firebaseConfig = {
-  apiKey: "AIzaSyB6CLQZHPG60LqsIKHAlS_Wt5OFXqfwqkw",
-  authDomain: "antimo-6a86b.firebaseapp.com",
-  projectId: "antimo-6a86b",
-  storageBucket: "antimo-6a86b.firebasestorage.app",
-  messagingSenderId: "671676764068",
-  appId: "1:671676764068:web:95027e0babe3f30042fb31",
-  measurementId: "G-WTWNH23PLS"
+const ICONS = {
+ home: `<svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>`,
+ agenda: `<svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10z"/></svg>`,
+ finance: `<svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v-2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>`,
+ directory: `<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM8 18H6v-2h2v2zm0-4H6v-2h2v2zm0-4H6V8h2v2zm0-4H6V4h2v2zm6 12h-4v-2h4v2zm0-4h-4v-2h4v2zm0-4h-4V8h4v2zm0-4h-4V4h4v2zm6 12h-4v-2h4v2zm0-4h-4v-2h4v2zm0-4h-4V8h4v2zm0-4h-4V4h4v2z"/></svg>`,
+ report: `<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>`
 };
 
-let app, db, storage;
-let isFirebaseConfigured = firebaseConfig.apiKey !== "INSERISCI_QUI_API_KEY";
-
-if (isFirebaseConfigured) {
-    try {
-        app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        
-        // Abilita la persistenza offline (cache locale di Firebase)
-        enableIndexedDbPersistence(db).catch((err) => {
-            console.warn("Firebase Persistence offline error: ", err.code);
-        });
-
-        storage = getStorage(app);
-        console.log("Firebase Inizializzato con successo.");
-    } catch(e) {
-        console.error("Errore inizializzazione Firebase", e);
-        isFirebaseConfigured = false;
-    }
-} else {
-    console.warn("Firebase non configurato. I dati verranno salvati solo in locale (localStorage) finché non aggiornerai le chiavi in app.js.");
-    // Piccola notifica la prima volta
-    if(!sessionStorage.getItem('fb_warned')) {
-        alert("Attenzione: Firebase non è configurato. Inserisci le tue chiavi in app.js per abilitare il salvataggio in Cloud. Per ora i dati restano sul dispositivo.");
-        sessionStorage.setItem('fb_warned', 'true');
-    }
+window.togglePcMode = function() {
+    document.body.classList.toggle('pc-mode');
+    localStorage.setItem('pclayout', document.body.classList.contains('pc-mode'));
+};
+if (localStorage.getItem('pclayout') === 'true') {
+    document.body.classList.add('pc-mode');
 }
-// =====================================
 
-// Liste Dinamiche Dropdown
-window.antimoDropdownLists = { interventi: [], dispositivi: [], ruoli: [], programmi_seqex: [] };
-window.decodeCodeToLabel = function(codeRaw, type = 'interventi') {
-    if(!codeRaw) return "";
-    let codes = codeRaw.split(',').map(c => c.trim());
-    return codes.map(c => {
-        let listStr = type === 'interventi' ? 'interventi' : (type === 'ruoli' ? 'ruoli' : 'dispositivi');
-        let found = window.antimoDropdownLists[listStr].find(item => item.id === c);
-        return found ? found.desc : c;
-    }).join(', ');
-};
-
-async function loadDropdownLists() {
-    const defaultTypes = ['Visita', 'Sostituzione', 'Ritiro', 'Consegna', 'Manutenzione', 'Installazione', 'Riparazione'];
-    const defaultDevices = ['Concentratore', 'Ventilatore', 'Aspiratore', 'D3', 'Stativo', 'Cpap', 'AutoCpap', 'Saturimetro'];
-    const defaultRoles = ["TECNICO", "TRASPORTATORE", "AMMINISTRATIVO", "MAGAZZINO", "LOGISTICA", "DIREZIONE", "PRODUZIONE O2", "CONSULENTE E", "CONSULENTE D", "CONSULENTE M"];
+async function init() {
+    await Promise.all(['locations','families','organizations','people','external_workers','labor_rates'].map(async coll => {
+        const s = await getDocs(collection(db, coll));
+        s.forEach(d => appCache[coll][d.id] = {...d.data(), id: d.id});
+    }));
     
-    // Default se Firebase non è configurato o offline primissimo avvio
-    // Per retrocompatibilità al 100%, l'ID delle voci default combacia col loro nome testo originario.
-    let baseDropdownLists = {
-        interventi: defaultTypes.map(t => ({ id: t, desc: t })),
-        dispositivi: defaultDevices.map(d => ({ id: d, desc: d })),
-        ruoli: defaultRoles.map(r => ({ id: r, desc: r })),
-        programmi_seqex: []
-    };
-    
-    window.antimoDropdownLists = baseDropdownLists;
-
-    if(isFirebaseConfigured) {
-        try {
-            const docRef = doc(db, "configurazioni", "liste_dropdown");
-            const docSnap = await getDoc(docRef);
-            if(docSnap.exists()) {
-                const cloudData = docSnap.data();
-                
-                let needsUpdate = false;
-                if(!cloudData.interventi) { cloudData.interventi = baseDropdownLists.interventi; needsUpdate = true; }
-                if(!cloudData.dispositivi) { cloudData.dispositivi = baseDropdownLists.dispositivi; needsUpdate = true; }
-                if(!cloudData.ruoli) { cloudData.ruoli = baseDropdownLists.ruoli; needsUpdate = true; }
-                if(!cloudData.programmi_seqex) { cloudData.programmi_seqex = baseDropdownLists.programmi_seqex; needsUpdate = true; }
-                
-                window.antimoDropdownLists = cloudData;
-                
-                if(needsUpdate) {
-                    await setDoc(docRef, window.antimoDropdownLists);
-                }
-                
-                localStorage.setItem('antimo_dropdown_lists', JSON.stringify(window.antimoDropdownLists));
-            } else {
-                await setDoc(docRef, window.antimoDropdownLists);
-                localStorage.setItem('antimo_dropdown_lists', JSON.stringify(window.antimoDropdownLists));
-            }
-        } catch(e) {
-            console.error("Errore fetch liste dropdown, uso cache", e);
-            let cached = localStorage.getItem('antimo_dropdown_lists');
-            if(cached) {
-                window.antimoDropdownLists = JSON.parse(cached);
-                if(!window.antimoDropdownLists.ruoli) window.antimoDropdownLists.ruoli = baseDropdownLists.ruoli;
-                if(!window.antimoDropdownLists.programmi_seqex) window.antimoDropdownLists.programmi_seqex = baseDropdownLists.programmi_seqex;
-            }
-        }
-        
-        // Fetch Operatori Sanitari
-        window.operatoriSanitari = [];
-        try {
-            const qOps = query(collection(db, "anagrafiche"), where("qualifica", "==", "Operatore sanitario"));
-            const opsSnap = await getDocs(qOps);
-            opsSnap.forEach(d => {
-                const data = d.data();
-                window.operatoriSanitari.push({id: d.id, nome: (data.nome + " " + (data.cognome||"")).trim()});
-            });
-        } catch(e) { console.error("Errore fetch operatori sanitari", e); }
-        
-        // Fetch Tecnici per Dropdown Assegnato
-        try {
-            window.tecniciAssegnati = [];
-            const qT = query(collection(db, "anagrafiche"), where("localita", "==", "App (Dipendente)"));
-            const tSnap = await getDocs(qT);
-            tSnap.forEach(d => {
-                const data = d.data();
-                window.tecniciAssegnati.push({id: d.id, nome: (data.ragioneSociale || (data.nome + " " + (data.cognome||""))).trim()});
-            });
-            
-            const dd = document.getElementById('tecnicoAssegnato');
-            if (dd && dd.options.length <= 1) {
-                window.tecniciAssegnati.forEach(t => {
-                    const opt = document.createElement('option');
-                    opt.value = t.nome;
-                    opt.textContent = t.nome;
-                    dd.appendChild(opt);
-                });
-                if (localStorage.getItem('antimo_user_name')) {
-                    const myName = localStorage.getItem('antimo_user_name');
-                    if (Array.from(dd.options).some(o => o.value === myName)) {
-                        dd.value = myName; // DEFAULT a me
-                    }
-                }
-            }
-            
-        } catch(e) { console.error("Errore fetch tecnici", e); }
+    const needsSeed = Object.keys(appCache.people).length === 0 || Object.keys(appCache.organizations).length === 0;
+    if (needsSeed) {
+        loginSelect.innerHTML = '<option value="">(Database Incompleto - Esegui Seed)</option>';
+        alert("Attenzione: Il database Firestore (collezione 'people' o 'organizations') risulta vuoto o incompleto! Vai su /seed.html per inizializzare il DB della V3.");
     } else {
-        let cached = localStorage.getItem('antimo_dropdown_lists');
-        if(cached) window.antimoDropdownLists = JSON.parse(cached);
-    }
-}
-// Chiamiamo il caricamento
-loadDropdownLists().then(() => {
-    initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
-    initDynamicBlocks('dynamicProgInterventionsContainer', 'btnAddProgInterventionBlock');
-});
-
-// Stato App (Incarichi Filter & Interventions)
-window.selectedIncarichi = JSON.parse(localStorage.getItem('antimo_incarichi_filter')) || ["TUTTI"];
-
-window.passesIncarichiFilter = function(inv, selectedArr) {
-    if (!selectedArr || selectedArr.length === 0 || selectedArr.includes("TUTTI")) return true;
-    let roleName = inv.tecnicoAssegnato || inv.operatore;
-    if (!roleName) roleName = (inv.programmatoDa || "Sconosciuto") + " (Assegnante)";
-    return selectedArr.includes(roleName);
-};
-
-window.buildIncarichiModalList = function() {
-    const incContainer = document.getElementById('incarichiListContainer');
-    if (!incContainer) return;
-    
-    // Raccogli nomi unici
-    const roles = new Set();
-    // 1. Dal database anagrafiche (fallback base)
-    if(window.tecniciAssegnati) window.tecniciAssegnati.forEach(t => roles.add(t.nome));
-    
-    // 2. Dai tasks attuali
-    const allTasks = [...(plannedInterventions||[]), ...(completedInterventions||[])];
-    allTasks.forEach(inv => {
-        let roleName = inv.tecnicoAssegnato || inv.operatore;
-        if (!roleName) roleName = (inv.programmatoDa || "Sconosciuto") + " (Assegnante)";
-        roles.add(roleName);
-    });
-
-    const rolesArr = Array.from(roles).sort();
-    
-    // Mantieni stato UI se il modale è aperto interattivamente
-    const currentChecks = {};
-    document.querySelectorAll('.cbx-incarico').forEach(c => currentChecks[c.value] = c.checked);
-
-    incContainer.innerHTML = '';
-    rolesArr.forEach(r => {
-        let isChecked = false;
-        if (Object.keys(currentChecks).length > 0) {
-           isChecked = currentChecks[r] || false;
-        } else {
-           isChecked = window.selectedIncarichi && (window.selectedIncarichi.includes("TUTTI") || window.selectedIncarichi.includes(r));
-        }
-        
-        // Evidenzia "(Assegnante)"
-        let displayHtml = r;
-        const replaceStr = " (Assegnante)";
-        if (r.includes(replaceStr)) {
-            displayHtml = r.replace(replaceStr, " <span style='font-size:0.75rem; color:#ef4444; font-weight:bold; background:#fee2e2; padding:2px 6px; border-radius:4px;'>Assegnante</span>");
-        }
-        
-        incContainer.innerHTML += `
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px; border-radius: 6px; background: rgba(0,0,0,0.02); transition: background 0.2s;">
-                <input type="checkbox" class="cbx-incarico" value="${r}" style="width: 18px; height: 18px; cursor: pointer;" ${isChecked ? 'checked' : ''}>
-                <span style="font-size: 0.95rem; color: #334155;">${displayHtml}</span>
-            </label>
-        `;
-    });
-};
-
-window.stringToColorData = function(str) {
-    if(!str) str = "Unknown";
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
-    const hex = "00000".substring(0, 6 - c.length) + c;
-    const r = parseInt(hex.substr(0, 2), 16);
-    const g = parseInt(hex.substr(2, 2), 16);
-    const b = parseInt(hex.substr(4, 2), 16);
-    const yiq = ((r*299)+(g*587)+(b*114))/1000;
-    return { bg: '#' + hex, text: (yiq >= 128) ? '#0f172a' : '#ffffff' };
-};
-
-let completedInterventions = JSON.parse(localStorage.getItem('antimo_interventions')) || [];
-let plannedInterventions = JSON.parse(localStorage.getItem('antimo_plannedInterventions')) || [];
-
-let currentAttachments = [];
-let currentProgAttachments = []; // Novita: Array allegati per la programmazione
-let pendingFileUrlsProgrammati = []; // Trasferisce gli allegati dal programmato all'attivo
-let requireKm = JSON.parse(localStorage.getItem('antimo_requireKm')); 
-if (requireKm === null) requireKm = false; // default
-
-
-// DOM Elements
-const interventionSection = document.getElementById('interventionSection');
-const activeInterventionSection = document.getElementById('activeInterventionSection');
-const interventiCount = document.getElementById('interventiCount');
-const nesegCount = document.getElementById('nesegCount');
-const programmatiCount = document.getElementById('programmatiCount');
-const filterTecnicoOggi = document.getElementById('filterTecnicoOggi');
-
-const newInterventionForm = document.getElementById('newInterventionForm');
-const btnToggleNuovoIntervento = document.getElementById('btnToggleNuovoIntervento');
-const btnCloseInterventionSection = document.getElementById('btnCloseInterventionSection');
-const btnStartIntervention = document.getElementById('btnStartIntervention');
-const btnPlanIntervention = document.getElementById('btnPlanIntervention');
-const btnViewActivities = document.getElementById('btnViewActivities');
-const btnShareCSV = document.getElementById('btnShareCSV');
-const btnManualSyncMobile = document.getElementById('btnManualSyncMobile');
-const activitiesListContainer = document.getElementById('activitiesListContainer');
-const activitiesList = document.getElementById('activitiesList');
-const plannedInterventionsSection = document.getElementById('plannedInterventionsSection');
-const plannedList = document.getElementById('plannedList');
-const npInterventionsSection = document.getElementById('npInterventionsSection');
-const npList = document.getElementById('npList');
-const oggiInterventionsSection = document.getElementById('oggiInterventionsSection');
-const oggiList = document.getElementById('oggiList');
-const domaniInterventionsSection = document.getElementById('domaniInterventionsSection');
-const domaniList = document.getElementById('domaniList');
-
-// Buttons for Toggling Sections
-const btnMostraProgrammati = document.getElementById('btnMostraProgrammati');
-const btnMostraP = document.getElementById('btnMostraP');
-const btnCalendar = document.getElementById('btnCalendarLink'); // changed to Link!
-const btnMostraEseguiti = document.getElementById('btnMostraEseguiti');
-const btnMostraNP = document.getElementById('btnMostraNP');
-const btnMostraNeseguiti = document.getElementById('btnMostraNeseguiti');
-const npCount = document.getElementById('npCount');
-const btnMostraOggi = document.getElementById('btnMostraOggi');
-const btnMostraDomani = document.getElementById('btnMostraDomani');
-const oggiCount = document.getElementById('oggiCount');
-const domaniCount = document.getElementById('domaniCount');
-
-// Messaggistica
-const messagesSection = document.getElementById('messagesSection');
-const btnToggleMessages = document.getElementById('btnToggleMessages');
-const messagesContainer = document.getElementById('messagesContainer');
-const messagesList = document.getElementById('messagesList');
-const newMessageForm = document.getElementById('newMessageForm');
-const msgText = document.getElementById('msgText');
-const msgIsNotification = document.getElementById('msgIsNotification');
-const btnTopNotification = document.getElementById('btnTopNotification');
-const topNotificationText = document.getElementById('topNotificationText');
-
-// Nodi Ricerca e Filtro Bacheca
-const btnMsgTabAll = document.getElementById('btnMsgTabAll');
-const btnMsgTabReceived = document.getElementById('btnMsgTabReceived');
-const btnMsgTabSent = document.getElementById('btnMsgTabSent');
-const btnMsgTabUnread = document.getElementById('btnMsgTabUnread');
-const btnMsgTabRead = document.getElementById('btnMsgTabRead');
-const btnMsgTabDeleted = document.getElementById('btnMsgTabDeleted');
-const btnMsgTabInCharge = document.getElementById('btnMsgTabInCharge');
-const btnMsgTabReplied = document.getElementById('btnMsgTabReplied');
-const btnEmptyTrash = document.getElementById('btnEmptyTrash');
-const msgSearchText = document.getElementById('msgSearchText');
-const msgSearchUser = document.getElementById('msgSearchUser');
-const msgSearchDate = document.getElementById('msgSearchDate');
-let currentMsgTab = 'all'; // 'all', 'received', 'sent', 'unread', 'read', 'in_charge', 'replied', 'resolved', 'deleted'
-
-// Nuovi Toggles Logic
-let isPlannedVisible = false;
-let isNpVisible = false;
-let isNesegVisible = false;
-let isOggiVisible = false;
-let isDomaniVisible = false;
-let isEseguitiVisible = false;
-let selectedCalendarDate = null;
-let allExpanded = false;
-
-// Tracker for 1-Step Form Programmed interventions
-let activeProgFbId = null;
-let activeProgItem = null;
-
-const globalToggleCardContainer = document.getElementById('globalToggleCardContainer');
-const btnToggleAllCollapse = document.getElementById('btnToggleAllCollapse');
-
-if(btnToggleAllCollapse) {
-    btnToggleAllCollapse.addEventListener('click', () => {
-        allExpanded = !allExpanded;
-        const expandedViews = document.querySelectorAll('.card-expanded-view');
-        const icons = document.querySelectorAll('.expand-icon');
-        expandedViews.forEach(el => {
-            if (allExpanded) el.classList.remove('hidden');
-            else el.classList.add('hidden');
-        });
-        icons.forEach(el => {
-            if (allExpanded) el.classList.add('rotate-icon');
-            else el.classList.remove('rotate-icon');
-        });
-        btnToggleAllCollapse.innerHTML = allExpanded ? `<span class="btn-icon">⏫</span> CHIUDI TUTTE LE SCHEDE` : `<span class="btn-icon">⏬</span> APRI TUTTE LE SCHEDE`;
-    });
-}
-
-function setupAccordionCard(cardContainer) {
-    const compactView = cardContainer.querySelector('.card-compact-view');
-    const expandedView = cardContainer.querySelector('.card-expanded-view');
-    const icon = cardContainer.querySelector('.expand-icon');
-    
-    if (allExpanded && expandedView) {
-        expandedView.classList.remove('hidden');
-        if (icon) icon.classList.add('rotate-icon');
+        loginSelect.innerHTML = '<option value="">-- Seleziona Utente --</option>';
     }
     
-    if (compactView && expandedView) {
-        compactView.addEventListener('click', (e) => {
-            if (e.target.tagName.toLowerCase() === 'button' || e.target.closest('button')) return;
-            const isHidden = expandedView.classList.contains('hidden');
-            if (isHidden && !allExpanded) {
-                document.querySelectorAll('.card-expanded-view').forEach(el => el.classList.add('hidden'));
-                document.querySelectorAll('.expand-icon').forEach(el => el.classList.remove('rotate-icon'));
-            }
-            if (isHidden) {
-                expandedView.classList.remove('hidden');
-                if (icon) icon.classList.add('rotate-icon');
-            } else {
-                expandedView.classList.add('hidden');
-                if (icon) icon.classList.remove('rotate-icon');
-            }
-        });
-    }
-}
-
-function updateHeaderFiltersUI() {
-    const list = [
-        { btn: btnMostraOggi, active: isOggiVisible },
-        { btn: btnMostraDomani, active: isDomaniVisible },
-        { btn: btnMostraP, active: isPlannedVisible && !selectedCalendarDate },
-        { btn: btnMostraNP, active: isNpVisible },
-        { btn: btnMostraEseguiti, active: isEseguitiVisible },
-        { btn: btnCalendar, active: !!selectedCalendarDate }
-    ];
-    list.forEach(item => {
-        if (item.btn) {
-            if (item.active) item.btn.classList.add('active-filter');
-            else item.btn.classList.remove('active-filter');
+    Object.keys(appCache.people).forEach(id => {
+        const p = appCache.people[id];
+        p.roles = p.roles || [];
+        const hasAccess = p.appAccess === true || (p.appAccess === undefined && ['giuseppe', 'teresa', 'caterina', 'stefano', 'davide', 'paolo', 'luca'].includes(id));
+        if(p.active !== false && hasAccess) {
+            let roleLbl = p.roles[0] || p.role || 'Utente';
+            if(id === 'giuseppe') roleLbl = 'Admin totale';
+            else if(id === 'davide' || id === 'teresa') roleLbl = 'Supervisore';
+            else if(id === 'stefano' || id === 'caterina') roleLbl = 'Approvatore';
+            else if(id === 'paolo') roleLbl = 'Operativo';
+            const dispName = p.fullName || p.name || id;
+            loginSelect.innerHTML += `<option value="${id}">${dispName} — ${roleLbl}</option>`;
         }
     });
+
+    document.getElementById('btnLogin').addEventListener('click', () => {
+        if(!loginSelect.value) return;
+        currentUser = { id: loginSelect.value, ...appCache.people[loginSelect.value] };
+        document.getElementById('loginOverlay').classList.remove('open');
+        setTimeout(() => document.getElementById('loginOverlay').style.display='none', 300);
+        boot();
+    });
     
-    const anyListVisible = isOggiVisible || isDomaniVisible || isPlannedVisible || isNpVisible || isEseguitiVisible;
-    if (anyListVisible && globalToggleCardContainer) globalToggleCardContainer.classList.remove('hidden');
-    else if (globalToggleCardContainer) globalToggleCardContainer.classList.add('hidden');
+    document.getElementById('bottomNav').addEventListener('click', (e) => {
+        const b = e.target.closest('.nav-item');
+        if(!b) return;
+        document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+        b.classList.add('active');
+        document.querySelectorAll('.view-section').forEach(v=>v.classList.remove('active'));
+        document.getElementById(b.dataset.target).classList.add('active');
+        document.getElementById('headerTitle').textContent = b.dataset.title;
+        if(b.dataset.target === 'view-agenda' && window.taskCalendar) {
+            setTimeout(() => window.taskCalendar.render(), 100);
+        }
+    });
+
+    document.getElementById('fabMain').addEventListener('click', openNewRequestWizard);
+    document.querySelectorAll('.btn-close-modal').forEach(b => b.addEventListener('click', e => {
+        const p = e.target.closest('.modal-fs, .bottom-sheet'); if(p) p.classList.remove('open');
+        const bd = document.getElementById('bsBackdrop'); if(bd) bd.classList.remove('open');
+    }));
+    document.getElementById('btnNotifs').addEventListener('click', () => { document.getElementById('notifPanel').classList.add('open'); });
 }
 
-function toggleTarget(target) {
-    const wasOn = (() => {
-        if(target === 'oggi') return isOggiVisible;
-        if(target === 'domani') return isDomaniVisible;
-        if(target === 'planned') return isPlannedVisible;
-        if(target === 'np') return isNpVisible;
-        if(target === 'eseguiti') return isEseguitiVisible;
-        if(target === 'neseg') return isNesegVisible;
+const logActivity = async(a, eT, eI)=>addDoc(collection(db,"activity_logs"),{userId:currentUser.id,userName:currentUser.fullName,action:a,entityType:eT,entityId:eI,timestamp:serverTimestamp()});
+const sendNotification = async(tI, t, m)=>addDoc(collection(db,"notifications"),{userId:tI,title:t,message:m,read:false,createdAt:serverTimestamp()});
+window.markNotifRead = async(id)=>updateDoc(doc(db,"notifications",id),{read:true});
+
+function boot() {
+    const dName = currentUser.fullName || currentUser.name || currentUser.id;
+    document.getElementById('headerUserInfo').textContent = `${dName} | v6.4`;
+    const r = currentUser.roles||[];
+    let nav = '';
+    const isSuper = r.includes('admin') || r.includes('owner') || r.includes('management_control') || r.includes('admin_support') || r.includes('domain_approver');
+    if(isSuper) {
+        nav = `<button class="nav-item active" data-target="view-home" data-title="Home Controllo">${ICONS.home}<span>Home</span></button>
+               <button class="nav-item" data-target="view-agenda" data-title="Agenda">${ICONS.agenda}<span>Agenda</span></button>
+               <button class="nav-item" data-target="view-finance" data-title="Costi e Spese">${ICONS.finance}<span>Finanza</span></button>
+               <button class="nav-item" data-target="view-directory" data-title="Rubrica">${ICONS.directory}<span>Enti</span></button>
+               <button class="nav-item" data-target="view-report" data-title="Report Statistico">${ICONS.report}<span>Report</span></button>`;
+    } else if(r.includes('technician')||r.includes('coordinator')) {
+        nav = `<button class="nav-item active" data-target="view-home" data-title="Oggi">${ICONS.home}<span>Oggi</span></button>
+               <button class="nav-item" data-target="view-agenda" data-title="Agenda">${ICONS.agenda}<span>Agenda</span></button>
+               <button class="nav-item" data-target="view-finance" data-title="Cassa">${ICONS.finance}<span>Cassa</span></button>
+               <button class="nav-item" data-target="view-directory" data-title="Rubrica">${ICONS.directory}<span>Rubrica</span></button>`;
+        document.getElementById('headerWallet').classList.remove('hidden');
+    } else {
+        nav = `<button class="nav-item active" data-target="view-home" data-title="Le Mie Richieste">${ICONS.home}<span>Home</span></button>
+               <button class="nav-item" data-target="view-agenda" data-title="Agenda">${ICONS.agenda}<span>Agenda</span></button>
+               <button class="nav-item" data-target="view-directory" data-title="Proprietà">${ICONS.directory}<span>Proprietà</span></button>`;
+    }
+    document.getElementById('bottomNav').innerHTML = nav;
+
+    onSnapshot(query(collection(db,"tasks"),orderBy("createdAt","desc")), snap=>{liveTasks=snap.docs.map(d=>({id:d.id,...d.data()})); renderHome(); renderAgenda(); renderReport();});
+    onSnapshot(query(collection(db,"requests"),orderBy("createdAt","desc")), snap=>{liveRequests=snap.docs.map(d=>({id:d.id,...d.data()})); renderHome();});
+    onSnapshot(query(collection(db,"expenses"),orderBy("createdAt","desc")), snap=>{liveExpenses=snap.docs.map(d=>({id:d.id,...d.data()})); renderFinance(); renderReport();});
+    onSnapshot(query(collection(db,"cash_movements"),orderBy("createdAt","desc")), snap=>{liveCash=snap.docs.map(d=>({id:d.id,...d.data()})); if(r.includes('technician')){const bal=liveCash.filter(c=>c.givenTo===currentUser.id).sort((a,b)=>b.createdAt-a.createdAt)[0]?.balanceAfter||0; document.getElementById('headerWallet').textContent=`€${bal.toFixed(2)}`; currentUser.wallet=bal;} renderFinance();});
+    onSnapshot(query(collection(db,"notifications"),where("userId","==",currentUser.id)), snap=>{
+        const todayIso = new Date().toISOString().split('T')[0];
+        liveNotifications=snap.docs.map(d=>({id:d.id,...d.data()}))
+        .filter(n => !n.scheduledStart || n.scheduledStart.split('T')[0] >= todayIso)
+        .sort((a,b)=>b.createdAt-a.createdAt);
+        const unread = liveNotifications.filter(n=>!n.read);
+        const x=unread.length; 
+        const b=document.getElementById('notifBadge'); 
+        if(x>0){b.textContent=x;b.classList.remove('hidden');}else b.classList.add('hidden'); 
+        document.getElementById('notifList').innerHTML = unread.length === 0 ? '<p class="text-center text-muted" style="padding:20px;">Nessuna nuova notifica.</p>' : unread.map(n=>`<div class="card" onclick="window.markNotifRead('${n.id}')" style="border-left:4px solid var(--danger); cursor:pointer;"><strong>${n.title}</strong><p>${n.message}</p></div>`).join('');
+    });
+    onSnapshot(query(collection(db,"activity_logs")), snap=>liveLogs=snap.docs.map(d=>({id:d.id,...d.data()})));
+    onSnapshot(query(collection(db,"work_sessions"),orderBy("createdAt","desc")), snap=>{liveWorkSessions=snap.docs.map(d=>({id:d.id,...d.data()})); renderFinance(); renderReport();});
+    renderDirectory();
+}
+
+const getEntTags=(fam,org)=>`${(fam||[]).map(x=>`<span class="entity-tag family">${appCache.families[x]?.name}</span>`).join('')}${(org||[]).map(x=>`<span class="entity-tag org">${appCache.organizations[x]?.name}</span>`).join('')}`;
+
+function renderHome() {
+    const feed = document.getElementById('feedList'); feed.innerHTML='';
+
+    const isAdmin = currentUser.roles.includes('admin') || currentUser.roles.includes('owner');
+    const isSupervisor = currentUser.roles.includes('management_control') || currentUser.roles.includes('admin_support');
+    const isDomainApprover = currentUser.roles.includes('domain_approver');
+    const isWorker = currentUser.roles.includes('technician');
+
+    const myFam = [...(currentUser.familyIds||[]), ...(currentUser.familyIds||[]).map(f=>f.replace('famiglia_','fam_'))];
+    const myOrgs = (currentUser.organizationRoles||[]).map(x=>x.organizationId);
+
+    const canSee = (item) => {
+        if(isAdmin) return true;
+        if(isSupervisor) {
+            if(item.status === 'pending_approval' || item.status === 'new' || item.status === 'completed' || item.status === 'accounted') return true;
+            if((item.familyIds||[]).includes('famiglia_teresa') || (item.familyIds||[]).includes('fam_teresa')) return true;
+            if((item.organizationIds||[]).includes('eubios') || (item.organizationIds||[]).includes('org_eubios')) return true;
+            return false;
+        }
+        if(isDomainApprover) {
+            if(item.status === 'pending_approval' && (
+                (item.familyIds||[]).some(x=>myFam.includes(x)) || 
+                (item.organizationIds||[]).some(x=>myOrgs.includes(x))
+            )) return true;
+            if((item.familyIds||[]).some(x=>myFam.includes(x))) return true;
+            if((item.organizationIds||[]).some(x=>myOrgs.includes(x))) return true;
+            return false;
+        }
+        if(isWorker) {
+            if(item.assignedTo === currentUser.id) return true;
+            if(item.requestedBy === currentUser.id) return true;
+            return false;
+        }
         return false;
-    })();
+    };
 
-    // Disattiva tutti
-    isOggiVisible = false;
-    isDomaniVisible = false;
-    isPlannedVisible = false;
-    isNpVisible = false;
-    isEseguitiVisible = false;
-    isNesegVisible = false;
-    selectedCalendarDate = null;
-
-    // Se non era già attivo, allora attivalo (effetto toggle esclusivo)
-    if (!wasOn) {
-        if (target === 'oggi') isOggiVisible = true;
-        if (target === 'domani') isDomaniVisible = true;
-        if (target === 'planned') isPlannedVisible = true;
-        if (target === 'np') isNpVisible = true;
-        if (target === 'eseguiti') isEseguitiVisible = true;
-        if (target === 'neseg') isNesegVisible = true;
-    }
-
-    if (isEseguitiVisible || isOggiVisible || isNesegVisible) {
-        activitiesListContainer.classList.remove('hidden');
-        if(btnViewActivities) btnViewActivities.innerHTML = `<span class="btn-icon">🙈</span> NASCONDI ATTIVITÀ`;
-        renderActivitiesList();
-    } else {
-        activitiesListContainer.classList.add('hidden');
-        if(btnViewActivities) btnViewActivities.innerHTML = `<span class="btn-icon">👁</span> VISUALIZZA ATTIVITÀ`;
-    }
-
-    updateHeaderFiltersUI();
-    updateUI();
-
-    // Modalita "Schermo Pieno": Nascondi elementi intermedi se c'è una lista aperta
-    const activeListNow = isOggiVisible || isDomaniVisible || isPlannedVisible || isNpVisible || isEseguitiVisible || isNesegVisible;
-    const msgSect = document.getElementById('messagesSection');
-    const bntSect = document.getElementById('nuovoInterventoBtnContainer');
-    
-    if (activeListNow) {
-        if (msgSect) msgSect.style.display = 'none';
-        if (bntSect) bntSect.style.display = 'none';
-    } else {
-        if (msgSect) msgSect.style.display = '';
-        if (bntSect) bntSect.style.display = '';
-    }
-
-    // Porta in primo piano ripristinando la visuale in alto per mantenere visibile lo spazio verde!
-    setTimeout(() => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 50);
-}
-
-if(btnMostraOggi) btnMostraOggi.addEventListener('click', () => toggleTarget('oggi'));
-if(btnMostraDomani) btnMostraDomani.addEventListener('click', () => toggleTarget('domani'));
-if(btnMostraP) btnMostraP.addEventListener('click', () => toggleTarget('planned'));
-if(btnMostraNP) btnMostraNP.addEventListener('click', () => toggleTarget('np'));
-if(btnMostraEseguiti) btnMostraEseguiti.addEventListener('click', () => toggleTarget('eseguiti'));
-if(btnMostraNeseguiti) btnMostraNeseguiti.addEventListener('click', () => toggleTarget('neseg'));
-
-const btnCloseActivitiesList = document.getElementById('btnCloseActivitiesList');
-if(btnCloseActivitiesList) btnCloseActivitiesList.addEventListener('click', () => { if(typeof toggleTarget === 'function') toggleTarget('eseguiti'); });
-
-if(btnToggleMessages) {
-    btnToggleMessages.addEventListener('click', () => {
-        messagesContainer.classList.toggle('hidden');
-        let badgeSpan = btnToggleMessages.querySelector('span');
-        let noteBadge = badgeSpan ? ' ' + badgeSpan.outerHTML : '';
-        btnToggleMessages.innerHTML = (messagesContainer.classList.contains('hidden') ? 'Mostra' : 'Nascondi') + noteBadge;
-    });
-}
-
-if(btnTopNotification) {
-    btnTopNotification.addEventListener('click', () => {
-        if(messagesContainer.classList.contains('hidden')) {
-            messagesContainer.classList.remove('hidden');
-            btnToggleMessages.textContent = 'Nascondi';
-        }
-        messagesSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-}
-
-if(btnToggleNuovoIntervento) {
-    btnToggleNuovoIntervento.addEventListener('click', () => {
-        interventionSection.classList.toggle('hidden');
-        if(!interventionSection.classList.contains('hidden')) {
-            interventionSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    });
-}
-
-if(btnCloseInterventionSection) {
-    btnCloseInterventionSection.addEventListener('click', () => {
-        interventionSection.classList.add('hidden');
-    });
-}
-
-// --- LOGICA BLOCCHI DINAMICI ---
-function createInterventionBlockHTML() {
-    const types = window.antimoDropdownLists && window.antimoDropdownLists.interventi ? window.antimoDropdownLists.interventi : [];
-    const devices = window.antimoDropdownLists && window.antimoDropdownLists.dispositivi ? window.antimoDropdownLists.dispositivi : [];
-    const operatori = window.operatoriSanitari || [];
-    
-    let typeOptions = types.map(t => `<option value="${t.id}">${t.desc}</option>`).join('');
-    let devOptions = devices.map(d => `<option value="${d.id}">${d.desc}</option>`).join('');
-    let opOptions = operatori.map(o => `<option value="${o.nome}">${o.nome}</option>`).join('');
-    
-    return `
-        <div class="dynamic-intervention-block" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 15px; background: #f8fafc; position: relative;">
-            <button type="button" class="btn-remove-block" style="position: absolute; top: -10px; right: -10px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">×</button>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 8px;">
-                    <label style="font-size: 0.8rem; color: #475569;">Tipo Intervento *</label>
-                    <select class="block-tipo" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: white;">
-                        <option value="">Seleziona...</option>
-                        ${typeOptions}
-                        <option value="Altro">Altro...</option>
-                    </select>
-                </div>
-                <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 8px;">
-                    <label style="font-size: 0.8rem; color: #475569;">Dispositivo</label>
-                    <select class="block-disp" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: white;">
-                        <option value="">Nessuno</option>
-                        ${devOptions}
-                        <option value="Altro">Altro...</option>
-                    </select>
-                </div>
-            </div>
+    const getPriCounters = (filterType) => {
+        let count = 0, newCount = 0;
+        liveTasks.forEach(t => {
+            if((t.status === 'completed' || t.status === 'accounted') && filterType !== 'completed' && filterType !== 'accounted') return;
+            if(!canSee(t)) return; // <-- Only count what user can see
             
-            <div class="accessori-container form-group" style="margin-bottom: 10px; display: none;">
-                <label style="font-size: 0.8rem; color: #ea580c; font-weight: bold;">Accessori Modello (Multiselezionabili):</label>
-                <div class="accessori-list" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px;"></div>
-            </div>
+            let match = false;
+            if(filterType === 'all') match = true;
+            else if(filterType === 'completed') { if(t.status === 'completed') match = true; }
+            else if(filterType === 'accounted') { if(t.status === 'accounted') match = true; }
+            else if(filterType === 'high') { if(t.priority==='high') match=true; }
+            else if(filterType === 'medium') { if(t.priority==='medium' || !t.priority) match=true; }
+            else if(filterType === 'low') { if(t.priority==='low') match=true; }
+            else if(filterType === 'scheduled') { if(t.scheduledStart) match=true; }
+            if(match) { count++; if(!(t.readBy||[]).includes(currentUser.id)) newCount++; }
+        });
+        return {count, newCount};
+    };
 
-            <div class="seqex-container form-group" style="margin-bottom: 10px; display: none; background: #e0e7ff; padding: 10px; border-radius: 8px; border: 1px dashed #6366f1;">
-                <label style="font-size: 0.85rem; color: #4338ca; font-weight: bold; width: 100%; display: block; margin-bottom: 8px;">Dettagli Terapia SEQEX</label>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px;">
-                    <div style="flex: 1; min-width: 120px;">
-                        <label style="font-size: 0.75rem; color: #3730a3;">Volte al giorno</label>
-                        <input type="number" class="seqex-volte" placeholder="Es. 2" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #a5b4fc; font-size: 0.85rem;">
-                    </div>
-                    <div style="flex: 1; min-width: 120px;">
-                        <label style="font-size: 0.75rem; color: #3730a3;">Minuti al giorno</label>
-                        <input type="number" class="seqex-minuti" placeholder="Es. 30" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #a5b4fc; font-size: 0.85rem;">
-                    </div>
-                </div>
-                <label style="font-size: 0.75rem; color: #3730a3; margin-top: 5px; display:block;">Programmi SEQEX (Multiselezionabili):</label>
-                <div class="seqex-programmi-list" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px;"></div>
-            </div>
+    let dashHtml = `<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;">`;
+    const btns = [
+        {id:'all', label:'TUTTI I TASK', bg:'#10b981'},
+        {id:'high', label:'Alta Priorità', bg:'#dc2626'},
+        {id:'medium', label:'Media Priorità', bg:'#d97706'},
+        {id:'low', label:'Bassa Priorità', bg:'#2563eb'},
+        {id:'scheduled', label:'Programmati', bg:'#0284c7'},
+        {id:'completed', label:'Completati', bg:'#059669'},
+        {id:'accounted', label:'Contabilizzati', bg:'#3b82f6'}
+    ];
+    btns.forEach((b, i) => {
+        const c = getPriCounters(b.id);
+        const span = (b.id === 'all') ? `grid-column: 1 / -1;` : '';
+        dashHtml += `<div onclick="window.openPivotModal('${b.id}')" class="shadow-sm" style="background:${b.bg}; color:white; padding:15px; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; position:relative; ${span} transition:0.2s;" onmouseover="this.style.opacity=0.9" onmouseout="this.style.opacity=1">
+            <div style="font-weight:bold; font-size:1.1rem; text-align:center;">${b.label}</div>
+            <div style="font-size:1.8rem; font-weight:800; margin-top:5px;">${c.count}</div>
+            ${c.newCount > 0 ? `<div style="position:absolute; top:-8px; right:-8px; background:var(--danger); color:white; border-radius:12px; padding:4px 10px; font-size:0.85rem; font-weight:bold; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.2); animation: pulse 2s infinite;">${c.newCount} Nuovi</div>` : ''}
+        </div>`;
+    });
+    dashHtml += `</div>`;
+    feed.innerHTML = dashHtml;
 
-            <div class="form-group" style="margin-bottom: 10px;">
-                <label style="font-size: 0.8rem; color: #475569;">Matricola / Note Extra</label>
-                <div style="display: flex; gap: 8px;">
-                    <input type="text" class="block-mat" placeholder="Es. SN123456" style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: white;">
-                    <button type="button" class="btn-scan-barcode" style="background: #1e293b; color: white; border: none; border-radius: 6px; padding: 0 15px; font-size: 1.2rem; cursor: pointer;" title="Scansiona Codice a Barre / QR">📷</button>
+
+    if(isAdmin || isSupervisor || isDomainApprover) {
+        liveRequests.filter(r=> (r.status==='new'||r.status==='approved') && canSee(r)).forEach(r => feed.innerHTML += `<div class="card"><div class="card-header"><span class="status-badge status-${r.status}">${r.status}</span> <span style="font-size:0.8rem;color:var(--text-muted)">📍 ${appCache.locations[r.locationId]?.name||'N/D'}</span></div><div class="card-title">${r.title}</div><p style="font-size:0.9rem;color:#666">${r.description}</p><div class="entity-tags">${getEntTags(r.familyIds,r.organizationIds)}</div><button class="btn btn-primary mt-2" onclick="window.openApproveWizard('${r.id}')">Assegna e Pianifica</button></div>`);
+        liveTasks.filter(t=>t.status==='pending_approval' && canSee(t)).forEach(t => feed.innerHTML += `<div class="card" style="border-left: 5px solid var(--warning)"><div class="card-header"><span class="status-badge" style="background:var(--warning); color:white;">Proposto da ${t.requestedBy ? (appCache.people[t.requestedBy]?.shortName || appCache.people[t.requestedBy]?.name || t.requestedBy) : 'Tecnico'}</span></div><div class="card-title">${t.title}</div><div class="entity-tags">${getEntTags(t.familyIds,t.organizationIds)}</div><button class="btn btn-success mt-2" onclick="window.execAction('APPROVE_PROPOSED','${t.id}')">👍 Approva (Inizia Oggi)</button></div>`);
+        liveTasks.filter(t=>t.status!=='completed' && t.status!=='pending_approval' && canSee(t)).forEach(t => feed.innerHTML += `<div class="card" onclick="window.openTaskDetail('${t.id}')"><div class="card-header"><span class="status-badge status-${t.status}">${t.status}</span> <div style="text-align:right"><div style="font-weight:bold;color:var(--primary);font-size:0.8rem">${t.scheduledStart?new Date(t.scheduledStart).toLocaleDateString():''}</div><span style="font-size:0.75rem;color:var(--text-muted)">📍 ${appCache.locations[t.locationId]?.name}</span></div></div><div class="card-title">${t.title}</div><div class="entity-tags">${getEntTags(t.familyIds,t.organizationIds)}</div></div>`);
+    } else if(isWorker) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        let validTasks = liveTasks.filter(t => t.assignedTo === currentUser.id && t.status !== 'completed');
+        
+        const morning = []; const afternoon = []; const pendingProps = [];
+        
+        validTasks.forEach(t => {
+            if(t.status==='pending_approval') { pendingProps.push(t); return; }
+            const isUrgent = t.priority === 'high' || t.priority === 'urgent';
+            let tgt = afternoon;
+            if(t.scheduledStart) {
+                const d = new Date(t.scheduledStart); const hrs = d.getHours(); const dStr = t.scheduledStart.split('T')[0];
+                if(dStr < todayStr && !isUrgent) tgt = morning; // Overdue top priority
+                else if(dStr === todayStr) tgt = hrs < 13 ? morning : afternoon;
+                else if(isUrgent) tgt = morning;
+                else return; // Future skipped
+            } else { if(isUrgent) tgt = morning; }
+            tgt.push(t);
+        });
+
+        const sortAgenda = (arr) => arr.sort((a,b) => {
+            const aU=(a.priority==='high'||a.priority==='urgent')?1:0, bU=(b.priority==='high'||b.priority==='urgent')?1:0;
+            if(aU !== bU) return bU - aU;
+            if(a.locationId && b.locationId && a.locationId !== b.locationId) return a.locationId.localeCompare(b.locationId);
+            if(a.scheduledStart && b.scheduledStart) return a.scheduledStart.localeCompare(b.scheduledStart);
+            return 0;
+        });
+
+        sortAgenda(morning); sortAgenda(afternoon);
+
+        let html = '';
+        if(morning.length===0 && afternoon.length===0 && pendingProps.length===0) { feed.innerHTML += '<div class="text-center text-muted mt-4 mb-4">Nessuna attività pendente per oggi. Vai al mare! 🏖️</div>'; return; }
+
+        const buildQA = (t) => `
+            <div class="card" style="border-left: 5px solid ${t.priority==='urgent'||t.priority==='high'?'var(--danger)':'var(--primary)'}">
+                <div class="card-header">
+                    <div><span class="status-badge status-${t.status}">${t.status}</span> ${t.priority==='urgent'||t.priority==='high'?'<span class="status-badge badge-urgent">🚨 URGENTE</span>':''} ${t.needsMaterial?'<span class="status-badge badge-material">📦 NO MAT</span>':''}</div>
+                    <div style="text-align:right"><span style="font-size:0.85rem; font-weight:bold; color:var(--text-main); display:block;">${t.scheduledStart?`🕒 ${new Date(t.scheduledStart).getHours().toString().padStart(2,'0')}:${new Date(t.scheduledStart).getMinutes().toString().padStart(2,'0')}`:'Nessun Orario'}</span><span style="font-size:0.75rem; color:var(--text-muted)">📍 ${appCache.locations[t.locationId]?.name||'N/D'}</span></div>
                 </div>
+                <div class="card-title" onclick="window.openTaskDetail('${t.id}')" style="cursor:pointer; margin-bottom:8px;">${t.title}</div>
+                <div class="entity-tags" style="margin-bottom:10px;">${getEntTags(t.familyIds,t.organizationIds)}</div>
+                <div class="quick-actions-bar">
+                    <button class="qa-btn qa-close" onclick="window.execAction('COMP_TASK','${t.id}')"><svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>Chiudi</button>
+                    <button class="qa-btn qa-material" onclick="window.execAction('TOGGLE_MATERIAL','${t.id}')"><svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg>Materia</button>
+                    <button class="qa-btn qa-expense" onclick="window.openExpenseWizard('${t.id}')"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.11-1.36-3.11-2.92v-.46h2.26v.29c0 .61.75 1.14 2.18 1.14 1.63 0 2.21-.6 2.21-1.31 0-.89-.96-1.32-2.5-1.84-1.86-.64-3.32-1.52-3.32-3.23 0-1.54 1.25-2.58 2.95-2.92V4h2.67v1.94c1.55.33 2.81 1.25 2.81 2.8v.4h-2.2v-.23c0-.68-.81-1.21-2.04-1.21-1.52 0-2.12.59-2.12 1.22 0 .84.85 1.22 2.5 1.76 1.88.62 3.32 1.54 3.32 3.26 0 1.58-1.23 2.62-2.94 2.91z"/></svg>Spesa</button>
+                    <button class="qa-btn qa-reschedule" onclick="window.openRescheduleWizard('${t.id}')"><svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>Sposta</button>
+                </div>
+            </div>`;
+
+        if(morning.length > 0) { html += '<h3 style="margin-bottom:12px; color:var(--primary); font-size:1.1rem; border-bottom:2px solid var(--border); padding-bottom:5px;">☀️ Mattina</h3>'; morning.forEach(t => html += buildQA(t)); }
+        if(afternoon.length > 0) { html += '<h3 style="margin-top:20px; margin-bottom:12px; color:var(--primary); font-size:1.1rem; border-bottom:2px solid var(--border); padding-bottom:5px;">🌙 Pomeriggio</h3>'; afternoon.forEach(t => html += buildQA(t)); }
+        if(pendingProps.length > 0) { html += '<h3 style="margin-top:20px; margin-bottom:12px; color:var(--warning); font-size:1.1rem; border-bottom:2px solid var(--border); padding-bottom:5px;">🟡 Proposti (In Attesa)</h3>'; pendingProps.forEach(t => html += `<div class="card" style="border-left: 5px solid var(--warning)"><div class="card-header"><div><span class="status-badge" style="background:var(--warning); color:white;">⏳ IN ATTESA</span></div><div style="text-align:right"><span style="font-size:0.75rem; color:var(--text-muted)">📍 ${appCache.locations[t.locationId]?.name||'N/D'}</span></div></div><div class="card-title" onclick="window.openTaskDetail('${t.id}')" style="cursor:pointer;">${t.title}</div><div class="entity-tags" style="margin-bottom:10px;">${getEntTags(t.familyIds,t.organizationIds)}</div></div>`); }
+        feed.innerHTML += html;
+    } else {
+        liveTasks.filter(t=> t.requestedBy===currentUser.id || (t.familyIds||[]).some(b=>myFam.includes(b)) || (t.organizationIds||[]).some(b=>myOrgs.includes(b)))
+                 .forEach(t => {
+                     let hb = '';
+                     if(t.status === 'pending_approval' && (
+                         (t.familyIds||[]).some(b=>myFam.includes(b)) || (t.organizationIds||[]).some(b=>myOrgs.includes(b))
+                     )) hb = `<button class="btn btn-success mt-2" onclick="window.execAction('APPROVE_PROPOSED','${t.id}')" style="display:block; width:100%;">👍 Approva Task Proposto</button>`;
+                     feed.innerHTML += `<div class="card" onclick="window.openTaskDetail('${t.id}')"><div class="card-title">${t.title}</div><span class="status-badge status-${t.status} mt-2">${t.status}</span>${hb}</div>`;
+                 });
+    }
+}
+
+window.taskCalendar = null;
+window.selectedAgendaDate = null;
+window.getStatusText = (s) => s === 'assigned' ? 'APPROVATO' : (s === 'pending_approval' ? 'DA APPROVARE' : (s === 'in_progress' ? 'IN CORSO' : (s === 'completed' ? 'COMPLETATO' : (s === 'accounted' ? 'CONTABILIZZATO' : s.toUpperCase()))));
+
+window.filterAgendaList = (dateStr) => {
+    window.selectedAgendaDate = dateStr;
+    const btn = document.getElementById('btnShowAllCards');
+    const title = document.getElementById('agendaListTitle');
+    if(dateStr) {
+        if(btn) btn.style.display = 'block';
+        if(title) {
+            const d = new Date(dateStr);
+            title.textContent = `Interventi del ${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+        }
+    } else {
+        if(btn) btn.style.display = 'none';
+        if(title) title.textContent = 'Prossimi Interventi';
+    }
+    renderAgendaCards();
+};
+
+const DAY_COLORS = [
+    { bg: '#a855f7', text: '#ffffff' }, // Dom 0
+    { bg: '#ef4444', text: '#ffffff' }, // Lun 1
+    { bg: '#f97316', text: '#ffffff' }, // Mar 2
+    { bg: '#fcd34d', text: '#000000' }, // Mer 3
+    { bg: '#10b981', text: '#ffffff' }, // Gio 4
+    { bg: '#0ea5e9', text: '#ffffff' }, // Ven 5
+    { bg: '#6366f1', text: '#ffffff' }  // Sab 6
+];
+
+function renderAgendaCards() {
+    const listEl = document.getElementById('agendaList');
+    if(!listEl) return;
+    listEl.innerHTML = '';
+    
+    const isSuper = currentUser.roles.includes('admin') || currentUser.roles.includes('owner') || currentUser.roles.includes('management_control') || currentUser.roles.includes('admin_support') || currentUser.roles.includes('domain_approver');
+    let q = liveTasks;
+    if(!isSuper) {
+        if(currentUser.roles.includes('technician')) {
+            q = liveTasks.filter(t=>t.assignedTo===currentUser.id);
+        } else {
+            const myFam = [...(currentUser.familyIds||[]), ...(currentUser.familyIds||[]).map(f=>f.replace('famiglia_','fam_'))];
+            const myOrgs = (currentUser.organizationRoles||[]).map(x=>x.organizationId);
+            q = liveTasks.filter(t=> t.requestedBy===currentUser.id || (t.familyIds||[]).some(b=>myFam.includes(b)) || (t.organizationIds||[]).some(b=>myOrgs.includes(b)));
+        }
+    }
+    q = q.filter(t => t.scheduledStart && t.status !== 'completed');
+    
+    if(window.selectedAgendaDate) {
+        q = q.filter(t => t.scheduledStart.startsWith(window.selectedAgendaDate));
+    }
+    
+    q.sort((a,b)=>a.scheduledStart.localeCompare(b.scheduledStart)).forEach(t => {
+        const d = new Date(t.scheduledStart);
+        const dayIdx = d.getDay();
+        const colors = DAY_COLORS[dayIdx];
+        
+        const loc = appCache.locations[t.locationId]?.name || 'N/D';
+        const ur = (t.priority === 'urgent' || t.priority === 'high') ? `<span class="status-badge badge-urgent" style="margin-left:5px;">🚨 URGENTE</span>` : '';
+        const assignedName = appCache.people[t.assignedTo]?.fullName || t.assignedTo || 'Nessuno';
+        
+        listEl.innerHTML += `
+        <div class="card" onclick="window.openTaskDetail('${t.id}')" style="background-color:${colors.bg}; color:${colors.text}; border-radius:12px; margin-bottom:12px; border:none;">
+            <div class="flex-between">
+                <div style="font-weight:bold; font-size:1.1rem;">🕒 ${t.scheduledStart.split('T')[1]} - ${d.getDate()}/${d.getMonth()+1}</div>
+                <div style="font-size:0.8rem; background:rgba(255,255,255,0.3); padding:3px 8px; border-radius:12px; font-weight:bold;">👤 ${assignedName}</div>
             </div>
-            
-            <div style="border-top: 1px dashed #cbd5e1; padding-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
-                <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 0;">
-                    <label style="font-size: 0.75rem; color: #0284c7; font-weight: bold;">Operatore Sanitario (Opzionale)</label>
-                    <select class="block-operatore" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #bae6fd; font-size: 0.85rem; background: #f0f9ff;">
-                        <option value="">Nessuno</option>
-                        ${opOptions}
-                    </select>
+            <div class="card-title mt-2" style="font-weight:800; font-size:1.15rem; color:${colors.text};">${t.title} ${ur}</div>
+            <div style="font-size:0.85rem; margin-top:5px; opacity:0.95;">📍 ${loc}</div>
+            <div style="font-size:0.85rem; margin-top:5px; font-weight:800; opacity:0.95;">${window.getStatusText(t.status)}</div>
+        </div>`;
+    });
+    
+    if(q.length === 0) {
+        listEl.innerHTML = `<div class="text-center text-muted" style="padding:20px;">Nessun intervento.</div>`;
+    }
+}
+
+function renderAgenda() {
+    const btn = document.getElementById('btnWorkerSessionCal');
+    if(btn) btn.style.display = currentUser.roles.includes('technician') ? 'inline-flex' : 'none';
+
+    renderAgendaCards();
+
+    const calEl = document.getElementById('calendarContainer');
+    if(!calEl) return;
+    
+    const events = [];
+    const isSuper = currentUser.roles.includes('admin') || currentUser.roles.includes('owner') || currentUser.roles.includes('management_control') || currentUser.roles.includes('admin_support') || currentUser.roles.includes('domain_approver');
+    let q = liveTasks;
+    if(!isSuper) {
+        if(currentUser.roles.includes('technician')) {
+            q = liveTasks.filter(t=>t.assignedTo===currentUser.id);
+        } else {
+            const myFam = [...(currentUser.familyIds||[]), ...(currentUser.familyIds||[]).map(f=>f.replace('famiglia_','fam_'))];
+            const myOrgs = (currentUser.organizationRoles||[]).map(x=>x.organizationId);
+            q = liveTasks.filter(t=> t.requestedBy===currentUser.id || (t.familyIds||[]).some(b=>myFam.includes(b)) || (t.organizationIds||[]).some(b=>myOrgs.includes(b)));
+        }
+    }
+    
+    q.filter(t => t.scheduledStart).forEach(t => {
+        const d = new Date(t.scheduledStart);
+        const dayIdx = d.getDay();
+        const colors = DAY_COLORS[dayIdx];
+        events.push({
+            id: t.id,
+            title: t.title,
+            start: t.scheduledStart,
+            end: t.scheduledEnd || t.scheduledStart,
+            backgroundColor: colors.bg,
+            borderColor: colors.bg,
+            textColor: colors.text,
+            extendedProps: { taskId: t.id }
+        });
+    });
+
+    if(!window.taskCalendar) {
+        if(typeof FullCalendar !== 'undefined') {
+            window.taskCalendar = new FullCalendar.Calendar(calEl, {
+                initialView: 'dayGridMonth',
+                locale: 'it',
+                firstDay: 1, // Start on Monday
+                headerToolbar: {
+                    left: 'prev,next',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+                buttonText: { today: 'Oggi', month: 'Mese', week: 'Sett', day: 'Giorno' },
+                height: '100%',
+                events: events,
+                eventClick: function(info) {
+                    window.openTaskDetail(info.event.extendedProps.taskId);
+                },
+                dateClick: function(info) {
+                    window.filterAgendaList(info.dateStr);
+                    document.getElementById('agendaListTitle').scrollIntoView({behavior: 'smooth', block: 'start'});
+                }
+            });
+            window.taskCalendar.render();
+        }
+    } else {
+        window.taskCalendar.removeAllEvents();
+        window.taskCalendar.addEventSource(events);
+    }
+}
+
+function renderFinance() {
+    const fl = document.getElementById('financeList'); fl.innerHTML='';
+    const isSuper = currentUser.roles.includes('admin') || currentUser.roles.includes('owner') || currentUser.roles.includes('management_control') || currentUser.roles.includes('admin_support') || currentUser.roles.includes('domain_approver');
+    
+    if(currentUser.roles.includes('technician') && !isSuper) {
+        let h = `<h3>Le Mie Spese (Da Giustificare)</h3>`;
+        const pend = liveExpenses.filter(e => e.paidBy === currentUser.id && e.status === 'pending_approval');
+        if(pend.length === 0) h += `<p class="text-muted text-center">Nessuna spesa in sospeso.</p>`;
+        pend.forEach(e => {
+            h += `<div class="card" style="border-left: 4px solid var(--warning)">
+                <div class="flex-between"><strong>€ ${e.amount.toFixed(2)}</strong> <span class="status-badge" style="background:var(--warning); color:white;">⏳ IN ATTESA</span></div>
+                <div class="card-meta mt-2">${e.description}</div>
+                                ${!e.receiptUrl ? `<div class="mt-2"><span class="status-badge" style="background:#fee2e2; color:#b91c1c;">⚠️ MANCA SCONTRINO</span></div><button class="btn btn-secondary mt-2" onclick="window.attachReceipt('${e.id}')">📷 Fai Foto Scontrino</button>` : `<div class="mt-2"><span class="status-badge" style="background:#d1fae5; color:#059669;">🧾 SCONTRINO OK</span></div>`}
+                <div class="mt-2" style="display:flex; gap:10px;">
+                    <button class="btn btn-outline" style="flex:1; padding:8px;" onclick="window.editExpense('${e.id}')">✏️ Modifica</button>
+                    <button class="btn btn-danger btn-outline" style="flex:1; padding:8px;" onclick="window.deleteExpense('${e.id}', true)">🗑️ Elimina</button>
                 </div>
-                <div class="form-group" style="flex: 1; min-width: 80px; margin-bottom: 0;">
-                    <label style="font-size: 0.75rem; color: #0284c7; font-weight: bold;">Esito / Punteggio</label>
-                    <input type="text" class="block-esito" placeholder="Es. Positivo, 95..." style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #bae6fd; font-size: 0.85rem; background: #f0f9ff;">
+            </div>`;
+        });
+
+        h += `<h3 class="mt-4">Storico Cassa</h3><ul style="list-style:none; padding:10px 0;">`;
+        liveCash.filter(c=>c.givenTo===currentUser.id).sort((a,b)=>b.createdAt-a.createdAt).forEach(c=> { 
+            const p=c.type==='advance'||c.type==='reimbursement'||c.type==='adjustment'; 
+            let btns = '';
+            if(c.relatedExpenseId) {
+                btns = `<span style="margin-left:8px;"><button style="background:none;border:none;cursor:pointer;font-size:1.1rem;padding:0 5px;" onclick="window.editExpense('${c.relatedExpenseId}')">✏️</button><button style="background:none;border:none;cursor:pointer;font-size:1.1rem;padding:0 5px;" onclick="window.deleteExpense('${c.relatedExpenseId}', true)">🗑️</button></span>`;
+            }
+            h+=`<li class="flex-between" style="padding:12px 0; border-bottom:1px solid var(--border); align-items:center;"><div><span style="font-weight:500;">${c.reason||c.type}</span>${btns}</div> <strong style="color:${p?'var(--success)':'var(--danger)'}">${p?'+':'-'}€${c.amount.toFixed(2)}</strong></li>`
+        });
+        fl.innerHTML = h+`</ul><button class="btn btn-primary mt-4 mb-4" onclick="window.openExpenseWizard()">➕ Aggiungi Spesa (Preleva da Cassa)</button>`;
+    }
+    if(isSuper) {
+        let h = `<h3>Fondi Operatori</h3>`;
+        Object.values(appCache.people).filter(p=>p.roles.includes('technician') && p.id!=='luca').forEach(w => {
+            const cList = liveCash.filter(c=>c.givenTo===w.id).sort((a,b)=>b.createdAt-a.createdAt);
+            const bal = cList.length > 0 ? cList[0].balanceAfter : 0;
+            h += `<div class="card flex-between" style="align-items:center;"><div><strong>${w.fullName}</strong><div style="font-size:1.2rem; color:${bal<0?'var(--danger)':'var(--success)'}; font-weight:bold;">€ ${bal.toFixed(2)}</div></div> <button class="btn btn-info" style="width:auto; padding:8px 15px;" onclick="window.topUpWallet('${w.id}')">Ricarica Fondo</button></div>`;
+        });
+        h += `<h3 class="mt-4">Gestione Tutte le Spese</h3>`;
+        
+        const isDomainAppr = currentUser.roles.includes('domain_approver');
+        const myFam = [...(currentUser.familyIds||[]), ...(currentUser.familyIds||[]).map(f=>f.replace('famiglia_','fam_'))];
+        const myOrgs = (currentUser.organizationRoles||[]).map(x=>x.organizationId);
+
+        let unalloc = liveExpenses;
+        
+        if(isDomainAppr) {
+            unalloc = unalloc.filter(e => {
+                if(e.taskId) {
+                    const t = liveTasks.find(x=>x.id===e.taskId);
+                    if(t && ((t.familyIds||[]).some(b=>myFam.includes(b)) || (t.organizationIds||[]).some(b=>myOrgs.includes(b)))) return true;
+                }
+                if((e.allocations||[]).some(a=> myFam.includes(a.entityId) || myOrgs.includes(a.entityId))) return true;
+                return false;
+            });
+        }
+        
+        // Ordina per data creazione per avere le ultime
+        unalloc.sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+
+        if(unalloc.length === 0) h += `<p class="text-muted text-center">Nessuna spesa nel database.</p>`;
+        unalloc.forEach(e => {
+            const isAlloc = e.allocations && e.allocations.length > 0;
+            const badge = e.status === 'pending_approval' ? `<span class="status-badge" style="background:var(--warning); color:white;">⏳ DA APPROVARE</span>` : (isAlloc ? `<span class="status-badge status-completed">ALLOCATA</span>` : `<span class="status-badge status-new">DA ALLOCARE</span>`);
+            h += `<div class="card" style="border-left: 4px solid ${isAlloc?'var(--success)':'var(--primary)'}">
+                <div class="flex-between">
+                    <strong>€ ${e.amount.toFixed(2)}</strong>
+                    ${badge}
                 </div>
-                <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 0;">
-                    <label style="font-size: 0.75rem; color: #0284c7; font-weight: bold;">Stato Valutazione</label>
-                    <select class="block-stato-valutazione" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #bae6fd; font-size: 0.85rem; background: #f0f9ff;">
-                        <option value="">Nessuno</option>
-                        <option value="Svolta - A buon fine">✅ Svolta - A buon fine</option>
-                        <option value="Svolta - Da ripetere">🔄 Svolta - Da ripetere</option>
-                    </select>
+                <div class="card-meta mt-2">Da: ${appCache.people[e.paidBy]?.shortName || e.paidBy} | ${e.description}</div>
+                                ${(e.status==='pending_approval')?'':(!e.receiptUrl ? `<div class="mt-2"><span class="status-badge" style="background:#fee2e2; color:#b91c1c;">⚠️ NESSUN SCONTRINO</span></div>` : `<div class="mt-2"><span class="status-badge" style="background:#d1fae5; color:#059669;">🧾 SCONTRINO OK</span></div>`)}
+                <div class="mt-2" style="display:flex; gap:10px;">
+                    ${!isAlloc ? `<button class="btn btn-primary" style="flex:2;" onclick="window.openAllocationWizard('${e.id}', 'expenses')">Ripartisci</button>` : `<button class="btn btn-secondary" style="flex:2;" onclick="window.openAllocationWizard('${e.id}', 'expenses')">Rivedi</button>`}
+                    <button class="btn btn-outline" style="flex:1; padding:8px;" onclick="window.editExpense('${e.id}')">✏️</button>
+                    <button class="btn btn-danger btn-outline" style="flex:1; padding:8px;" onclick="window.deleteExpense('${e.id}', false)">🗑️</button>
                 </div>
+            </div>`;
+        });
+        h += `<h3 class="mt-4">Gestione Manovalanza</h3>`;
+        const unallocW = liveWorkSessions.sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+        if(unallocW.length === 0) h += `<p class="text-muted text-center">Nessuna manovalanza.</p>`;
+        unallocW.forEach(w => {
+            const wName = appCache.external_workers[w.workerId]?.fullName || w.workerId.toUpperCase();
+            const isAlloc = w.allocations && w.allocations.length > 0;
+            h += `<div class="card" style="border-left: 4px solid ${isAlloc?'var(--success)':'var(--primary)'}">
+                <div class="flex-between"><strong>€ ${w.totalCost.toFixed(2)}</strong><span class="status-badge ${isAlloc?'status-completed':'status-new'}">${isAlloc?'ALLOCATO':'DA ALLOCARE'}</span></div>
+                <div class="card-meta mt-2">Manovale: <strong>${wName}</strong> | In Data: ${w.date}</div>
+                <div class="mt-2" style="display:flex; gap:10px;">
+                    ${!isAlloc ? `<button class="btn btn-primary" style="flex:2;" onclick="window.openAllocationWizard('${w.id}', 'work_sessions')">Ripartisci</button>`:`<button class="btn btn-secondary" style="flex:2;" onclick="window.openAllocationWizard('${w.id}', 'work_sessions')">Rivedi</button>`}
+                    <button class="btn btn-outline" style="flex:1; padding:8px;" onclick="window.editWorkSession('${w.id}')">✏️</button>
+                    <button class="btn btn-danger btn-outline" style="flex:1; padding:8px;" onclick="window.deleteWorkSession('${w.id}')">🗑️</button>
+                </div>
+            </div>`;
+        });
+        fl.innerHTML = h;
+    }
+}
+
+window.toggleDirSection = (sec) => {
+    const el = document.getElementById('dir_sec_' + sec);
+    if(el.style.display === 'none') el.style.display = 'block';
+    else el.style.display = 'none';
+};
+
+window.addDirectoryItem = async (coll) => {
+    const name = prompt("Inserisci il nome per il nuovo elemento:");
+    if(!name || !name.trim()) return;
+    try {
+        const docRef = await addDoc(collection(db, coll), { name: name.trim() });
+        appCache[coll][docRef.id] = { name: name.trim() };
+        renderDirectory();
+    } catch(e) {
+        alert("Errore salvataggio: " + e.message);
+    }
+};
+
+window.addLaborRate = async () => {
+    const opts = [...Object.values(appCache.organizations).map(o=>o.name), ...Object.values(appCache.families).map(f=>f.name)];
+    const locName = prompt("Inserisci Proprietario o Luogo per questa tariffa:\n(Es: " + opts.slice(0,5).join(', ') + "...)");
+    if(!locName || !locName.trim()) return;
+    const rate = prompt("Inserisci la tariffa oraria (€/h) per " + locName + ":");
+    if(!rate || isNaN(rate)) return;
+    try {
+        const docRef = await addDoc(collection(db, 'labor_rates'), { locationName: locName.trim(), hourlyRate: parseFloat(rate) });
+        appCache['labor_rates'][docRef.id] = { id: docRef.id, locationName: locName.trim(), hourlyRate: parseFloat(rate) };
+        renderDirectory();
+    } catch(e) {
+        alert("Errore salvataggio: " + e.message);
+    }
+};
+
+window.editLaborRate = async (id) => {
+    const r = appCache['labor_rates'][id];
+    if(!r) return;
+    const locName = prompt("Modifica Nome Luogo:", r.locationName);
+    if(!locName || !locName.trim()) return;
+    const rate = prompt("Modifica Tariffa (€/h):", r.hourlyRate);
+    if(!rate || isNaN(rate)) return;
+    try {
+        await updateDoc(doc(db, 'labor_rates', id), { locationName: locName.trim(), hourlyRate: parseFloat(rate) });
+        r.locationName = locName.trim();
+        r.hourlyRate = parseFloat(rate);
+        renderDirectory();
+    } catch(e) {
+        alert("Errore modifica: " + e.message);
+    }
+};
+
+window.deleteLaborRate = async (id) => {
+    if(!confirm("Sicuro di eliminare questa tariffa?")) return;
+    try {
+        await deleteDoc(doc(db, 'labor_rates', id));
+        delete appCache['labor_rates'][id];
+        renderDirectory();
+    } catch(e) {
+        alert("Errore eliminazione: " + e.message);
+    }
+};
+
+function renderDirectory() {
+    const d = document.getElementById('directoryList'); d.innerHTML='';
+    const sections = [
+        { id: 'organizations', title: 'Organizzazioni' },
+        { id: 'families', title: 'Famiglie' },
+        { id: 'locations', title: 'Luoghi' }
+    ];
+    let html = '';
+    sections.forEach(s => {
+        const items = Object.values(appCache[s.id]).sort((a,b)=>a.name.localeCompare(b.name));
+        html += `<div class="card mb-3" style="padding:0; overflow:hidden;">
+            <div class="card-header" style="margin:0; padding:15px; background:var(--surface); cursor:pointer; border-bottom:1px solid var(--border);" onclick="window.toggleDirSection('${s.id}')">
+                <h3 style="margin:0; font-size:1.1rem; color:var(--primary);">${s.title} (${items.length}) <span>▼</span></h3>
+            </div>
+            <div id="dir_sec_${s.id}" style="display:none; padding:15px; background:var(--bg);">
+                <button class="btn btn-outline mb-3" onclick="window.addDirectoryItem('${s.id}')" style="padding:8px; font-size:0.9rem;">➕ Aggiungi ${s.title}</button>
+                ${items.map(o => `<div class="flex-between" style="padding:8px 0; border-bottom:1px dashed #ccc;"><strong style="font-size:0.95rem;">${o.name}</strong></div>`).join('')}
+                ${items.length===0 ? '<div class="text-muted">Nessun elemento.</div>' : ''}
+            </div>
+        </div>`;
+    });
+    
+    // Labor Rates Section
+    const rates = Object.values(appCache['labor_rates']).sort((a,b)=>(a.locationName||'').localeCompare(b.locationName||''));
+    html += `<div class="card mb-3" style="padding:0; overflow:hidden;">
+        <div class="card-header" style="margin:0; padding:15px; background:var(--surface); cursor:pointer; border-bottom:1px solid var(--border);" onclick="window.toggleDirSection('labor_rates')">
+            <h3 style="margin:0; font-size:1.1rem; color:var(--danger);">Costi Orari per Proprietario (${rates.length}) <span>▼</span></h3>
+        </div>
+        <div id="dir_sec_labor_rates" style="display:none; padding:15px; background:var(--bg);">
+            <button class="btn btn-outline mb-3" onclick="window.addLaborRate()" style="padding:8px; font-size:0.9rem;">➕ Aggiungi Nuova Tariffa</button>
+            ${rates.map(r => `<div class="flex-between" style="padding:8px 0; border-bottom:1px dashed #ccc;"><strong style="font-size:0.95rem;">${r.locationName}</strong><div><span style="margin-right:15px; color:var(--danger); font-weight:bold;">€${r.hourlyRate.toFixed(2)}/h</span><button style="background:none; border:none; cursor:pointer;" onclick="window.editLaborRate('${r.id}')">✏️</button><button style="background:none; border:none; cursor:pointer; margin-left:10px;" onclick="window.deleteLaborRate('${r.id}')">🗑️</button></div></div>`).join('')}
+            ${rates.length===0 ? '<div class="text-muted">Nessuna tariffa impostata.</div>' : ''}
+        </div>
+    </div>`;
+
+    d.innerHTML = html;
+}
+
+function renderReport() {
+    const rep = document.getElementById('reportContent'); if(!rep) return;
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
+    let paoloCompleted = 0, paoloOpen = 0, paoloOverdue = 0;
+    let visitedLocations = new Set();
+    liveTasks.forEach(t => {
+        if(t.assignedTo === 'worker_paolo') {
+            if(t.status === 'completed') paoloCompleted++;
+            else { paoloOpen++; if(t.scheduledStart && t.scheduledStart.split('T')[0] < todayStr) paoloOverdue++; }
+            if(t.locationId) visitedLocations.add(t.locationId);
+        }
+    });
+
+    let expTotal = 0, expApproved = 0, expPending = 0;
+    liveExpenses.forEach(e => { expTotal += e.amount; if(e.status === 'pending_approval') expPending += e.amount; if(e.status === 'approved') expApproved += e.amount; });
+    
+    let workerCostTotal = 0; const workerCostMap = {};
+    liveWorkSessions.forEach(w => { workerCostTotal += w.totalCost; workerCostMap[w.workerId] = (workerCostMap[w.workerId]||0) + w.totalCost; });
+    
+    const sumsFam = {}, sumsOrg = {};
+    liveExpenses.filter(e => e.status === 'approved').forEach(e => { (e.allocations||[]).forEach(a => { const t = a.type === 'family' ? sumsFam : sumsOrg; t[a.entityId] = (t[a.entityId]||0) + a.amount; }); });
+    liveWorkSessions.filter(w => w.allocations && w.allocations.length > 0).forEach(w => { (w.allocations||[]).forEach(a => { const t = a.type === 'family' ? sumsFam : sumsOrg; t[a.entityId] = (t[a.entityId]||0) + a.amount; }); });
+
+    const opsByLoc = {};
+    liveTasks.forEach(t => { if(t.locationId) opsByLoc[t.locationId] = (opsByLoc[t.locationId] || 0) + 1; });
+
+    rep.innerHTML = `
+        <div class="card mb-4" style="background:#f8fafc; border:1px solid #e2e8f0;">
+            <h3 style="color:var(--primary); margin-bottom:10px;">👤 Attività Paolo (Worker)</h3>
+            <div class="flex-between" style="padding:8px 0; border-bottom:1px solid #eee;"><span>Task Completati</span> <strong><span class="status-badge status-completed">${paoloCompleted}</span></strong></div>
+            <div class="flex-between" style="padding:8px 0; border-bottom:1px solid #eee;"><span>Task Aperti</span> <strong><span class="status-badge status-assigned">${paoloOpen}</span></strong></div>
+            <div class="flex-between" style="padding:8px 0; border-bottom:1px solid #eee;"><span>Task in Ritardo</span> <strong><span class="status-badge" style="background:var(--danger); color:white;">${paoloOverdue}</span></strong></div>
+            <div class="flex-between" style="padding:8px 0;"><span>Luoghi unici visitati</span> <strong>${visitedLocations.size}</strong></div>
+        </div>
+
+        <div class="card mb-4" style="background:#f8fafc; border:1px solid #e2e8f0;">
+            <h3 style="color:var(--primary); margin-bottom:10px;">💸 Sintesi Finanziaria</h3>
+            <div class="flex-between" style="padding:8px 0; border-bottom:1px solid #eee;"><span>Spese Materiali Tot.</span> <strong style="font-size:1.1rem;">€ ${expTotal.toFixed(2)}</strong></div>
+            <div class="flex-between" style="padding:8px 0; border-bottom:1px solid #eee;"><span>Costi Manovalanza Tot.</span> <strong style="color:var(--danger);">€ ${workerCostTotal.toFixed(2)}</strong></div>
+            <div style="padding:0 0 10px 10px; font-size:0.85rem; color:#666;">${Object.entries(workerCostMap).map(([k,v])=>`↳ ${appCache.external_workers[k]?.fullName||k}: €${v.toFixed(2)}`).join('<br>')}</div>
+            <div class="flex-between" style="padding:8px 0; border-bottom:1px solid #eee;"><span>Approvate/Ripartite</span> <strong style="color:var(--success);">€ ${expApproved.toFixed(2)}</strong></div>
+            <div class="flex-between" style="padding:8px 0;"><span>Attesa Scontrino/Verifica</span> <strong style="color:var(--warning);">€ ${expPending.toFixed(2)}</strong></div>
+        </div>
+
+        <div class="card mb-4" style="background:#f8fafc; border:1px solid #e2e8f0;">
+            <h3 style="color:var(--primary); margin-bottom:10px;">📊 Allocazione Costi</h3>
+            <h4 style="margin-top:10px; font-size:0.9rem; color:#666;">Per Famiglia</h4>
+            <div style="margin-bottom:10px;">
+                ${Object.keys(sumsFam).length === 0 ? '<div class="text-muted" style="font-size:0.8rem;">Nessun costo ripartito.</div>' : ''}
+                ${Object.entries(sumsFam).map(([k,v])=>`<div class="flex-between" style="padding:6px 0; border-bottom:1px dashed #eee;"><span style="font-size:0.85rem;">${appCache.families[k]?.name}</span><strong>€ ${v.toFixed(2)}</strong></div>`).join('')}
+            </div>
+            <h4 style="margin-top:15px; font-size:0.9rem; color:#666;">Per Organizzazione</h4>
+            <div>
+                ${Object.keys(sumsOrg).length === 0 ? '<div class="text-muted" style="font-size:0.8rem;">Nessun costo ripartito.</div>' : ''}
+                ${Object.entries(sumsOrg).map(([k,v])=>`<div class="flex-between" style="padding:6px 0; border-bottom:1px dashed #eee;"><span style="font-size:0.85rem;">${appCache.organizations[k]?.name}</span><strong>€ ${v.toFixed(2)}</strong></div>`).join('')}
             </div>
         </div>
+
+        <div class="card mb-4" style="background:#f8fafc; border:1px solid #e2e8f0;">
+            <h3 style="color:var(--primary); margin-bottom:10px;">📍 Operatività per Luogo</h3>
+            ${Object.keys(opsByLoc).length === 0 ? '<div class="text-muted" style="font-size:0.8rem;">Nessuna operazione registrata.</div>' : ''}
+            ${Object.entries(opsByLoc).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="flex-between" style="padding:6px 0; border-bottom:1px dashed #eee;"><span style="font-size:0.85rem;">${appCache.locations[k]?.name||k}</span><span class="entity-tag location">${v} Interv.</span></div>`).join('')}
+        </div>
+
+        <div class="card mb-4" style="background:#f8fafc; border:1px solid #e2e8f0; border-left: 4px solid var(--primary);">
+            <h3 style="color:var(--primary); margin-bottom:10px;">📈 Pivot Costi e Ore Lavoro</h3>
+            <p style="font-size:0.85rem; color:#666; margin-bottom:15px;">Analizza ed esplora i task completati e i costi orari imputati.</p>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <button class="btn btn-outline" style="padding:10px; font-weight:bold;" onclick="window.openPivotModal('today')">Oggi</button>
+                <button class="btn btn-outline" style="padding:10px; font-weight:bold;" onclick="window.openPivotModal('week')">Ultimi 7 gg</button>
+                <button class="btn btn-outline" style="padding:10px; font-weight:bold;" onclick="window.openPivotModal('month')">Ultimo Mese</button>
+                <button class="btn btn-outline" style="padding:10px; font-weight:bold;" onclick="window.openPivotModal('year')">Quest'Anno</button>
+            </div>
+            <button class="btn btn-primary mt-3" style="width:100%; padding:12px; font-weight:bold; font-size:1.1rem;" onclick="window.openPivotModal('completed')">Tutti i Task Completati</button>
+        </div>
+
+        <button class="btn btn-outline" style="margin-bottom:20px;" onclick="alert('Export CSV / Struttura Dati pronta nel database Firebase!')">📥 Esporta Dati</button>
     `;
 }
 
-function initDynamicBlocks(containerId, addBtnId) {
-    const container = document.getElementById(containerId);
-    const btnAdd = document.getElementById(addBtnId);
+window.openTaskDetail = async (taskId) => {
+    const t = liveTasks.find(x=>x.id===taskId); if(!t) return;
+    if(!(t.readBy||[]).includes(currentUser.id)) {
+        await updateDoc(doc(db,"tasks",taskId),{readBy: arrayUnion(currentUser.id)});
+        if(!t.readBy) t.readBy = [];
+        t.readBy.push(currentUser.id);
+        renderHome();
+    }
+    const ev = liveExpenses.filter(e=>e.taskId===taskId);
+    const expHtml = ev.length===0?'Nessuna spesa.':ev.map(e=>`<div class="flex-between"><span>${e.description}</span><strong>€${e.amount.toFixed(2)}</strong></div><div style="font-size:0.75rem; color:var(--text-muted)">${(e.allocations||[]).map(a=>`${appCache.organizations[a.entityId]?.name || appCache.families[a.entityId]?.name || a.entityId}(${a.percentage.toFixed(0)}%)`).join(', ')}</div><div class="mt-1" style="text-align:right;"><button class="btn btn-outline" style="padding:4px 8px; font-size:0.75rem; margin-right:5px;" onclick="window.editExpense('${e.id}')">✏️ Modifica</button><button class="btn btn-danger btn-outline" style="padding:4px 8px; font-size:0.75rem;" onclick="window.deleteExpense('${e.id}', true)">🗑️ Elimina</button></div>`).join('');
+    let supW = ``; if(t.supportWorkers && t.supportWorkers.length > 0) { supW = `<div class="mt-2"><span style="font-size:0.8rem; color:#666;">👨‍🔧 Supporto:</span> ${t.supportWorkers.map(w=>`<span class="entity-tag" style="background:#e0f2fe; color:#1e40af;">${appCache.external_workers[w]?.fullName||w}</span>`).join(' ')}</div>`; }
     
-    if(!container || !btnAdd) return;
-
-    // Configura blocco singolo
-    const addBlock = (data = null) => {
-        const div = document.createElement('div');
-        div.innerHTML = createInterventionBlockHTML();
-        const block = div.firstElementChild;
-        
-        block.querySelector('.btn-remove-block').addEventListener('click', () => {
-            if(container.children.length > 1) { 
-                block.remove();
-            } else {
-                alert("Devi mantenere almeno un blocco intervento.");
-            }
-        });
-
-        if (data) {
-            let tipoSelect = block.querySelector('.block-tipo');
-            let tipoMatched = Array.from(tipoSelect.options).some(o => o.value === data.tipo);
-            if (data.tipo && !tipoMatched) {
-                const optT = document.createElement('option');
-                optT.value = data.tipo;
-                optT.textContent = data.tipo;
-                let altroTOpt = tipoSelect.querySelector('option[value="Altro"]');
-                if (altroTOpt) tipoSelect.insertBefore(optT, altroTOpt);
-                else tipoSelect.appendChild(optT);
-            }
-            tipoSelect.value = data.tipo || "";
-
-            let dispSelect = block.querySelector('.block-disp');
-            let dispMatched = Array.from(dispSelect.options).some(o => o.value === data.disp);
-            if (data.disp && !dispMatched) {
-                const optD = document.createElement('option');
-                optD.value = data.disp;
-                optD.textContent = data.disp;
-                let altroDOpt = dispSelect.querySelector('option[value="Altro"]');
-                if (altroDOpt) dispSelect.insertBefore(optD, altroDOpt);
-                else dispSelect.appendChild(optD);
-            }
-            dispSelect.value = data.disp || "";
-            
-            if(data.mat) block.querySelector('.block-mat').value = data.mat;
-            if(data.operatoreValutazione) {
-                let opSel = block.querySelector('.block-operatore');
-                if(opSel) opSel.value = data.operatoreValutazione;
-            }
-            if(data.esito) {
-                let eSel = block.querySelector('.block-esito');
-                if(eSel) eSel.value = data.esito;
-            }
-            if(data.statoValutazione) {
-                let sSel = block.querySelector('.block-stato-valutazione');
-                if(sSel) sSel.value = data.statoValutazione;
-            }
-        }
-        
-        // Logica Accessori Dinamici
-        const dispSelectNode = block.querySelector('.block-disp');
-        const accContainer = block.querySelector('.accessori-container');
-        const accList = block.querySelector('.accessori-list');
-        const seqexContainer = block.querySelector('.seqex-container');
-        const seqexProgList = block.querySelector('.seqex-programmi-list');
-        const seqexVolte = block.querySelector('.seqex-volte');
-        const seqexMinuti = block.querySelector('.seqex-minuti');
-        
-        const renderAccessoriForDisp = (selectedDispId, preselectedAccArray = []) => {
-            accList.innerHTML = '';
-            const listDispositivi = window.antimoDropdownLists?.dispositivi || [];
-            const dev = listDispositivi.find(d => d.id === selectedDispId);
-            
-            if (dev && dev.accessori && dev.accessori.length > 0) {
-                accContainer.style.display = 'block';
-                dev.accessori.forEach(a => {
-                    const isChecked = preselectedAccArray.includes(a.desc) ? 'checked' : '';
-                    accList.innerHTML += `
-                        <label style="display:flex; align-items:center; gap:5px; font-size:0.85rem; background:white; border:1px solid #cbd5e1; padding:4px 8px; border-radius:6px; cursor:pointer;">
-                            <input type="checkbox" class="acc-chkbox" value="${a.desc.replace(/"/g, '&quot;')}" ${isChecked}>
-                            ${a.desc}
-                        </label>
-                    `;
-                });
-            } else {
-                accContainer.style.display = 'none';
-            }
-        };
-
-        const renderSeqexForDisp = (selectedDispId, savedData = null) => {
-            const listDispositivi = window.antimoDropdownLists?.dispositivi || [];
-            const dev = listDispositivi.find(d => d.id === selectedDispId);
-            const devDesc = dev ? dev.desc : selectedDispId;
-            const isSeqex = devDesc && devDesc.toUpperCase().includes('SEQEX');
-            
-            if (isSeqex) {
-                seqexContainer.style.display = 'block';
-                seqexProgList.innerHTML = '';
-                const listProg = window.antimoDropdownLists?.programmi_seqex || [];
-                const preselectedProg = savedData && savedData.seqex_programmiStr ? savedData.seqex_programmiStr.split(',').map(s=>s.trim()) : [];
-                
-                listProg.forEach(p => {
-                    const isChecked = preselectedProg.includes(p.desc) ? 'checked' : '';
-                    seqexProgList.innerHTML += `
-                        <label style="display:flex; align-items:center; gap:5px; font-size:0.85rem; background:white; border:1px solid #a5b4fc; padding:4px 8px; border-radius:6px; cursor:pointer;">
-                            <input type="checkbox" class="seqex-chkbox" value="${p.desc.replace(/"/g, '&quot;')}" ${isChecked}>
-                            ${p.desc}
-                        </label>
-                    `;
-                });
-                
-                if (savedData) {
-                    seqexVolte.value = savedData.seqex_volte || '';
-                    seqexMinuti.value = savedData.seqex_minuti || '';
-                }
-            } else {
-                seqexContainer.style.display = 'none';
-            }
-        };
-
-        // Aggiorna dinamicamente all'onchange
-        dispSelectNode.addEventListener('change', (e) => {
-            renderAccessoriForDisp(e.target.value, []);
-            renderSeqexForDisp(e.target.value, null);
-        });
-
-        // Avvio iniziale (es. in Modifica)
-        if (data && data.disp) {
-            renderAccessoriForDisp(data.disp, data.accessori || []);
-            renderSeqexForDisp(data.disp, data);
-        }
-        
-        // Logica Barcode Scanner
-        const scanBtn = block.querySelector('.btn-scan-barcode');
-        const matInput = block.querySelector('.block-mat');
-        scanBtn.addEventListener('click', () => {
-            window.openBarcodeScanner(matInput);
-        });
-        
-        container.appendChild(block);
-    };
-
-    // Assicurati che lo svuotamento parta pulito e con un blocco ready
-    container.innerHTML = '';
-    addBlock();
-
-    // Event listener per il pulsante
-    btnAdd.addEventListener('click', () => addBlock());
+    let acts = '';
     
-    return { addBlock, container }; // Export hook se necessario altrove
-}
-
-// Helper per leggere i dati al submit
-function extractDynamicBlocksData(containerId) {
-    const container = document.getElementById(containerId);
-    if(!container) return { array: [], tipoStr: "", dispStr: "", matStr: "", operatoreValutazioneStr: "", esitoStr: "", statoValutazioneStr: "" };
-    
-    let blocks = [];
-    container.querySelectorAll('.dynamic-intervention-block').forEach(b => {
-        let t = b.querySelector('.block-tipo').value.trim();
-        let d = b.querySelector('.block-disp').value.trim();
-        let m = b.querySelector('.block-mat').value.trim();
-        
-        let accCheckboxes = b.querySelectorAll('.acc-chkbox:checked');
-        let acc = Array.from(accCheckboxes).map(c => c.value);
-        let accJoin = acc.join(' + ');
-        
-        let seqexCheckboxes = b.querySelectorAll('.seqex-chkbox:checked');
-        let seqexProgStr = Array.from(seqexCheckboxes).map(c => c.value).join(', ');
-        let seqexVolteVal = b.querySelector('.seqex-volte') ? b.querySelector('.seqex-volte').value.trim() : "";
-        let seqexMinutiVal = b.querySelector('.seqex-minuti') ? b.querySelector('.seqex-minuti').value.trim() : "";
-        
-        let op = b.querySelector('.block-operatore') ? b.querySelector('.block-operatore').value.trim() : "";
-        let es = b.querySelector('.block-esito') ? b.querySelector('.block-esito').value.trim() : "";
-        let st = b.querySelector('.block-stato-valutazione') ? b.querySelector('.block-stato-valutazione').value.trim() : "";
-        
-        if(t || d || m || op || es || st || acc.length > 0 || seqexProgStr || seqexVolteVal || seqexMinutiVal) {
-            blocks.push({ 
-                tipo: t, disp: d, mat: m, accessori: acc, accessoriStr: accJoin, 
-                seqex_programmiStr: seqexProgStr, seqex_volte: seqexVolteVal, seqex_minuti: seqexMinutiVal,
-                operatoreValutazione: op, esito: es, statoValutazione: st 
-            });
-        }
-    });
-    
-    return {
-        array: blocks,
-        tipoStr: blocks.map(b => b.tipo).filter(x=>x).join(', '),
-        dispStr: blocks.map(b => b.disp).filter(x=>x).join(', '),
-        matStr: blocks.map(b => b.mat).filter(x=>x).join('; '),
-        accStr: blocks.map(b => b.accessoriStr).filter(x=>x).join('; '),
-        seqexProgrammiStr: blocks.map(b => b.seqex_programmiStr).filter(x=>x).join('; '),
-        operatoreValutazioneStr: blocks.map(b => b.operatoreValutazione).filter(x=>x).join(', '),
-        esitoStr: blocks.map(b => b.esito).filter(x=>x).join('; '),
-        statoValutazioneStr: blocks.map(b => b.statoValutazione).filter(x=>x).join(', ')
-    };
-}
-
-// --- LOGICA HTML5-QRCODE SCANNER ---
-let html5QrcodeScanner = null;
-window.openBarcodeScanner = function(targetInputElement) {
-    const modal = document.getElementById('barcodeScannerModal');
-    if(!modal) return alert("Errore: Modale Scanner non trovato.");
-    
-    modal.classList.remove('hidden');
-    
-    if(!html5QrcodeScanner) {
-        html5QrcodeScanner = new Html5Qrcode("qr-reader");
+    if(currentUser.roles.includes('technician') && t.assignedTo===currentUser.id) {
+        if(t.status==='assigned') acts = `<button class="btn btn-primary" onclick="window.execAction('START_TASK','${t.id}')">Inizia Lavoro</button>`;
+        else if(t.status==='in_progress') acts = `<button class="btn btn-secondary mb-2" onclick="window.openExpenseWizard('${t.id}')">➕ Aggiungi Spesa</button><button class="btn btn-success" onclick="window.execAction('COMP_TASK','${t.id}')">✔️ Completato</button>`;
     }
     
-    html5QrcodeScanner.start(
-        { facingMode: "environment" }, 
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText, decodedResult) => {
-            // Success callback
-            html5QrcodeScanner.stop().then((ignore) => {
-                targetInputElement.value = decodedText;
-                modal.classList.add('hidden');
-                // Optional beep feedback
-                try { if("vibrate" in navigator) navigator.vibrate(200); } catch(e){}
-            }).catch((err) => {
-                console.error("Failed to stop scanner", err);
-            });
-        },
-        (errorMessage) => {
-            // Ignore ongoing errors while searching for code
-        }
-    ).catch((err) => {
-        alert("Errore fotocamera: " + err);
-        modal.classList.add('hidden');
-    });
+    if(t.status !== 'completed') acts = `<button class="btn btn-warning mb-2" style="width:100%; color:black;" onclick="window.openNewRequestWizard('${t.id}')">✏️ Modifica Task</button>` + acts;
+    else acts = `<button class="btn btn-info mb-2" style="width:100%; color:white; background:var(--primary);" onclick="window.openCompleteTaskWizard('${t.id}')">✏️ Modifica Consuntivo Costo</button>` + acts;
+    acts += `<button class="btn btn-danger btn-outline mt-4" onclick="window.execAction('DEL_TASK','${t.id}')">🗑️ Elimina</button>`;
+
+    const wv = liveWorkSessions.filter(w=>w.taskId===taskId);
+    const wrkHtml = wv.length===0?'<div class="text-muted" style="font-size:0.85rem;">Nessuna manovalanza.</div>':wv.map(w=>`<div class="flex-between" style="margin-top:5px; border-top:1px dashed #eee; padding-top:5px;"><span>${appCache.external_workers[w.workerId]?.fullName||w.workerId} (${w.hours}h)</span><strong>€${w.cost.toFixed(2)}</strong></div><div style="font-size:0.75rem; color:var(--text-muted)">${(w.allocations||[]).map(a=>`${appCache.organizations[a.entityId]?.name || appCache.families[a.entityId]?.name || a.entityId}(${a.percentage.toFixed(0)}%)`).join(', ')}</div><div class="mt-1" style="text-align:right;"><button class="btn btn-outline" style="padding:4px 8px; font-size:0.75rem; margin-right:5px;" onclick="window.editWorkSession('${w.id}')">✏️ Modifica</button><button class="btn btn-danger btn-outline" style="padding:4px 8px; font-size:0.75rem;" onclick="window.deleteWorkSession('${w.id}')">🗑️ Elimina</button></div>`).join('');
     
-    const btnClose = document.getElementById('btnCloseBarcodeScanner');
-    if(btnClose) {
-        btnClose.onclick = () => {
-            html5QrcodeScanner.stop().then((ignore) => {
-                modal.classList.add('hidden');
-            }).catch((err) => {
-                modal.classList.add('hidden');
-            });
-        };
-    }
-}
-// --- FINE LOGICA BLOCCHI DINAMICI E SCANNER ---
-
-// LOGICA MESSAGGISTICA E NOTIFICHE
-let messagesDataCache = []; // Cache for filtering without refetching
-
-const btnMsgTabResolved = document.getElementById('btnMsgTabResolved');
-
-function updateMsgTabsUI() {
-    if(btnMsgTabAll) btnMsgTabAll.className = (currentMsgTab === 'all') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
-    if(btnMsgTabReceived) btnMsgTabReceived.className = (currentMsgTab === 'received') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
-    if(btnMsgTabSent) btnMsgTabSent.className = (currentMsgTab === 'sent') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
-    if(btnMsgTabUnread) btnMsgTabUnread.className = (currentMsgTab === 'unread') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
-    if(btnMsgTabRead) btnMsgTabRead.className = (currentMsgTab === 'read') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
-    if(btnMsgTabDeleted) btnMsgTabDeleted.className = (currentMsgTab === 'deleted') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
-    if(btnMsgTabResolved) btnMsgTabResolved.className = (currentMsgTab === 'resolved') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
-    if(btnMsgTabInCharge) btnMsgTabInCharge.className = (currentMsgTab === 'in_charge') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
-    if(btnMsgTabReplied) btnMsgTabReplied.className = (currentMsgTab === 'replied') ? "btn btn-sm btn-primary btn-blue" : "btn btn-sm btn-secondary";
-}
-
-if(btnMsgTabAll) btnMsgTabAll.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'all'; updateMsgTabsUI(); renderMessagesUI(); });
-if(btnMsgTabReceived) btnMsgTabReceived.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'received'; updateMsgTabsUI(); renderMessagesUI(); });
-if(btnMsgTabSent) btnMsgTabSent.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'sent'; updateMsgTabsUI(); renderMessagesUI(); });
-if(btnMsgTabUnread) btnMsgTabUnread.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'unread'; updateMsgTabsUI(); renderMessagesUI(); });
-if(btnMsgTabRead) btnMsgTabRead.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'read'; updateMsgTabsUI(); renderMessagesUI(); });
-if(btnMsgTabDeleted) btnMsgTabDeleted.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'deleted'; updateMsgTabsUI(); renderMessagesUI(); });
-if(btnMsgTabResolved) btnMsgTabResolved.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'resolved'; updateMsgTabsUI(); renderMessagesUI(); });
-if(btnMsgTabInCharge) btnMsgTabInCharge.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'in_charge'; updateMsgTabsUI(); renderMessagesUI(); });
-if(btnMsgTabReplied) btnMsgTabReplied.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'replied'; updateMsgTabsUI(); renderMessagesUI(); });
-
-if(btnEmptyTrash) btnEmptyTrash.addEventListener('click', async (e) => {
-    e.preventDefault();
-    if(!confirm("Sei sicuro di voler SVUOTARE IL CESTINO? Tutti i messaggi eliminati verranno distrutti per sempre!")) return;
-    try {
-        const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        const toDelete = messagesDataCache.filter(item => item.data.eliminato === true);
-        for(let msg of toDelete) {
-            await deleteDoc(doc(db, "messaggi", msg.id));
-        }
-    } catch(err) { console.error("Errore svuota cestino", err); }
-});
-
-if(msgSearchText) msgSearchText.addEventListener('input', () => renderMessagesUI());
-if(msgSearchUser) msgSearchUser.addEventListener('change', () => renderMessagesUI());
-if(msgSearchDate) msgSearchDate.addEventListener('change', () => renderMessagesUI());
-
-async function loadMessages() {
-    if (!isFirebaseConfigured) {
-        if(messagesList) messagesList.innerHTML = '<div style="color:red; font-size:0.85rem; text-align:center;">Sincronizzazione Cloud non configurata per i messaggi.</div>';
-        return;
-    }
-    try {
-        const { query, collection, onSnapshot, orderBy } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        const q = query(collection(db, "messaggi"), orderBy("timestamp", "desc"));
-        
-        onSnapshot(q, (snapshot) => {
-            messagesDataCache = [];
-            let uniqueUsers = new Set();
-            snapshot.forEach((docSnap) => {
-                const d = docSnap.data();
-                messagesDataCache.push({ id: docSnap.id, data: d });
-                if(d.sender && d.sender !== "Sconosciuto") uniqueUsers.add(d.sender);
-                if(d.recipients && d.recipients !== "Bacheca (Tutti)") {
-                    if (typeof d.recipients === 'string') {
-                        d.recipients.split(',').forEach(r => uniqueUsers.add(r.trim()));
-                    } else if (Array.isArray(d.recipients)) {
-                        d.recipients.forEach(r => uniqueUsers.add(r));
-                    }
-                }
-            });
-
-            if(msgSearchUser) {
-                const currentVal = msgSearchUser.value;
-                msgSearchUser.innerHTML = '<option value="">Utente (Tutti)</option>';
-                Array.from(uniqueUsers).sort().forEach(u => {
-                    if(u) {
-                        let opt = document.createElement('option');
-                        opt.value = u;
-                        opt.textContent = u;
-                        msgSearchUser.appendChild(opt);
-                    }
-                });
-                msgSearchUser.value = currentVal;
-            }
-
-            renderMessagesUI();
-        }, (error) => {
-            console.error("Errore snapshot messaggi", error);
-            if(messagesList) messagesList.innerHTML = '<div style="color:red; font-size:0.85rem; text-align:center;">Errore caricamento messaggi.</div>';
-        });
-    } catch(e) { console.error(e); }
-}
-
-function renderMessagesUI() {
-    if(!messagesList) return;
-    messagesList.innerHTML = '';
-    let count = 0;
-    let activeNotes = [];
-
-    const currentUser = localStorage.getItem('antimo_user_name') || "Sconosciuto";
-    const filterTecnico = document.getElementById('filterTecnicoOggi') ? document.getElementById('filterTecnicoOggi').value : "MIO";
-    const filterName = filterTecnico === "MIO" ? currentUser : filterTecnico;
-
-    const searchText = (msgSearchText && msgSearchText.value) ? msgSearchText.value.toLowerCase() : "";
-    const searchUser = (msgSearchUser && msgSearchUser.value) ? msgSearchUser.value : "";
-    const searchDate = (msgSearchDate && msgSearchDate.value) ? msgSearchDate.value : "";
-    
-    // Calculate counts for categories
-    let countAll = 0;
-    let countUnread = 0;
-    let countRead = 0;
-    let countReceived = 0;
-    let countSent = 0;
-    let countDeleted = 0;
-    let countResolved = 0;
-    let countInCharge = 0;
-    let countReplied = 0;
-    
-    messagesDataCache.forEach(item => {
-        const d = item.data;
-        let sN = d.sender || "Sconosciuto";
-        let rN = d.recipients || "Bacheca (Tutti)";
-        if (Array.isArray(rN)) rN = rN.join(', ');
-
-        if (filterTecnico !== "TUTTI") {
-            const isRelevantForFilter = (sN === filterName) || (rN.includes(filterName)) || (rN === "Bacheca (Tutti)");
-            if (!isRelevantForFilter) return; // skip
-        }
-
-        // Apply shared filters (Search Text, Search User, Search Date)
-        if (searchUser && sN !== searchUser && !rN.includes(searchUser)) return;
-        if (searchText) {
-            const msgT = (d.text || "").toLowerCase();
-            const senderT = sN.toLowerCase();
-            if (!msgT.includes(searchText) && !senderT.includes(searchText)) return;
-        }
-        if (searchDate && d.timestamp) {
-            const dt = new Date(d.timestamp.toMillis());
-            const dtStr = dt.getFullYear() + "-" + String(dt.getMonth()+1).padStart(2,'0') + "-" + String(dt.getDate()).padStart(2,'0');
-            if (dtStr !== searchDate) return;
-        }
-
-        // Tally categories mutually exclusive funnel
-        const isReadByMe = d.lettiDa && d.lettiDa.includes(currentUser);
-
-        if (d.eliminato === true) {
-            countDeleted++;
-        } else if (d.isResolved === true) {
-            countResolved++;
-        } else if (d.haRisposto === true) {
-            countReplied++;
-            countAll++;
-        } else if (d.presoInCarico === true) {
-            countInCharge++;
-            countAll++;
-        } else {
-            if (!isReadByMe) {
-                countAll++;
-                countUnread++;
-            } else {
-                countRead++;
-            }
-            if ((rN === "Bacheca (Tutti)" || rN.includes(currentUser))) countReceived++;
-            if (sN === currentUser) countSent++;
-        }
-    });
-
-    const applyCountStyle = (btn, count, exclude) => {
-        if(!btn) return;
-        if(exclude) {
-            btn.style.backgroundColor = "";
-            btn.style.color = "";
-            return;
-        }
-        if(count > 0) {
-            btn.style.backgroundColor = "var(--blue-primary, #0d6efd)";
-            btn.style.color = "white";
-            btn.style.border = "none";
-        } else {
-            btn.style.backgroundColor = "";
-            btn.style.color = "";
-            btn.style.border = "";
-        }
-    };
-
-    if(btnMsgTabAll) { btnMsgTabAll.innerHTML = `Tutti (${countAll})`; applyCountStyle(btnMsgTabAll, countAll, false); }
-    if(btnMsgTabUnread) { btnMsgTabUnread.innerHTML = `Non Letti (${countUnread})`; applyCountStyle(btnMsgTabUnread, countUnread, false); }
-    if(btnMsgTabRead) { btnMsgTabRead.innerHTML = `👁️ Letti (${countRead})`; applyCountStyle(btnMsgTabRead, countRead, false); }
-    if(btnMsgTabReceived) { btnMsgTabReceived.innerHTML = `Ricevuti (${countReceived})`; applyCountStyle(btnMsgTabReceived, countReceived, false); }
-    if(btnMsgTabSent) { btnMsgTabSent.innerHTML = `Inviati (${countSent})`; applyCountStyle(btnMsgTabSent, countSent, false); }
-    if(btnMsgTabInCharge) { btnMsgTabInCharge.innerHTML = `👷 Presi in Carico (${countInCharge})`; applyCountStyle(btnMsgTabInCharge, countInCharge, false); }
-    if(btnMsgTabReplied) { btnMsgTabReplied.innerHTML = `↩️ Risposti (${countReplied})`; applyCountStyle(btnMsgTabReplied, countReplied, false); }
-    if(btnMsgTabDeleted) { btnMsgTabDeleted.innerHTML = `Cestino (${countDeleted})`; applyCountStyle(btnMsgTabDeleted, countDeleted, true); }
-    if(btnMsgTabResolved) { btnMsgTabResolved.innerHTML = `✅ Risolti (${countResolved})`; applyCountStyle(btnMsgTabResolved, countResolved, true); }
-
-    if(btnEmptyTrash) {
-        if (currentMsgTab === 'deleted' && countDeleted > 0) {
-            btnEmptyTrash.classList.remove('hidden');
-        } else {
-            btnEmptyTrash.classList.add('hidden');
-        }
+    let prioBadge = '';
+    if(t.priority) {
+        const pColors = {high: '#dc2626', medium: '#d97706', low: '#2563eb'};
+        const pText = {high: 'Alta', medium: 'Media', low: 'Bassa'};
+        prioBadge = `<span class="status-badge" style="background:${pColors[t.priority]}; color:white; margin-left:10px;">Priorità: ${pText[t.priority]}</span>`;
     }
 
-    let filtered = messagesDataCache.filter(item => {
-        const d = item.data;
-        let sN = d.sender || "Sconosciuto";
-        let rN = d.recipients || "Bacheca (Tutti)";
-        if (Array.isArray(rN)) rN = rN.join(', ');
-
-        if (currentMsgTab === 'deleted') {
-            if (d.eliminato !== true) return false;
-        } else if (currentMsgTab === 'resolved') {
-            if (d.isResolved !== true || d.eliminato) return false;
-        } else if (currentMsgTab === 'replied') {
-            if (d.haRisposto !== true || d.isResolved || d.eliminato) return false;
-        } else if (currentMsgTab === 'in_charge') {
-            if (d.presoInCarico !== true || d.haRisposto || d.isResolved || d.eliminato) return false;
-        } else if (currentMsgTab === 'read') {
-            const isReadByMe = d.lettiDa && d.lettiDa.includes(currentUser);
-            if (!isReadByMe || d.eliminato) return false;
-        } else if (currentMsgTab === 'all') {
-            const isReadByMe = d.lettiDa && d.lettiDa.includes(currentUser);
-            if (d.eliminato || d.isResolved || isReadByMe) return false;
-        } else {
-            // received, sent, unread
-            const isReadByMe = d.lettiDa && d.lettiDa.includes(currentUser);
-            if (d.eliminato || d.isResolved || d.haRisposto || d.presoInCarico || isReadByMe) return false;
-            if (currentMsgTab === 'received') {
-                if (rN !== "Bacheca (Tutti)" && !rN.includes(currentUser)) return false;
-            } else if (currentMsgTab === 'sent') {
-                if (sN !== currentUser) return false;
-            } else if (currentMsgTab === 'unread') {
-                // Già escluso da isReadByMe sopra
-            }
-        }
-
-        if (searchUser) {
-            if (sN !== searchUser && !rN.includes(searchUser)) return false;
-        }
-
-        if (searchText) {
-            const msgT = (d.text || "").toLowerCase();
-            const senderT = sN.toLowerCase();
-            if (!msgT.includes(searchText) && !senderT.includes(searchText)) return false;
-        }
-
-        if (searchDate && d.timestamp) {
-            const dt = new Date(d.timestamp.toMillis());
-            const dtStr = dt.getFullYear() + "-" + String(dt.getMonth()+1).padStart(2,'0') + "-" + String(dt.getDate()).padStart(2,'0');
-            if (dtStr !== searchDate) return false;
-        }
-
-        return true;
-    });
-
-    if (filtered.length === 0) {
-        messagesList.innerHTML = '<div style="text-align: center; font-size: 0.9rem; color: #666; padding: 10px;">Nessun messaggio trovato per questa selezione.</div>';
-    } else {
-        filtered.forEach((item) => {
-            count++;
-            const data = item.data;
-            const docSnapId = item.id;
-            
-            const isReadByMe = data.lettiDa && data.lettiDa.includes(currentUser);
-
-            // Notification badge condition: only brand new untouched messages
-            if(data.isNotification && !data.eliminato && !isReadByMe && !data.presoInCarico) {
-                activeNotes.push(data.text);
-            }
-            
-            const div = document.createElement('div');
-            div.setAttribute('data-id', docSnapId);
-            div.style.padding = "10px";
-            div.style.borderRadius = "8px";
-            div.style.backgroundColor = data.isNotification ? "#fffbeb" : (isReadByMe ? "#f8fafc" : "#f1f5f9");
-            if (data.eliminato) div.style.backgroundColor = "#fee2e2";
-            div.style.borderLeft = data.isNotification ? "4px solid #f59e0b" : "4px solid #cbd5e1";
-            if (data.eliminato) div.style.borderLeft = "4px solid #ef4444";
-            div.style.fontSize = "0.9rem";
-            div.style.display = "flex";
-            div.style.flexDirection = "column";
-            div.style.gap = "5px";
-            div.style.transition = "background-color 1s ease";
-            if(isReadByMe && !data.isNotification && !data.eliminato) div.style.opacity = "0.6";
-            if(data.eliminato) div.style.opacity = "0.8";
-
-            let timeStr = "--/--/---- --:--";
-            if(data.timestamp) {
-                const d = new Date(data.timestamp.toMillis());
-                timeStr = `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-            }
-
-            let sN = data.sender || "Sconosciuto";
-            let rN = data.recipients || "Bacheca (Tutti)";
-            
-            let attHtml = '';
-            if(data.fileUrls && data.fileUrls.length > 0) {
-                attHtml = '<div style="margin-top: 10px; display: flex; gap: 5px; flex-wrap: wrap;">';
-                data.fileUrls.forEach(f => {
-                    attHtml += `<a href="${f.url}" target="_blank" style="display:inline-flex; align-items:center; gap:5px; padding:4px 8px; background:rgba(59,130,246,0.1); color:var(--blue-primary); border-radius:4px; text-decoration:none; font-size:0.8rem; border:1px solid #bfdbfe;">📎 ${f.name || 'Allegato'}</a>`;
-                });
-                attHtml += '</div>';
-            }
-
-            div.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <span style="font-size: 0.75rem; color: #666; font-weight: 600;">⏰ ${timeStr} </span>
-                    <div>
-                        ${data.eliminato ? '<span style="font-size:0.75rem; background:#ef4444; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">🗑️ CESTINO</span>' : ''}
-                        ${data.isResolved && !data.eliminato ? '<span style="font-size:0.75rem; background:#10b981; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">✅ RISOLTO</span>' : ''}
-                        ${data.haRisposto && !data.eliminato && !data.isResolved ? `<span style="font-size:0.75rem; background:#6366f1; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">↩️ RISPOSTO</span>` : ''}
-                        ${data.presoInCarico && !data.eliminato && !data.isResolved && !data.haRisposto ? `<span style="font-size:0.75rem; background:#3b82f6; color:white; padding:2px 6px; border-radius:12px; font-weight:bold; margin-right:4px;">👷 Preso in Carico da ${data.presoInCaricoDa || 'Te'}</span>` : ''}
-                        ${data.isNotification && !data.eliminato && !data.isResolved ? '<span style="font-size:0.75rem; background:#f59e0b; color:white; padding:2px 6px; border-radius:12px; font-weight:bold;">📌 NOTIFICA</span>' : ''}
-                    </div>
-                </div>
-                <div style="margin-top:5px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; font-size: 0.8rem; color: var(--blue-dark);">
-                    <strong>Da:</strong> ${sN} &nbsp;|&nbsp; <strong>A:</strong> ${rN}
-                </div>
-                <div style="color: #333; line-height: 1.4; white-space: pre-wrap; margin-top:5px; ${(isReadByMe || data.eliminato) ? 'text-decoration: line-through; color: #777;' : ''}">${data.text}</div>
-                ${attHtml}
-            `;
-            
-            const actionDiv = document.createElement('div');
-            actionDiv.style.display = "flex";
-            actionDiv.style.gap = "8px";
-            actionDiv.style.marginTop = "8px";
-            actionDiv.style.flexWrap = "wrap";
-
-            if (data.eliminato) {
-                const restoreBtn = document.createElement('button');
-                restoreBtn.innerHTML = "♻️ Ripristina";
-                restoreBtn.style.cssText = "background: none; border: 1px solid #10b981; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #047857; background-color: rgba(16,185,129,0.1);";
-                restoreBtn.onclick = async () => {
-                    try {
-                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await updateDoc(doc(db, "messaggi", docSnapId), { eliminato: false });
-                    } catch(err) { console.error("Errore ripristino", err); }
-                };
-                actionDiv.appendChild(restoreBtn);
-
-                const hardDeleteBtn = document.createElement('button');
-                hardDeleteBtn.innerHTML = "🔥 Elimina Definitivamente";
-                hardDeleteBtn.style.cssText = "background: none; border: 1px solid #dc2626; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #b91c1c; background-color: rgba(220,38,38,0.1); font-weight: bold;";
-                hardDeleteBtn.onclick = async () => {
-                    if(!confirm("Sei sicuro di voler distruggere per sempre questo messaggio? Non potrà essere recuperato!")) return;
-                    try {
-                        const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await deleteDoc(doc(db, "messaggi", docSnapId));
-                    } catch(err) { console.error("Errore hard delete", err); }
-                };
-                actionDiv.appendChild(hardDeleteBtn);
-            } else if (data.isResolved) {
-                const riprendiBtn = document.createElement('button');
-                riprendiBtn.innerHTML = "♻️ Riprendi in Carico";
-                riprendiBtn.style.cssText = "background: none; border: 1px solid #f59e0b; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #b45309; background-color: rgba(245,158,11,0.1);";
-                riprendiBtn.onclick = async () => {
-                    try {
-                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await updateDoc(doc(db, "messaggi", docSnapId), { isResolved: false });
-                    } catch(err) { console.error("Errore riprendi risolto", err); }
-                };
-                actionDiv.appendChild(riprendiBtn);
-
-                const hardDeleteBtn = document.createElement('button');
-                hardDeleteBtn.innerHTML = "🔥 Elimina Definitivamente";
-                hardDeleteBtn.style.cssText = "background: none; border: 1px solid #dc2626; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #b91c1c; background-color: rgba(220,38,38,0.1); font-weight: bold;";
-                hardDeleteBtn.onclick = async () => {
-                    if(!confirm("Sei sicuro di voler distruggere per sempre questo messaggio? Non potrà essere recuperato!")) return;
-                    try {
-                        const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await deleteDoc(doc(db, "messaggi", docSnapId));
-                    } catch(err) { console.error("Errore hard delete", err); }
-                };
-                actionDiv.appendChild(hardDeleteBtn);
-            } else {
-                const toggleBtn = document.createElement('button');
-                toggleBtn.innerHTML = data.isNotification ? "🔕 Annulla Notifica" : "🔔 Setta Promemoria";
-                toggleBtn.style.cssText = "background: none; border: 1px solid #b8b8b8; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #555; background-color: rgba(255,255,255,0.5);";
-                toggleBtn.onclick = async () => {
-                    try {
-                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await updateDoc(doc(db, "messaggi", docSnapId), { isNotification: !data.isNotification });
-                    } catch(err) { console.error("Errore toggle", err); }
-                };
-                actionDiv.appendChild(toggleBtn);
-
-                const replyBtn = document.createElement('button');
-                replyBtn.innerHTML = "↩️ Rispondi";
-                replyBtn.style.cssText = "background: none; border: 1px solid #10b981; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #047857; background-color: rgba(16,185,129,0.1); font-weight: bold;";
-                replyBtn.onclick = () => {
-                    window.pendingReplyRecipients = [sN];
-                    window.replyingToMsgId = docSnapId;
-                    if(msgText) {
-                        msgText.placeholder = `Rispondi a ${sN}...`;
-                        msgText.focus();
-                        msgText.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-                };
-                actionDiv.appendChild(replyBtn);
-
-                const replyAllBtn = document.createElement('button');
-                replyAllBtn.innerHTML = "↩️👥 Rispondi a tutti";
-                replyAllBtn.style.cssText = "background: none; border: 1px solid #059669; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #065f46; background-color: rgba(5,150,105,0.1); font-weight: bold;";
-                replyAllBtn.onclick = () => {
-                    let allRecs = [sN];
-                    if (data.recipients && data.recipients !== "Bacheca (Tutti)") {
-                        if (typeof data.recipients === 'string') {
-                            data.recipients.split(',').forEach(r => allRecs.push(r.trim()));
-                        } else if (Array.isArray(data.recipients)) {
-                            data.recipients.forEach(r => allRecs.push(r));
-                        }
-                    }
-                    const currentUser = localStorage.getItem('antimo_user_name') || "Sconosciuto";
-                    allRecs = [...new Set(allRecs)].filter(r => r !== currentUser);
-                    window.pendingReplyRecipients = allRecs;
-                    window.replyingToMsgId = docSnapId;
-                    
-                    if (msgText) {
-                        msgText.placeholder = `Rispondi a tutti (${allRecs.join(', ')})...`;
-                        msgText.focus();
-                        msgText.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-                };
-                actionDiv.appendChild(replyAllBtn);
-
-                const toggleReadBtn = document.createElement('button');
-                toggleReadBtn.innerHTML = isReadByMe ? "📖 Da Leggere" : "✔️ Segna Letto";
-                toggleReadBtn.style.cssText = "background: none; border: 1px solid #b8b8b8; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #555; background-color: rgba(255,255,255,0.5);";
-                toggleReadBtn.onclick = async () => {
-                    try {
-                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        let newLettiDa = data.lettiDa ? [...data.lettiDa] : [];
-                        if (isReadByMe) {
-                            newLettiDa = newLettiDa.filter(u => u !== currentUser);
-                        } else {
-                            newLettiDa.push(currentUser);
-                        }
-                        await updateDoc(doc(db, "messaggi", docSnapId), { lettiDa: newLettiDa, letto: newLettiDa.length > 0 }); // Mantengo anche 'letto: true' per compatibilità globale passata
-                    } catch(err) { console.error("Errore letto", err); }
-                };
-                actionDiv.appendChild(toggleReadBtn);
-                
-                const myUserName = localStorage.getItem('antimo_user_name') || 'Sconosciuto';
-                const toggleCaricoBtn = document.createElement('button');
-                toggleCaricoBtn.innerHTML = data.presoInCarico ? `❌ Annulla Incarico (${data.presoInCaricoDa || 'Te'})` : "👷 Prendi in Carico";
-                toggleCaricoBtn.style.cssText = "background: none; border: 1px solid #3b82f6; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #1d4ed8; background-color: rgba(59,130,246,0.1);";
-                toggleCaricoBtn.onclick = async () => {
-                    try {
-                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        if (data.presoInCarico) {
-                            await updateDoc(doc(db, "messaggi", docSnapId), { presoInCarico: false, presoInCaricoDa: null });
-                        } else {
-                            await updateDoc(doc(db, "messaggi", docSnapId), { presoInCarico: true, presoInCaricoDa: myUserName });
-                        }
-                    } catch(err) { console.error("Errore carico", err); }
-                };
-                actionDiv.appendChild(toggleCaricoBtn);
-
-                if (data.presoInCarico && data.presoInCaricoDa === myUserName) {
-                    const resolveBtn = document.createElement('button');
-                    resolveBtn.innerHTML = "✅ Segna come Risolto";
-                    resolveBtn.style.cssText = "background: none; border: 1px solid #10b981; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #047857; background-color: rgba(16,185,129,0.1); font-weight: bold;";
-                    resolveBtn.onclick = async () => {
-                        try {
-                            const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                            await updateDoc(doc(db, "messaggi", docSnapId), { isResolved: true, isNotification: false, letto: true });
-                        } catch(err) { console.error("Errore risolvi", err); }
-                    };
-                    actionDiv.appendChild(resolveBtn);
-                }
-
-                const deleteBtn = document.createElement('button');
-                deleteBtn.innerHTML = "🗑️ Elimina";
-                deleteBtn.style.cssText = "background: none; border: 1px solid #ffcccc; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; cursor: pointer; color: #d32f2f; background-color: rgba(255,255,255,0.5);";
-                deleteBtn.onclick = async () => {
-                    try {
-                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await updateDoc(doc(db, "messaggi", docSnapId), { eliminato: true });
-                    } catch(err) { console.error("Errore soft delete", err); }
-                };
-                actionDiv.appendChild(deleteBtn);
-            }
-
-            div.appendChild(actionDiv);
-            messagesList.appendChild(div);
-        });
+    let laborInfo = '';
+    if(t.status === 'completed' && t.laborCost !== undefined) {
+        laborInfo = `<div style="margin-top:15px; padding:15px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px;">
+            <div style="font-size:0.9rem; color:#0369a1; margin-bottom:5px;"><strong>Costo Ora di Lavoro:</strong> €${t.laborCost.toFixed(2)} (${t.activityType||'N/A'})</div>
+            <div style="font-size:0.8rem; color:#475569;">Inizio: ${new Date(t.actualStart).toLocaleString()}<br>Fine: ${new Date(t.actualEnd).toLocaleString()}</div>
+        </div>`;
     }
-    
-    // Aggiorna Pulsante Globale Notifiche e Testo "Mostra/Nascondi"
-    if(activeNotes.length > 0 && btnTopNotification) {
-        btnTopNotification.classList.remove('hidden');
-        if(topNotificationText) topNotificationText.textContent = `${activeNotes.length > 1 ? `(${activeNotes.length}) ` : ''}${activeNotes[0]}`;
-    } else if(btnTopNotification) {
-        btnTopNotification.classList.add('hidden');
-    }
-    
-    if(btnToggleMessages) {
-        const isHidden = messagesContainer.classList.contains('hidden');
-        let noteBadge = activeNotes.length > 0 ? ` <span style="background:#ef4444;color:white;padding:3px 8px;border-radius:12px;font-size:1rem;font-weight:bold;margin-left:5px;box-shadow:0 2px 4px rgba(239,68,68,0.3);">${activeNotes.length}</span>` : '';
-        btnToggleMessages.innerHTML = (isHidden ? 'MOSTRA' : 'NASCONDI') + noteBadge;
-    }
-    
-    // In caso di link WhatsApp con msgId
-    const urlParams = new URLSearchParams(window.location.search);
-    const msgId = urlParams.get('msgId');
-    if(msgId && currentMsgTab === 'all') {
-        const targetMsg = messagesList.querySelector(`div[data-id="${msgId}"]`);
-        if(targetMsg) {
-            messagesContainer.classList.remove('hidden');
-            if(btnToggleMessages) btnToggleMessages.textContent = 'Nascondi';
-            setTimeout(() => {
-                targetMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                const originalBg = targetMsg.style.backgroundColor;
-                targetMsg.style.backgroundColor = '#dbeafe';
-                setTimeout(() => { targetMsg.style.backgroundColor = originalBg; }, 3000);
-            }, 500);
-            window.history.replaceState({}, document.title, window.location.pathname);
-        }
-    }
-}
 
-let pendingMessageText = "";
-let pendingMessageIsNotification = false;
-let pendingMessageFiles = [];
-
-const msgAttachmentsInput = document.getElementById('msgAttachments');
-const msgPreviewContainer = document.getElementById('msgPreviewContainer');
-
-if (msgAttachmentsInput) {
-    msgAttachmentsInput.addEventListener('change', (e) => {
-        const files = e.target.files;
-        pendingMessageFiles = [];
-        msgPreviewContainer.innerHTML = '';
-        if (files.length > 0) {
-            msgPreviewContainer.classList.remove('hidden');
-            Array.from(files).forEach(file => {
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    const dataUrl = ev.target.result;
-                    pendingMessageFiles.push({ name: file.name, type: file.type, data: dataUrl });
-                    
-                    const div = document.createElement('div');
-                    div.style.cssText = 'position: relative; width: 60px; height: 60px; border: 1px solid #ccc; border-radius: 4px; overflow: hidden;';
-                    if (file.type.startsWith('image/')) {
-                        div.innerHTML = `<img src="${dataUrl}" style="width:100%; height:100%; object-fit:cover;">`;
-                    } else if (file.type.startsWith('video/')) {
-                        div.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#eee; font-size:1.5rem;">🎥</div>`;
-                    } else {
-                        div.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#eee; font-size:1.5rem;">📄</div>`;
-                    }
-                    msgPreviewContainer.appendChild(div);
-                };
-                reader.readAsDataURL(file);
-            });
-        } else {
-            msgPreviewContainer.classList.add('hidden');
-        }
-    });
-}
-
-const btnWhatsappNuovoIntervento = document.getElementById('btnWhatsappNuovoIntervento');
-if (btnWhatsappNuovoIntervento) {
-    btnWhatsappNuovoIntervento.addEventListener('click', () => {
-        let paz = document.getElementById('paziente') ? document.getElementById('paziente').value : "";
-        let loc = document.getElementById('localita') ? document.getElementById('localita').value : "";
-        let ind = document.getElementById('indirizzo') ? document.getElementById('indirizzo').value : "";
-        
-        let extraInfo = "";
-        if (paz || loc || ind) {
-            extraInfo = `\nPaziente: ${paz}\nLuogo: ${loc} - ${ind}`;
-        }
-        
-        pendingMessageText = "NUOVO INTERVENTO" + extraInfo;
-        pendingMessageIsNotification = false;
-        if(waSelectModal) waSelectModal.classList.remove('hidden');
-    });
-}
-
-// GLOBAL PASTE LISTENER PRO (Bacheca & Allegati Intervento)
-document.addEventListener('paste', (e) => {
-    const target = e.target;
-    // Identifichiamo dove l'utente sta incollando
-    const isBacheca = target.id === 'msgText';
-    // Qualunque casella di testo durante l'inserimento/modifica intervento vale per gli allegati
-    const isInterventionNote = target.closest('#interventionSection') && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT');
-
-    if (!isBacheca && !isInterventionNote) return;
-
-    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-    for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.kind === 'file' && item.type.startsWith('image/')) {
-            const file = item.getAsFile();
-            if (!file) continue;
-
-            const fileName = `PastedImage_${Date.now()}.png`;
-            const reader = new FileReader();
-
-            reader.onload = (ev) => {
-                const dataUrl = ev.target.result;
-
-                if (isBacheca) {
-                    if (msgPreviewContainer) msgPreviewContainer.classList.remove('hidden');
-                    pendingMessageFiles.push({ name: fileName, type: file.type, data: dataUrl });
-
-                    if (msgPreviewContainer) {
-                        const div = document.createElement('div');
-                        div.style.cssText = 'position: relative; width: 60px; height: 60px; border: 1px solid #ccc; border-radius: 4px; overflow: hidden; margin-top: 5px; margin-right: 5px; display: inline-block;';
-                        div.innerHTML = `<img src="${dataUrl}" style="width:100%; height:100%; object-fit:cover;">`;
-                        msgPreviewContainer.appendChild(div);
-                    }
-                } else if (isInterventionNote) {
-                    // Lo inseriamo negli allegati dell'Intervento (Eseguito / Programmato)
-                    const filePreviewCont = document.getElementById('filePreviewContainer');
-                    if (filePreviewCont) filePreviewCont.classList.remove('hidden');
-                    
-                    currentAttachments.push({
-                        data: dataUrl,
-                        type: file.type,
-                        name: fileName
-                    });
-                    
-                    if (typeof renderAttachmentsPreview === 'function') {
-                        renderAttachmentsPreview();
-                    }
-                }
-            };
-            reader.readAsDataURL(file);
-        }
-    }
-});
-
-const waSelectModal = document.getElementById('waSelectModal');
-const waContactsList = document.getElementById('waContactsList');
-const waSelectAll = document.getElementById('waSelectAll');
-const btnWaSkip = document.getElementById('btnWaSkip');
-const btnWaSend = document.getElementById('btnWaSend');
-const btnCloseWaSelect = document.getElementById('btnCloseWaSelect');
-
-if(btnCloseWaSelect) {
-    btnCloseWaSelect.addEventListener('click', () => {
-        waSelectModal.classList.add('hidden');
-        window.pendingReplyRecipients = null;
-        window.replyingToMsgId = null;
-        if (msgAttachmentsInput) msgAttachmentsInput.value = '';
-        if (msgPreviewContainer) { msgPreviewContainer.innerHTML = ''; msgPreviewContainer.classList.add('hidden'); }
-        pendingMessageFiles = [];
-        if(document.getElementById('msgText')) {
-            document.getElementById('msgText').placeholder = "Scrivi un nuovo messaggio o comunicazione...";
-        }
-    });
-}
-
-const waQueueModal = document.getElementById('waQueueModal');
-const waQueueList = document.getElementById('waQueueList');
-const btnCloseWaQueue = document.getElementById('btnCloseWaQueue');
-
-async function processMessageSave(text, isNotif, recipients = "Bacheca (Tutti)") {
-    if(!isFirebaseConfigured) return null;
-    try {
-        const senderName = localStorage.getItem('antimo_user_name') || "Sconosciuto";
-        const { collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        const { ref: storageRefCall, uploadString, getDownloadURL } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js");
-        
-        let fileUrls = [];
-        if (pendingMessageFiles && pendingMessageFiles.length > 0 && typeof storage !== 'undefined') {
-            const upPromises = pendingMessageFiles.map(async (att, idx) => {
-                const fName = `messaggi_attachments/msg_${Date.now()}_${idx}_${att.name.replace(/[^a-zA-Z0-9.\-]/g, "_")}`;
-                const storageRef = storageRefCall(storage, fName);
-                await uploadString(storageRef, att.data, 'data_url');
-                const url = await getDownloadURL(storageRef);
-                return { url: url, name: att.name, type: att.type };
-            });
-            fileUrls = await Promise.all(upPromises);
-        }
-
-        const docD = {
-            text: text,
-            isNotification: isNotif,
-            sender: senderName,
-            recipients: recipients,
-            timestamp: serverTimestamp(),
-            fileUrls: fileUrls
-        };
-        const docRef = await addDoc(collection(db, "messaggi"), docD);
-
-        // Se è una risposta a un messaggio specifico, aggiorna l'originale
-        if (window.replyingToMsgId) {
-            try {
-                const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                await updateDoc(doc(db, "messaggi", window.replyingToMsgId), { haRisposto: true, rispostoDa: senderName });
-            } catch(e) { console.error("Errore update haRisposto", e); }
-            window.replyingToMsgId = null;
-        }
-
-        return docRef.id;
-    } catch(err) {
-        console.error("Errore invio msg", err);
-        alert("Errore invio messaggio.");
-        return null;
-    }
-}
-
-if(newMessageForm) {
-    newMessageForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const testoS = document.getElementById('msgText').value.trim();
-        const isNotif = document.getElementById('msgIsNotification') ? document.getElementById('msgIsNotification').checked : true;
-        
-        if(!testoS || !isFirebaseConfigured) return;
-        
-        pendingMessageText = testoS;
-        pendingMessageIsNotification = isNotif;
-        
-        // Load employees from Firebase
-        waContactsList.innerHTML = '<div style="text-align: center; color: #666; font-size: 0.9rem;">Caricamento dipendenti...</div>';
-        waSelectAll.checked = false;
-        waSelectModal.classList.remove('hidden');
-
-        try {
-            const { collection, getDocs, query, where } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-            const q = query(collection(db, "anagrafiche"), where("localita", "==", "App (Dipendente)"));
-            const snap = await getDocs(q);
-            
-            waContactsList.innerHTML = '';
-            let dipendenti = [];
-            snap.forEach(doc => dipendenti.push(doc.data()));
-            
-            if (dipendenti.length > 0) {
-                dipendenti.forEach((c, i) => {
-                    const cbValue = c.telefono1 || c.telefono || "";
-                    const cbName = `${c.nome} ${c.cognome || ''}`.trim();
-                    const isChecked = window.pendingReplyRecipients && window.pendingReplyRecipients.includes(cbName) ? 'checked' : '';
-                    const div = document.createElement('label');
-                    div.style.cssText = "display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: #f9f9f9; border-radius: 6px; border: 1px solid #eee;";
-                    div.innerHTML = `<input type="checkbox" class="wa-contact-cb" value="${i}" data-name="${cbName}" data-phone="${cbValue}" style="transform: scale(1.2);" ${isChecked}> <span style="font-weight:bold; color:var(--blue-dark);">${cbName}</span> <span style="color:#666; font-size:0.85rem;">(${cbValue || 'Nessun num'})</span>`;
-                    waContactsList.appendChild(div);
-                });
-            } else {
-                waContactsList.innerHTML = '<div style="text-align: center; color: #666; font-size: 0.9rem;">Nessun dipendente trovato.</div>';
-            }
-        } catch(err) {
-            console.error("Errore fetch dipendenti per WA:", err);
-            waContactsList.innerHTML = '<div style="text-align: center; color: red; font-size: 0.9rem;">Errore caricamento.</div>';
-        }
-    });
-}
-
-if(waSelectAll) {
-    waSelectAll.addEventListener('change', (e) => {
-        document.querySelectorAll('.wa-contact-cb').forEach(cb => cb.checked = e.target.checked);
-    });
-}
-
-if(btnWaSkip) {
-    btnWaSkip.addEventListener('click', async () => {
-        const checkedBoxes = Array.from(document.querySelectorAll('.wa-contact-cb:checked'));
-        let recNames = checkedBoxes.map(cb => cb.getAttribute('data-name')).join(', ');
-        if(!recNames) recNames = "Bacheca (Tutti)";
-
-        btnWaSkip.disabled = true; btnWaSkip.innerHTML = '...';
-        await processMessageSave(pendingMessageText, pendingMessageIsNotification, recNames);
-        if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = true;
-        
-        if (msgAttachmentsInput) msgAttachmentsInput.value = '';
-        if (msgPreviewContainer) { msgPreviewContainer.innerHTML = ''; msgPreviewContainer.classList.add('hidden'); }
-        pendingMessageFiles = [];
-        window.pendingReplyRecipients = null;
-        if(document.getElementById('msgText')) {
-            document.getElementById('msgText').value = '';
-            document.getElementById('msgText').placeholder = "Scrivi un nuovo messaggio o comunicazione...";
-        }
-        
-        waSelectModal.classList.add('hidden');
-        btnWaSkip.disabled = false; btnWaSkip.innerHTML = 'Solo Bacheca';
-    });
-}
-
-if(btnWaSend) {
-    btnWaSend.addEventListener('click', async () => {
-        const checkedBoxes = Array.from(document.querySelectorAll('.wa-contact-cb:checked'));
-        const selectedIndexes = checkedBoxes.map(cb => parseInt(cb.value));
-        
-        let recNames = checkedBoxes.map(cb => cb.getAttribute('data-name')).join(', ');
-        if(!recNames) recNames = "Bacheca (Tutti)";
-        
-        btnWaSend.disabled = true; btnWaSend.innerHTML = '...';
-        const msgId = await processMessageSave(pendingMessageText, pendingMessageIsNotification, recNames);
-        if(document.getElementById('msgIsNotification')) document.getElementById('msgIsNotification').checked = true;
-        
-        if (msgAttachmentsInput) msgAttachmentsInput.value = '';
-        if (msgPreviewContainer) { msgPreviewContainer.innerHTML = ''; msgPreviewContainer.classList.add('hidden'); }
-        pendingMessageFiles = [];
-        window.pendingReplyRecipients = null;
-        if(document.getElementById('msgText')) {
-            document.getElementById('msgText').value = '';
-            document.getElementById('msgText').placeholder = "Scrivi un nuovo messaggio o comunicazione...";
-        }
-        
-        waSelectModal.classList.add('hidden');
-        btnWaSend.disabled = false; btnWaSend.innerHTML = 'Procedi su WA';
-        
-        if(checkedBoxes.length > 0 && msgId) {
-            waQueueList.innerHTML = '';
-            checkedBoxes.forEach(cb => {
-                const cNome = cb.getAttribute('data-name');
-                const cNumero = cb.getAttribute('data-phone');
-                if(!cNumero) return; // Salta se non ha il numero
-
-                const btn = document.createElement('a');
-                btn.className = "btn btn-primary";
-                btn.style.cssText = "background: #25D366; border: none; padding: 12px; text-decoration: none; color: white; display: flex; justify-content: center; align-items: center; gap: 8px; font-weight: bold; border-radius: 8px;";
-                btn.target = "_blank";
-                
-                let cleanNum = cNumero.replace(/\s+/g, '');
-                if(!cleanNum.startsWith('+') && cleanNum.length <= 10) cleanNum = "39" + cleanNum;
-                else cleanNum = cleanNum.replace('+', '');
-                
-                let appLink = window.location.origin + window.location.pathname + '?msgId=' + msgId;
-                let textWithLink = "📩 Nuova comunicazione in Bacheca.\n\n👉 Apri nell'App per leggere e visualizzare eventuali allegati: " + appLink;
-                
-                btn.href = `https://wa.me/${cleanNum}?text=${encodeURIComponent(textWithLink)}`;
-                btn.innerHTML = `<span style="font-size:1.2rem;">💬</span> WhatsApp per ${cNome}`;
-                btn.onclick = () => { 
-                    btn.style.opacity = '0.5'; 
-                    btn.innerHTML = `<span style="font-size:1.2rem;">✅</span> Inviato a ${cNome}`;
-                };
-                waQueueList.appendChild(btn);
-            });
-            if (waQueueList.innerHTML !== '') {
-                waQueueModal.classList.remove('hidden');
-            }
-        }
-    });
-}
-
-if(btnCloseWaQueue) {
-    btnCloseWaQueue.addEventListener('click', () => {
-        waQueueModal.classList.add('hidden');
-    });
-}
-
-// Form Inputs
-const iTipo = document.getElementById('tipoAttivita');
-const iPaziente = document.getElementById('paziente');
-const iLocalita = document.getElementById('localita');
-const iIndirizzo = document.getElementById('indirizzo');
-const iTelefono = document.getElementById('telefono');
-
-const iNuovoDispositivo = document.getElementById('nuovoDispositivo');
-const iNote = document.getElementById('note');
-const inputKmPercorsi = document.getElementById('kmPercorsi');
-const inputMatricola = document.getElementById('matricola');
-const inputAllegato = document.getElementById('allegatoFile');
-const filePreviewContainer = document.getElementById('filePreviewContainer');
-const inputDataProgrammata = document.getElementById('dataProgrammata');
-
-// Setting e Nuovi
-const btnSettings = document.getElementById('btnSettings');
-const settingsModal = document.getElementById('settingsModal');
-const btnCloseSettings = document.getElementById('btnCloseSettings');
-const toggleRequireKm = document.getElementById('toggleRequireKm');
-const kmContainer = document.getElementById('kmContainer');
-const activeExtraAttachmentsContainer = document.getElementById('activeExtraAttachmentsContainer');
-const activeExtraAttachmentsList = document.getElementById('activeExtraAttachmentsList');
-const inputAllegatoProgrammazione = document.getElementById('allegatoProgrammazione');
-const progPreviewContainer = document.getElementById('progPreviewContainer');
-
-// Backup & Versioni
-const btnOpenBackup = document.getElementById('btnOpenBackup');
-const backupModal = document.getElementById('backupModal');
-const btnCloseBackup = document.getElementById('btnCloseBackup');
-const versionDescModal = document.getElementById('versionDescModal');
-const btnCloseVersionDesc = document.getElementById('btnCloseVersionDesc');
-const btnAiSearch = document.getElementById('btnAiSearch');
-const aiSearchInput = document.getElementById('aiSearchInput');
-const aiSearchResult = document.getElementById('aiSearchResult');
-const verTitleDesc = document.getElementById('verTitleDesc');
-const versionDescContent = document.getElementById('versionDescContent');
-
-// Backup Dates
-const backupManualeDate = document.getElementById('backupManualeDate');
-const backupOggiDate = document.getElementById('backupOggiDate');
-const backup2giorniDate = document.getElementById('backup2giorniDate');
-const backup7giorniDate = document.getElementById('backup7giorniDate');
-
-const btnSaveManualBackup = document.getElementById('btnSaveManualBackup');
-const btnAllVersions = document.getElementById('btnAllVersions');
-
-const justifyModal = document.getElementById('justifyModal');
-const justifyReason = document.getElementById('justifyReason');
-const btnCancelJustify = document.getElementById('btnCancelJustify');
-const btnConfirmJustify = document.getElementById('btnConfirmJustify');
-
-let interventionToJustify = null; // Memorizza l'ID in fase di giustificazione
-
-let customDevices = JSON.parse(localStorage.getItem('antimo_customDevices')) || [];
-
-const editInterventionModal = document.getElementById('editInterventionModal');
-const btnCancelEdit = document.getElementById('btnCancelEdit');
-const btnSaveEdit = document.getElementById('btnSaveEdit');
-
-async function deleteProgrammatoAppJs(index) {
-    const p = plannedInterventions[index];
-    if(!p) return;
-    if(!confirm(`Sicuro di voler eliminare l'intervento programmato per ${p.paziente}?`)) return;
-    
-    plannedInterventions.splice(index, 1);
-    saveState();
-    
-    if (isFirebaseConfigured && (p.idFb || p.id)) {
-        try {
-            const { doc, deleteDoc, collection, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-            if (p.idFb) {
-                await deleteDoc(doc(db, "programmati", p.idFb));
-            } else {
-                const q = query(collection(db, "programmati"), where("id", "==", p.id));
-                const snaps = await getDocs(q);
-                snaps.forEach(async d => await deleteDoc(doc(db, "programmati", d.id)));
-            }
-        } catch(e) { console.error("Errore rimozione cloud", e); }
-    }
-    updateUI();
-    updateInterventiCount();
-}
-
-let currentEditProgIndex = null;
-window.editProgrammatoAppJs = function(index) {
-    const p = plannedInterventions[index];
-    if(!p) return;
-    const fbId = p.idFb || p.id;
-    window.location.href = `programmati.html?editId=${fbId}`;
+    document.getElementById('taskDetailContent').innerHTML = `<span class="status-badge status-${t.status} mb-2">${window.getStatusText(t.status)}</span>${prioBadge}<h2 class="mb-2 mt-2">${t.title}</h2><div class="entity-tags">${getEntTags(t.familyIds,t.organizationIds)}</div>${supW}${laborInfo}<p class="mt-2">${t.description}</p><h4 class="mt-4">Spese Materiali</h4>${expHtml}<h4 class="mt-4">Manovalanza Esterna</h4>${wrkHtml}`;
+    const logH = liveLogs.filter(l=>l.entityId===taskId).sort((a,b)=>b.timestamp-a.timestamp).map(l=>`<div style="font-size:0.75rem; border-left:2px solid #ccc; padding-left:5px;"><strong>${l.userName}</strong>: ${l.action}</div>`).join('');
+    const isSuper = currentUser.roles.includes('admin') || currentUser.roles.includes('owner') || currentUser.roles.includes('management_control') || currentUser.roles.includes('admin_support') || currentUser.roles.includes('domain_approver');
+    document.getElementById('taskDetailContent').innerHTML += isSuper ? `<h4 class="mt-4">Audit Logs</h4>${logH}` : '';
+    document.getElementById('taskDetailActions').innerHTML = acts;
+    document.getElementById('taskDetailModal').classList.add('open');
 };
 
-// Modal removed
-if(btnCancelEdit) btnCancelEdit.addEventListener('click', () => {});
-
-if(btnSaveEdit) {
-    btnSaveEdit.addEventListener('click', async () => {});
-}
-
-function initApp() {
-
-    updateUI();
-    updateInterventiCount();
-    
-    // Inizializza Listeners Real-time e sync
-    loadMessages();
-    syncAssistitiDatabase();
-    initChangelog();
-    
-    // Proviamo a sincronizzare i dati locali vecchi/offline non ancora sul cloud
-    setTimeout(syncLocalDataToCloud, 2000);
-    setTimeout(syncPlannedInterventions, 1000); // Pesca i programmati dal cloud
-}
-
-// Nuova funzione per scaricare gli interventi PROGRAMMATI dal Cloud a tutti i dispositivi
-async function syncPlannedInterventions() {
-    if (!isFirebaseConfigured) return;
-    try {
-        const { collection, getDocs, query, where } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        
-        // Vogliamo solo quelli che sono esplicitamente 'planned' (o senza status, legacy)
-        // Non possiamo usare un 'in' facile se non creiamo indice composto, quindi filtriamo dopo averli presi tutti se sono pochi, 
-        // oppure facciamo una query se il db lo permette. Per sicurezza prendiamo tutto e filtriamo per evitare indici mancanti.
-        const snap = await getDocs(collection(db, "programmati"));
-        let cloudPlanned = [];
-        snap.forEach(doc => {
-            const data = doc.data();
-            if (!data.status || data.status === 'planned' || data.status === 'in_attesa') {
-                cloudPlanned.push({ idFb: doc.id, id: doc.id, ...data });
-            }
-        });
-        
-        // Ordiniamo per data teorica o per come arrivano
-        plannedInterventions = cloudPlanned;
-        saveState();
-        updateInterventiCount();
-        updateUI();
-        console.log("Interventi programmati sincronizzati dal Cloud (filtrati 'da fare').");
-    } catch(e) {
-        console.error("Errore fetch programmati da Firebase:", e);
+window.execAction = async (act, id) => {
+    const bd = document.getElementById('bsBackdrop'); if(bd) bd.classList.remove('open');
+    if(act==='APPROVE_PROPOSED') { const t=liveTasks.find(x=>x.id===id); await updateDoc(doc(db,"tasks",id),{status:'assigned', scheduledStart: new Date().toISOString()}); await logActivity('APPROVE_PROPOSED','task',id); sendNotification(t.assignedTo, 'Proposta Approvata', `${currentUser.fullName} ha approvato: ${t.title}`); return; }
+    else if(act==='ACCOUNT_TASK') { await updateDoc(doc(db,"tasks",id),{status:'accounted'}); await logActivity('ACCOUNT_TASK','task',id); const t=liveTasks.find(x=>x.id===id); if(t) t.status='accounted'; window.renderPivotTable(document.getElementById('pivotGroupSelect').value); return; }
+    else if(act==='START_TASK') { await updateDoc(doc(db,"tasks",id),{status:'in_progress', actualStart: new Date().toISOString()}); await logActivity('START_TASK','task',id); }
+    else if(act==='COMP_TASK') { window.openCompleteTaskWizard(id); return; }
+    else if(act==='DEL_TASK') { 
+        if(confirm("Sicuro di voler eliminare definitivamente questo task e le sue registrazioni associate?")) { await logActivity('DEL_TASK','task',id); await deleteDoc(doc(db,"tasks",id)); } 
     }
-}
+    else if(act==='TOGGLE_MATERIAL') { const t=liveTasks.find(x=>x.id===id); await updateDoc(doc(db,"tasks",id),{needsMaterial:!t.needsMaterial}); await logActivity(t.needsMaterial?'FOUND_MATERIAL':'MISSING_MATERIAL','task',id); if(!t.needsMaterial) sendNotification('admin', 'Materiale Mancante', `${t.title} è senza materiali.`); }
+    const m = document.getElementById('taskDetailModal'); if(m) m.classList.remove('open');
+};
 
-// Nuova funzione per ascoltare e sincronizzare il DB degli Assistiti
-async function syncAssistitiDatabase() {
-    if (!isFirebaseConfigured) return;
-    try {
-        const { doc, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        const docRef = doc(db, "shared_data", "assistiti");
-        onSnapshot(docRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                if (data.list) {
-                    localStorage.setItem('antimo_assistiti', JSON.stringify(data.list));
-                    if(typeof window.renderAssistitiDatalist === 'function') {
-                        window.renderAssistitiDatalist();
-                    }
-                }
-            }
-        });
-    } catch(e) {
-        console.error("Errore attivazione listener Assistiti", e);
-    }
-}
-
-// Funzione per sincronizzare i vecchi interventi salvati solo in localStorage verso Firebase
-async function syncLocalDataToCloud() {
-    if (!isFirebaseConfigured) return;
+window.openCompleteTaskWizard = (taskId) => {
+    const t = liveTasks.find(x=>x.id===taskId); if(!t) return;
+    const b = document.getElementById('wizardBody'); document.getElementById('wizardTitle').textContent="Completa Task e Costi";
     
-    // Invece di fidarci del flag locale "cloudSynced" (che potrebbe essersi buggato
-    // con il vecchio DB errato), guardiamo TUTTO quello che abbiamo in locale.
-    let tuttiIFilePath = completedInterventions;
-    if (tuttiIFilePath.length === 0) {
-        if (typeof console !== 'undefined') console.log("Nessun intervento in locale.");
-        return 0; 
-    }
-    
-    // 1. Peschiamo tutti gli ID già presenti sul CLOUD VERO (antimo-6a86b)
-    let cloudIds = [];
-    try {
-        const snap = await getDocs(collection(db, "interventi"));
-        snap.forEach(doc => {
-            const data = doc.data();
-            if(data.id) cloudIds.push(data.id);
-        });
-    } catch(e) {
-        console.error("Impossibile leggere il cloud per il check", e);
-        throw new Error("Impossibile leggere dal Cloud per verificare i doppioni. Controlla i permessi o la connessione.");
-    }
-    
-    // Filtriamo gli interventi che in locale risultano "sincronizzati" ma che sul server non ci sono più:
-    // Significa che sono stati eliminati definitivamente dalla dashboard admin.
-    let daRimuovere = tuttiIFilePath.filter(inv => inv.cloudSynced && !cloudIds.includes(inv.id));
-    if (daRimuovere.length > 0) {
-        console.log(`Rilevati ${daRimuovere.length} interventi eliminati dal server admin. Pulisco cache locale.`);
-        completedInterventions = completedInterventions.filter(inv => cloudIds.includes(inv.id) || !inv.cloudSynced);
-        saveState();
-        if(typeof updateUI === 'function') updateUI();
-        if(typeof updateInterventiCount === 'function') updateInterventiCount();
-        tuttiIFilePath = completedInterventions;
+    let rate = 0;
+    const names = [ ...(t.familyIds||[]).map(x=>appCache.families[x]?.name), ...(t.organizationIds||[]).map(x=>appCache.organizations[x]?.name) ].filter(x=>x);
+    if(names.length > 0) {
+        const labor = Object.values(appCache['labor_rates']).find(r => names.includes(r.locationName));
+        if (labor) rate = labor.hourlyRate;
     }
 
-    // 2. Filtriamo solo quelli locali offline NUOVI che MANGANo dal cloud e che NON sono mai stati sul cloud
-    let daSincronizzare = tuttiIFilePath.filter(inv => !inv.cloudSynced && !cloudIds.includes(inv.id));
-    
-    // DEBUG MANUALE POTENTE PER L'UTENTE
-    if (typeof window !== 'undefined' && window._antimo_forcing_sync) {
-        alert(`DEBUG:\nMemoria Telefono: ${tuttiIFilePath.length} interventi\nTrovati sul Cloud VERO: ${cloudIds.length}\nQuelli che mancano sul Cloud: ${daSincronizzare.length}`);
-    }
-    
-    if (daSincronizzare.length === 0) {
-        // Se tutti quelli locali sono già sul cloud VERO:
-        // Assicuriamoci che tutti abbiano la spunta cloudSynced per il futuro
-        let dbUpdatedFilter = false;
-        tuttiIFilePath.forEach(i => {
-            if(!i.cloudSynced) { i.cloudSynced = true; dbUpdatedFilter = true; }
-        });
-        if(dbUpdatedFilter) saveState();
-        
-        return 0; // Niente di bloccato
-    }
-    
-    console.log(`Trovati ${daSincronizzare.length} interventi locali MANGANTI dal cloud. Li carico forzatamente...`);
-    
-    let dbUpdated = false;
-    
-    for (let inv of daSincronizzare) {
-        try {
-            // Inviamo l'intervento su Firestore in modo sicuro
-            let fileCloudUrl = inv.fileUrl || null;
-            
-            // Se c'è un file base64 non ancora caricato
-            if (inv.fileData && !fileCloudUrl) {
-                let ext = "jpg";
-                if (inv.fileName) {
-                    ext = inv.fileName.split('.').pop();
-                } else if (inv.fileType === "application/pdf") {
-                    ext = "pdf";
-                } else if (inv.fileType && inv.fileType.startsWith("video/")) {
-                    ext = "mp4";
-                }
-                
-                try {
-                    const storageRef = ref(storage, `allegati/${inv.id}_sync.${ext}`);
-                    await uploadString(storageRef, inv.fileData, 'data_url');
-                    fileCloudUrl = await getDownloadURL(storageRef);
-                } catch(uploadErr) {
-                    console.error("Errore upload allegato in auto-sync", uploadErr);
-                    // Continuiamo comunque
-                }
-            }
-            const payloadToSave = {
-                timestamp: serverTimestamp(),
-                id: inv.id || Date.now().toString(),
-                tipo: inv.tipo || "Non specificato",
-                paziente: inv.paziente || "Sconosciuto",
-                localita: inv.localita || inv.destinazione || "",
-                indirizzo: inv.indirizzo || "",
-                telefono: inv.telefono || "",
-                dispositivi: inv.dispositivi || "",
-                matricola: inv.matricola || "",
-                note: inv.note || "",
-                operatore: inv.operatore || localStorage.getItem('antimo_user_name') || "Sconosciuto",
-                startTime: inv.startTime || Date.now(),
-                endTime: inv.endTime || Date.now(),
-                kmPercorsi: inv.kmPercorsi || "0",
-                fileUrl: fileCloudUrl || null,
-                haAllegato: !!(inv.fileData || fileCloudUrl),
-                fileType: inv.fileType || null
-            };
-
-            await addDoc(collection(db, "interventi"), payloadToSave);
-            
-            console.log("Intervento offline sincronizzato con successo:", inv.paziente);
-            inv.fileUrl = fileCloudUrl;
-            
-            // In ogni caso marchiamolo come sincronizzato
-            inv.cloudSynced = true;
-            // Svuotiamo il peso locale per non saturare i 5MB
-            delete inv.fileData; // Rimuovo enormi base64 se presenti (evitano QuotaExceededError su CloudUpload)
-            dbUpdated = true;
-            
-        } catch (err) {
-            console.error("Errore auto-sync in background per " + inv.paziente, err);
-            alert(`Impossibile sincronizzare l'intervento di ${inv.paziente}. Errore: ${err.message}`);
-        }
-    }
-    
-    if (dbUpdated) {
-        saveState();
-        updateInterventiCount();
-    }
-    
-    return daSincronizzare.length;
-}
-
-function saveState() {
-    localStorage.setItem('antimo_interventions', JSON.stringify(completedInterventions));
-    localStorage.setItem('antimo_plannedInterventions', JSON.stringify(plannedInterventions));
-    localStorage.setItem('antimo_customDevices', JSON.stringify(customDevices));
-}
-
-function updateUI() {
-    // Gestione KM visibilità dal Setting
-    if (requireKm) {
-        kmContainer.classList.remove('hidden');
-    } else {
-        kmContainer.classList.add('hidden');
+    const nowD = new Date();
+    const nowIso = new Date(nowD.getTime() - (nowD.getTimezoneOffset() * 60000)).toISOString().slice(0,16);
+    let startIso = nowIso;
+    if(t.actualStart) {
+        const sD = new Date(t.actualStart); sD.setMinutes(sD.getMinutes() - sD.getTimezoneOffset());
+        startIso = sD.toISOString().slice(0,16);
+    } else if (t.scheduledStart) {
+        const sD = new Date(t.scheduledStart); sD.setMinutes(sD.getMinutes() - sD.getTimezoneOffset());
+        startIso = sD.toISOString().slice(0,16);
     }
 
-    // Le attività programmate
-    let visibiliProg = plannedInterventions.filter(p => !p.status || p.status === 'planned');
-    
-    // Gestione Multi-Tenant (Tutti vs MIO)
-    const targetFilter = filterTecnicoOggi ? filterTecnicoOggi.value : "MIO";
-    const myName = localStorage.getItem('antimo_user_name') || "";
-    
-    if (targetFilter === "MIO" || targetFilter === "") {
-        visibiliProg = visibiliProg.filter(p => p.tecnicoAssegnato === myName || p.programmatoDa === myName || p.operatore === myName);
-    } else if (targetFilter !== "TUTTI") {
-        visibiliProg = visibiliProg.filter(p => p.tecnicoAssegnato === targetFilter || p.programmatoDa === targetFilter || p.operatore === targetFilter);
-    }
+    b.innerHTML = `<form id="wcF">
+        <label>Ora Inizio Effettiva</label>
+        <input type="datetime-local" id="wcStart" value="${startIso}" required>
+        <label>Ora Fine Effettiva</label>
+        <input type="datetime-local" id="wcEnd" value="${nowIso}" required>
+        <label>Tipo di Attività</label>
+        <input type="text" id="wcType" placeholder="Es. Riparazione Elettrica o Idraulica" value="${t.activityType||''}" required>
+        <label>Tariffa Oraria Applicata (€/h)</label>
+        <input type="number" id="wcRate" step="0.01" value="${rate}">
+        <div id="wcCostDiv" style="font-weight:bold; font-size:1.1rem; margin:15px 0; color:var(--danger);">Costo Totale: €0.00</div>
+        <button type="submit" class="btn btn-success" style="width:100%;">Conferma Chiusura Task</button>
+    </form>`;
 
-    // Applica logic Incarichi (Multi-select)
-    visibiliProg = visibiliProg.filter(p => window.passesIncarichiFilter(p, window.selectedIncarichi));
-
-    updateHeaderFiltersUI();
-    
-    if (selectedCalendarDate) {
-        oggiInterventionsSection.classList.add('hidden');
-        domaniInterventionsSection.classList.add('hidden');
-        npInterventionsSection.classList.add('hidden');
-        
-        if (isPlannedVisible) {
-            plannedInterventionsSection.classList.remove('hidden');
-            const titolo = plannedInterventionsSection.querySelector('h2');
-            if(titolo) titolo.innerHTML = `<span class="btn-icon">📅</span> Interventi del ${selectedCalendarDate.split('-').reverse().join('/')}`;
-            const filteredByDate = visibiliProg.filter(p => p.dataPrevista === selectedCalendarDate);
-            renderPlannedInterventions(filteredByDate, [], []);
+    const updC = () => {
+        const s = new Date(b.querySelector('#wcStart').value);
+        const e = new Date(b.querySelector('#wcEnd').value);
+        const r = parseFloat(b.querySelector('#wcRate').value) || 0;
+        if(s && e && e > s) {
+            const hrs = (e - s) / 3600000;
+            b.querySelector('#wcCostDiv').textContent = `Costo Totale: €${(hrs * r).toFixed(2)} (${hrs.toFixed(2)} ore)`;
         } else {
-            plannedInterventionsSection.classList.add('hidden');
+            b.querySelector('#wcCostDiv').textContent = `Costo Totale: €0.00`;
         }
-        return;
-    }
+    };
+    b.querySelector('#wcStart').addEventListener('change', updC);
+    b.querySelector('#wcEnd').addEventListener('change', updC);
+    b.querySelector('#wcRate').addEventListener('input', updC);
+    updC();
+
+    b.querySelector('#wcF').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const start = new Date(b.querySelector('#wcStart').value).toISOString();
+        const end = new Date(b.querySelector('#wcEnd').value).toISOString();
+        const type = b.querySelector('#wcType').value;
+        const r = parseFloat(b.querySelector('#wcRate').value) || 0;
+        const hrs = (new Date(end) - new Date(start)) / 3600000;
+        const cost = hrs > 0 ? hrs * r : 0;
+
+        await updateDoc(doc(db,"tasks",taskId),{
+            status:'completed',
+            actualStart: start,
+            actualEnd: end,
+            activityType: type,
+            laborRateValue: r,
+            laborCost: parseFloat(cost.toFixed(2))
+        });
+        await logActivity('COMP_TASK','task',taskId);
+        if(t.assignedTo) sendNotification('admin', 'Task Completato', `${currentUser.fullName} ha completato: ${t.title} con costo €${cost.toFixed(2)}`);
+        
+        document.getElementById('actionWizardModal').classList.remove('open');
+        const m = document.getElementById('taskDetailModal'); if(m) m.classList.remove('open');
+    });
+    document.getElementById('actionWizardModal').classList.add('open');
+};
+
+window.tempRichDescription = "";
+window.tempAttachments = [];
+
+window.openRichDescriptionModal = () => {
+    document.getElementById('richDescText').value = window.tempRichDescription;
+    document.getElementById('richDescFiles').value = "";
+    document.getElementById('richDescModal').classList.add('open');
+};
+
+window.saveRichDescription = () => {
+    window.tempRichDescription = document.getElementById('richDescText').value;
+    const files = document.getElementById('richDescFiles').files;
+    window.tempAttachments = Array.from(files).map(f => 'attachment_' + Date.now() + '_' + f.name);
     
-    const titoloProg = plannedInterventionsSection.querySelector('h2');
-    if(titoloProg) titoloProg.innerHTML = `<span class="btn-icon">📅</span> Tutti i Programmati`;
-    
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
-
-    if(visibiliProg.length > 0 && isPlannedVisible) plannedInterventionsSection.classList.remove('hidden');
-    else plannedInterventionsSection.classList.add('hidden');
-
-    const oggiProg = visibiliProg.filter(p => p.dataPrevista === todayStr);
-    if(oggiProg.length > 0 && isOggiVisible) oggiInterventionsSection.classList.remove('hidden');
-    else oggiInterventionsSection.classList.add('hidden');
-
-    const domaniProg = visibiliProg.filter(p => p.dataPrevista === tomorrowStr);
-    if(domaniProg.length > 0 && isDomaniVisible) domaniInterventionsSection.classList.remove('hidden');
-    else domaniInterventionsSection.classList.add('hidden');
-
-    renderPlannedInterventions(visibiliProg, oggiProg, domaniProg);
-
-    // NP (SE isNpVisible è true)
-    let visibiliNP = plannedInterventions.filter(p => p.status === 'in_attesa');
-    
-    if (targetFilter === "MIO" || targetFilter === "") {
-        visibiliNP = visibiliNP.filter(p => p.tecnicoAssegnato === myName || p.programmatoDa === myName || p.operatore === myName);
-    } else if (targetFilter !== "TUTTI") {
-        visibiliNP = visibiliNP.filter(p => p.tecnicoAssegnato === targetFilter || p.programmatoDa === targetFilter || p.operatore === targetFilter);
-    }
-    
-    // Applica logic Incarichi (Multi-select)
-    visibiliNP = visibiliNP.filter(p => window.passesIncarichiFilter(p, window.selectedIncarichi));
-
-    if(visibiliNP.length > 0 && isNpVisible) {
-        npInterventionsSection.classList.remove('hidden');
+    const summary = document.getElementById('rdSummary');
+    if(window.tempRichDescription || window.tempAttachments.length > 0) {
+        summary.style.display = 'block';
+        summary.textContent = `Dettagli: ${window.tempRichDescription ? 'Sì' : 'No'} | Allegati: ${window.tempAttachments.length}`;
     } else {
-        npInterventionsSection.classList.add('hidden');
+        summary.style.display = 'none';
     }
-    renderNpInterventions(visibiliNP);
-}
+    document.getElementById('richDescModal').classList.remove('open');
+};
 
-function padZ(num) { return num.toString().padStart(2, '0'); }
-function formatDateDMY(date) { return `${padZ(date.getDate())}-${padZ(date.getMonth() + 1)}-${date.getFullYear()}`; }
-function formatTime(ms) {
-    let ts = Math.floor(ms / 1000);
-    return `${padZ(Math.floor(ts / 3600))}:${padZ(Math.floor((ts % 3600) / 60))}:${padZ(ts % 60)}`;
-}
+window.openNewRequestWizard = (taskIdToEdit = null) => {
+    if(typeof taskIdToEdit !== 'string') taskIdToEdit = null;
+    let t = null;
+    if(taskIdToEdit) t = liveTasks.find(x=>x.id===taskIdToEdit);
 
-async function updateInterventiCount() { 
-    if(typeof window.buildIncarichiModalList === 'function') window.buildIncarichiModalList();
-
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
-
-    // Applica logic Multi-Tenant (MIO/TUTTI)
-    let soloPlanned = plannedInterventions.filter(p => !p.status || p.status === 'planned');
-    const targetFilter = filterTecnicoOggi ? filterTecnicoOggi.value : "MIO";
-    const myName = localStorage.getItem('antimo_user_name') || "";
+    window.tempRichDescription = t ? (t.description||"") : "";
+    window.tempAttachments = t ? (t.attachments||[]) : [];
     
-    if (targetFilter === "MIO" || targetFilter === "") {
-        soloPlanned = soloPlanned.filter(p => p.tecnicoAssegnato === myName || p.programmatoDa === myName || p.operatore === myName);
-    } else if (targetFilter !== "TUTTI") {
-        soloPlanned = soloPlanned.filter(p => p.tecnicoAssegnato === targetFilter || p.programmatoDa === targetFilter || p.operatore === targetFilter);
-    }
-
-    // Applica logic Incarichi (Multi-select)
-    soloPlanned = soloPlanned.filter(p => window.passesIncarichiFilter(p, window.selectedIncarichi));
-
-    let cOggi = 0, cDomani = 0, cNeseg = 0;
-    let cMagDaPreparare = 0;
-
-    // Il badge magazzino deve riflettere globalmente tutte le attività da preparare
-    plannedInterventions.forEach(p => {
-        if (p.assegnatoMagazzino === true && p.status !== 'completed' && p.status !== 'justified_not_executed' && p.materialePronto !== true) {
-            cMagDaPreparare++;
+    const b = document.getElementById('wizardBody');
+    document.getElementById('wizardTitle').textContent = t ? "Modifica Task" : "Nuovo Task / Richiesta";
+    
+    // Checkboxes pre-selection logic
+    const orgHtml = Object.values(appCache.organizations).map(o=>`<label class="check-item"><input type="checkbox" value="org_${o.id}" ${t && (t.organizationIds||[]).includes(o.id) ? 'checked' : ''}>${o.name}</label>`).join('');
+    const famHtml = Object.values(appCache.families).map(f=>`<label class="check-item"><input type="checkbox" value="fam_${f.id}" ${t && (t.familyIds||[]).includes(f.id) ? 'checked' : ''}>${f.name}</label>`).join('');
+    
+    let initialBtnText = "Seleziona Beneficiari...";
+    if(t) {
+        let names = [];
+        (t.organizationIds||[]).forEach(id => names.push(appCache.organizations[id]?.name));
+        (t.familyIds||[]).forEach(id => names.push(appCache.families[id]?.name));
+        let validNames = names.filter(Boolean);
+        if(validNames.length > 0) {
+            let j = validNames.join(', ');
+            initialBtnText = j.length > 35 ? j.substring(0,32) + "..." : j;
         }
+    }
+    
+    // Costruisci le opzioni dei tecnici escludendo Luca
+    const wOpts = Object.values(appCache.people).filter(p=>p.roles.includes('technician') && p.id !== 'worker_luca').map(p=>`<option value="${p.id}" ${t && t.assignedTo===p.id?'selected':(!t && currentUser.id===p.id?'selected':(p.id==='worker_paolo'?'selected':''))}>${p.fullName||p.name}</option>`).join('');
+
+    b.innerHTML = `<form id="wizF" data-edit-id="${taskIdToEdit||''}">
+        <input type="text" id="rt" placeholder="Titolo" value="${t ? t.title : ''}" required>
+        
+        <label>Pianificazione</label>
+        <select id="rSchedMode" style="margin-bottom:8px;">
+            <option value="none" ${t && !t.scheduledStart ? 'selected' : ''}>Senza Scadenza (Proponi)</option>
+            <option value="today">Oggi</option>
+            <option value="tomorrow">Domani</option>
+            <option value="datetime" ${t && t.scheduledStart && !t.scheduledEnd ? 'selected' : ''}>Data e Ora precisa</option>
+            <option value="range" ${t && t.scheduledEnd ? 'selected' : ''}>Da... a...</option>
+        </select>
+        <div id="rSchedDtDiv" style="display:${t && t.scheduledStart ? 'flex' : 'none'}; gap:10px; margin-bottom:12px;">
+            <input type="datetime-local" id="rSchedStart" style="flex:1;" value="${t && t.scheduledStart ? t.scheduledStart.slice(0,16) : ''}">
+            <input type="datetime-local" id="rSchedEnd" style="flex:1; display:${t && t.scheduledEnd ? 'block' : 'none'};" value="${t && t.scheduledEnd ? t.scheduledEnd.slice(0,16) : ''}">
+        </div>
+        
+        <button type="button" class="btn btn-secondary mb-2" onclick="window.openRichDescriptionModal()">✏️ Aggiungi Dettagli/Allegati (Opzionale)</button>
+        <div id="rdSummary" class="text-muted" style="font-size:0.8rem; margin-bottom:12px; display:${window.tempRichDescription || window.tempAttachments.length ? 'block' : 'none'}; font-weight:bold;">
+            Dettagli: ${window.tempRichDescription ? 'Sì' : 'No'} | Allegati: ${window.tempAttachments.length}
+        </div>
+        
+        <input type="hidden" id="rl" value="${t && t.locationId ? t.locationId : ''}">
+        
+        <label>Priorità</label>
+        <select id="rPriority" style="margin-bottom:15px; width:100%;">
+            <option value="low" ${t && t.priority==='low'?'selected':''}>Bassa</option>
+            <option value="medium" ${t && t.priority==='medium'?'selected':(!t?'selected':'')}>Media</option>
+            <option value="high" ${t && t.priority==='high'?'selected':''}>Alta</option>
+        </select>
+        
+        <label>Tecnico Incaricato</label>
+        <select id="rAssignee" style="margin-bottom:15px; width:100%;">
+            ${wOpts}
+            <option value="none">-- Da decidere --</option>
+        </select>
+        
+        <label>Luoghi di Lavoro / Destinatari (Multi-selezione)</label>
+        <div style="border:1px solid #ccc; padding:10px; border-radius:8px; margin-bottom:15px; background:#fafafa;">
+            <div id="multiSelectCheckboxes" style="display:flex; flex-direction:column; gap:5px;">
+                ${orgHtml}
+                ${famHtml}
+            </div>
+        </div>
+        
+        <button type="submit" class="btn ${t ? 'btn-warning' : 'btn-primary'}" style="color:${t ? '#000' : '#fff'}">${t ? 'Salva Modifiche' : 'Salva ed Invia'}</button>
+    </form>`;
+
+    b.querySelector('#rSchedMode').addEventListener('change', e => {
+        const v = e.target.value;
+        const dDiv = b.querySelector('#rSchedDtDiv');
+        const sDt = b.querySelector('#rSchedStart');
+        const eDt = b.querySelector('#rSchedEnd');
+        if(v === 'datetime') { dDiv.style.display='flex'; eDt.style.display='none'; sDt.required=true; eDt.required=false; }
+        else if(v === 'range') { dDiv.style.display='flex'; eDt.style.display='block'; sDt.required=true; eDt.required=true; }
+        else { dDiv.style.display='none'; sDt.required=false; eDt.required=false; }
     });
 
-    soloPlanned.forEach(p => {
-        if(p.dataPrevista === todayStr) cOggi++;
-        else if(p.dataPrevista === tomorrowStr) cDomani++;
+    document.getElementById('wizF').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const checks = Array.from(b.querySelectorAll('input[type=checkbox]:checked')).map(x=>x.value);
+        if(checks.length===0) return alert("Devi selezionare almeno un centro di costo!");
+        const orgIds=checks.filter(x=>x.startsWith('org_')).map(x=>x.slice(4)), famIds=checks.filter(x=>x.startsWith('fam_')).map(x=>x.slice(4));
         
-        if(p.dataPrevista && p.dataPrevista <= todayStr) cNeseg++;
-    });
+        let sStart = null; let sEnd = null;
+        const mode = b.querySelector('#rSchedMode').value;
+        if(mode === 'today') { const d = new Date(); d.setHours(8,0,0,0); sStart = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0,19); }
+        else if(mode === 'tomorrow') { const d = new Date(); d.setDate(d.getDate()+1); d.setHours(8,0,0,0); sStart = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0,19); }
+        else if(mode === 'datetime') { sStart = b.querySelector('#rSchedStart').value; }
+        else if(mode === 'range') { sStart = b.querySelector('#rSchedStart').value; sEnd = b.querySelector('#rSchedEnd').value; }
 
-    // Stessa logica per In Attesa
-    let soloNP = plannedInterventions.filter(p => p.status === 'in_attesa');
-    if (targetFilter === "MIO" || targetFilter === "") {
-        soloNP = soloNP.filter(p => p.tecnicoAssegnato === myName || p.programmatoDa === myName || p.operatore === myName);
-    } else if (targetFilter !== "TUTTI") {
-        soloNP = soloNP.filter(p => p.tecnicoAssegnato === targetFilter || p.programmatoDa === targetFilter || p.operatore === targetFilter);
-    }
-    soloNP = soloNP.filter(p => window.passesIncarichiFilter(p, window.selectedIncarichi));
+        const taskData = {
+            title: b.querySelector('#rt').value,
+            description: window.tempRichDescription,
+            attachments: window.tempAttachments,
+            organizationIds: orgIds, familyIds: famIds,
+            priority: b.querySelector('#rPriority').value,
+            assignedTo: b.querySelector('#rAssignee').value === 'none' ? null : b.querySelector('#rAssignee').value
+        };
+        
+        const locId = b.querySelector('#rl').value;
+        if(locId) taskData.locationId = locId;
 
-    if (programmatiCount) programmatiCount.textContent = soloPlanned.length;
-    if (oggiCount) oggiCount.textContent = cOggi;
-    if (domaniCount) domaniCount.textContent = cDomani;
-    if (npCount) npCount.textContent = soloNP.length;
-    if (nesegCount) nesegCount.textContent = cNeseg;
-    
-    // Aggiornamento Badge Magazzino
-    const badgeMagazzino = document.getElementById('badgeMagazzino');
-    if (badgeMagazzino) {
-        if (cMagDaPreparare > 0) {
-            badgeMagazzino.textContent = cMagDaPreparare;
-            badgeMagazzino.classList.remove('hidden');
-        } else {
-            badgeMagazzino.classList.add('hidden');
-        }
-    }
-    
-    // Calculate start and end of today
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = startOfToday.getTime() + 24 * 60 * 60 * 1000 - 1;
+        if(sStart) taskData.scheduledStart = sStart;
+        if(sEnd) taskData.scheduledEnd = sEnd;
 
-    // Filter completedInterventions for today only
-    let doneToday = completedInterventions.filter(inv => inv.startTime >= startOfToday.getTime() && inv.startTime <= endOfToday);
-    
-    if (targetFilter === "MIO" || targetFilter === "" || !isFirebaseConfigured) {
-        doneToday = doneToday.filter(p => window.passesIncarichiFilter(p, window.selectedIncarichi));
-        if (interventiCount) interventiCount.textContent = doneToday.length;
-    } else {
-        // Fetch dal DB chiunque oppure un utente specifico
-        try {
-            const q = query(collection(db, "interventi"), where("startTime", ">=", startOfToday.getTime()));
-            const snap = await getDocs(q);
-            window.firebaseEseguitiOggi = [];
-            snap.forEach(d => window.firebaseEseguitiOggi.push(d.data()));
+        const editId = b.querySelector('#wizF').getAttribute('data-edit-id');
+
+        if(editId) {
+            // Se in aggiornamento utente svuota le date
+            if(!sStart) taskData.scheduledStart = deleteField();
+            if(!sEnd) taskData.scheduledEnd = deleteField();
             
-            let fbDone = window.firebaseEseguitiOggi;
-            if (targetFilter !== "TUTTI") {
-                fbDone = fbDone.filter(x => x.operatore === targetFilter || x.tecnicoAssegnato === targetFilter);
-            }
-            fbDone = fbDone.filter(x => window.passesIncarichiFilter(x, window.selectedIncarichi));
-            if (interventiCount) interventiCount.textContent = fbDone.length;
-        } catch(e) {
-            console.error("Errore fetch firebase eseguiti:", e);
-            doneToday = doneToday.filter(p => window.passesIncarichiFilter(p, window.selectedIncarichi));
-            if (interventiCount) interventiCount.textContent = doneToday.length; // fallback
-        }
-    }
-    
-    // --- GESTIONE COLORI PULSANTI --- //
-    const statBtns = [
-        document.getElementById('btnMostraP'),
-        document.getElementById('btnMostraOggi'),
-        document.getElementById('btnMostraDomani'),
-        document.getElementById('btnMostraNP'),
-        document.getElementById('btnMostraEseguiti'),
-        document.getElementById('btnMostraNeseguiti')
-    ];
-    
-    if (window.selectedIncarichi && window.selectedIncarichi.length === 1 && window.selectedIncarichi[0] !== "TUTTI") {
-        const colorData = window.stringToColorData(window.selectedIncarichi[0]);
-        statBtns.forEach(b => {
-            if(b) {
-                b.style.backgroundColor = colorData.bg;
-                b.style.color = colorData.text;
-                Array.from(b.querySelectorAll('div, span, strong')).forEach(c => c.style.color = colorData.text);
-            }
-        });
-    } else {
-        statBtns.forEach(b => {
-            if(b) {
-                b.style.backgroundColor = ""; // Ripristina base classe CSS
-                b.style.color = "";
-                Array.from(b.querySelectorAll('div, span, strong')).forEach(c => c.style.color = "");
-            }
-        });
-    }
-}
+            if(sStart) taskData.status = 'assigned';
+            await updateDoc(doc(db,"tasks",editId), taskData);
+            await logActivity('EDIT_TASK', 'task', editId);
+        } else {
+            taskData.createdAt = serverTimestamp();
+            if(!currentUser.roles.includes('technician')) { taskData.requestedBy = currentUser.id; }
+            taskData.status = sStart ? 'assigned' : 'pending_approval';
 
-if(filterTecnicoOggi) {
-    // 1. Aggiungiamo i nomi di tutti i dipendenti al dropdown
-    if (window.anagrafiche && window.anagrafiche.length > 0) {
-        const dipendenti = window.anagrafiche.filter(d => d.qualifica === "Dipendente").map(d => d.ragioneSociale || (d.nome + " " + (d.cognome || ""))).sort();
-        /* Popoliamo filterTecnicoOggi */
-        dipendenti.forEach(nome => {
-            const opt = document.createElement('option');
-            opt.value = nome;
-            opt.style.color = "black";
-            opt.textContent = `👤 Solo: ${nome}`;
-            filterTecnicoOggi.appendChild(opt);
-        });
-
-        /* Popoliamo tecnicoAssegnato */
-        const dropdownsAss = [document.getElementById('tecnicoAssegnato'), document.getElementById('editTecnicoAssegnato')];
-        dropdownsAss.forEach(dd => {
-            if(dd && dd.options.length <= 1) { // EVITA DOPPIONI AL RELOAD
-                dipendenti.forEach(nome => {
-                    const opt = document.createElement('option');
-                    opt.value = nome;
-                    opt.textContent = nome;
-                    dd.appendChild(opt);
+            const tk = await addDoc(collection(db,"tasks"), taskData);
+            await logActivity(sStart ? 'CREATE_TASK' : 'PROPOSE_TASK', 'task', tk.id);
+            
+            Object.keys(appCache.people).filter(id => id !== currentUser.id && appCache.people[id].active).forEach(pid => {
+                addDoc(collection(db,"notifications"), {
+                    userId: pid, title: 'Nuovo Task Inserito', 
+                    message: `${currentUser.fullName} ha inserito il task: ${taskData.title}`,
+                    read: false, createdAt: serverTimestamp(), 
+                    taskId: tk.id, scheduledStart: sStart || null
                 });
-                
-                if(localStorage.getItem('antimo_user_name')) {
-                    const myName = localStorage.getItem('antimo_user_name');
-                    if(Array.from(dd.options).some(o => o.value === myName)) {
-                        dd.value = myName; // DEFAULT a me
-                    }
-                }
-            }
-        });
-    }
-
-    // 2. Imposta il valore
-    const savedFilter = localStorage.getItem('antimo_filterTecnicoOggi');
-    if (savedFilter) {
-        filterTecnicoOggi.value = savedFilter;
-    } else {
-        const defaultName = localStorage.getItem('antimo_user_name') || "";
-        if (defaultName.toLowerCase().includes("giuseppe")) {
-            filterTecnicoOggi.value = "TUTTI";
-        }
-    }
-
-    // 3. Listener
-    filterTecnicoOggi.addEventListener('change', (e) => {
-        localStorage.setItem('antimo_filterTecnicoOggi', e.target.value);
-        updateInterventiCount();
-        if(!activitiesListContainer.classList.contains('hidden')) {
-            renderActivitiesList();
-        }
-    });
-}
-
-function renderSpecialPlannedList(container, filteredData) {
-    if(!container) return;
-    container.innerHTML = '';
-    
-    filteredData.forEach(p => {
-        // Cerchiamo l'indice reale nell'array globale
-        const index = plannedInterventions.indexOf(p);
-        
-        const div = document.createElement('div');
-        div.className = "card-item-container";
-        
-        let dateStr = p.dataPrevista ? p.dataPrevista.split('-').reverse().join('/') : 'N/D';
-        let attachBadge = (p.fileUrlsProgrammati && p.fileUrlsProgrammati.length > 0) ? `<span style="font-size:0.8rem; background:var(--orange-light); color:white; padding:2px 5px; border-radius:4px; margin-left:5px;">📎</span>` : '';
-
-        let attachHtml = '';
-        if (p.fileUrlsProgrammati && p.fileUrlsProgrammati.length > 0) {
-            attachHtml = `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dotted #ccc;">
-                <strong>📎 Allegati Sede:</strong><br>
-                ${p.fileUrlsProgrammati.map((url, i) => `<a href="${url}" target="_blank" style="color: var(--blue-primary); font-size: 0.85rem; text-decoration: underline;">Allegato ${i+1}</a>`).join('<br>')}
-            </div>`;
-        }
-
-        div.innerHTML = `
-            <div class="card-compact-view">
-                <div style="flex:1;">
-                    <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${p.paziente} ${attachBadge}</div>
-                    <div style="font-size:0.75rem; color:#64748b; margin-top:2px;">👤 Da: <strong>${p.programmatoDa || 'N/D'}</strong> &rarr; 👨‍🔧 <strong>${p.tecnicoAssegnato || 'Da Assegnare'}</strong></div>
-                    <div style="font-size:0.85rem; color:#555;">📍 ${p.localita || p.destinazione} | 🔧 ${p.tipo}</div>
-                    <div style="font-size:0.80rem; color:var(--orange); font-weight:600; margin-top:4px;">🗓 Data Prevista: ${dateStr}</div>
-                </div>
-                <div style="display: flex; gap: 8px; align-items: center; padding-left: 10px;">
-                    <button class="btn btn-primary btn-orange btn-sm" style="padding:6px 10px; font-size:0.8rem; line-height:1; min-width:auto;" data-action="avvia" data-index="${index}">▶ AVVIA</button>
-                    <span class="expand-icon" style="font-size:1.2rem; color:var(--blue-light); padding:10px;">▼</span>
-                </div>
-            </div>
-            
-            <div class="card-expanded-view hidden">
-                <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${p.indirizzo || ''}</div>
-                <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${p.telefono || '-'}</div>
-                <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${p.dispositivi || 'Nessuno'}</div>
-                <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Accessori:</strong> ${p.accessoriStr || 'Nessuno'}</div>
-                <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Matricola:</strong> ${p.matricola || 'N/D'}</div>
-                <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${p.note || 'Nessuna'}</div>
-                ${attachHtml}
-                <div style="background: rgba(34,197,94,0.1); border: 1px solid #22c55e; border-radius: 6px; padding: 10px; margin-top: 10px; margin-bottom: 5px; display: flex; align-items: center; justify-content: space-between;">
-                    <label style="font-weight: bold; color: #15803d; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 8px; margin: 0;">
-                        <input type="checkbox" data-action="assegna-mag" data-index="${index}" style="width: 18px; height: 18px; cursor: pointer; accent-color: #16a34a;" ${p.assegnatoMagazzino ? 'checked' : ''}>
-                        📦 ASSEGNA MAG
-                    </label>
-                </div>
-                <div style="display:flex; gap:10px; margin-top: 15px;">
-                    <button class="btn btn-primary btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="edit" data-index="${index}">✏ Modifica</button>
-                    <button class="btn btn-danger btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="delete" data-index="${index}">🗑 Elimina</button>
-                    <button class="btn btn-danger btn-sm" style="flex:1; padding:8px; font-size:0.85rem; background:#b45309;" data-action="justify" data-index="${index}">✖ Non Eseg</button>
-                </div>
-            </div>
-        `;
-        
-        setupAccordionCard(div);
-        
-        const magCb1 = div.querySelector('input[data-action="assegna-mag"]');
-        if (magCb1) {
-            magCb1.addEventListener('change', async (e) => {
-                const idx = e.target.getAttribute('data-index');
-                const isChecked = e.target.checked;
-                const plannedItem = plannedInterventions[idx];
-                plannedItem.assegnatoMagazzino = isChecked;
-                try {
-                    const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                    await updateDoc(doc(db, "programmati", plannedItem.idFb || plannedItem.id), { assegnatoMagazzino: isChecked });
-                } catch(err) { e.target.checked = !isChecked; plannedItem.assegnatoMagazzino = !isChecked; }
             });
         }
-        
-        div.querySelector('button[data-action="edit"]')?.addEventListener('click', (e) => editProgrammatoAppJs(e.target.getAttribute('data-index')));
-        div.querySelector('button[data-action="delete"]')?.addEventListener('click', (e) => deleteProgrammatoAppJs(e.target.getAttribute('data-index')));
-        
-        div.querySelector('button[data-action="avvia"]').addEventListener('click', (e) => {
-            const idx = e.target.getAttribute('data-index');
-            editProgrammatoAppJs(idx);
-        });
-        
-        div.querySelector('button[data-action="justify"]').addEventListener('click', (e) => {
-            const idx = e.target.getAttribute('data-index');
-            interventionToJustify = plannedInterventions[idx];
-            justifyReason.value = "";
-            justifyModal.classList.remove('hidden');
-        });
-
-        container.appendChild(div);
+        document.getElementById('bsBackdrop').classList.remove('open'); document.getElementById('actionWizardModal').classList.remove('open');
+        document.getElementById('taskDetailModal').classList.remove('open');
     });
+    document.getElementById('actionWizardModal').classList.add('open');
 }
 
-function renderPlannedInterventions(tuttiProg = [], oggiProg = [], domaniProg = []) {
-    if(plannedList) renderSpecialPlannedList(plannedList, tuttiProg);
-    if(oggiList) renderSpecialPlannedList(oggiList, oggiProg);
-    if(domaniList) renderSpecialPlannedList(domaniList, domaniProg);
-}
-
-function renderNpInterventions(visibiliCustom) {
-    if(!npList) return;
-    npList.innerHTML = '';
-    
-    // Filtra solo quelli in attesa se non passato
-    const visibili = visibiliCustom || plannedInterventions.filter(p => p.status === 'in_attesa');
-    
-    visibili.forEach((p, indexOriginalArray) => {
-        // Cerchiamo l'indice reale nell'array globale
-        const index = plannedInterventions.indexOf(p);
-        
-        const div = document.createElement('div');
-        div.className = "card-item-container";
-        div.style.borderLeft = "4px solid #ef4444";
-        
-        let noteStr = p.note || p.dispositivi || 'Nessuna nota';
-        let attachBadge = (p.fileUrlsProgrammati && p.fileUrlsProgrammati.length > 0) ? `<span style="font-size:0.8rem; background:var(--orange-light); color:white; padding:2px 5px; border-radius:4px; margin-left:5px;">📎</span>` : '';
-
-        let attachHtml = '';
-        if (p.fileUrlsProgrammati && p.fileUrlsProgrammati.length > 0) {
-            attachHtml = `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dotted #ccc;">
-                <strong>📎 Allegati Sede:</strong><br>
-                ${p.fileUrlsProgrammati.map((url, i) => `<a href="${url}" target="_blank" style="color: var(--blue-primary); font-size: 0.85rem; text-decoration: underline;">Allegato ${i+1}</a>`).join('<br>')}
-            </div>`;
-        }
-
-        div.innerHTML = `
-            <div class="card-compact-view">
-                <div style="flex:1;">
-                    <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${p.paziente} ${attachBadge}</div>
-                    <div style="font-size:0.75rem; color:#64748b; margin-top:2px;">👤 Da: <strong>${p.programmatoDa || 'N/D'}</strong> &rarr; 👨‍🔧 <strong>${p.tecnicoAssegnato || 'Da Assegnare'}</strong></div>
-                    <div style="font-size:0.85rem; color:#555;">📍 ${p.localita || p.destinazione} | 🔧 ${p.tipo}</div>
-                    <div style="font-size:0.80rem; color:#ef4444; font-weight:600; margin-top:4px;">⏳ Da Programmare</div>
-                </div>
-                <div style="display: flex; gap: 8px; align-items: center; padding-left: 10px;">
-                    <button class="btn btn-primary btn-orange btn-sm" style="padding:6px 10px; font-size:0.8rem; line-height:1; min-width:auto;" data-action="avvia" data-index="${index}">▶ AVVIA</button>
-                    <span class="expand-icon" style="font-size:1.2rem; color:var(--blue-light); padding:10px;">▼</span>
-                </div>
-            </div>
-            
-            <div class="card-expanded-view hidden">
-                <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${p.indirizzo || ''}</div>
-                <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${p.telefono || '-'}</div>
-                <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${p.dispositivi || 'Nessuno'}</div>
-                <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Accessori:</strong> ${p.accessoriStr || 'Nessuno'}</div>
-                <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Matricola:</strong> ${p.matricola || 'N/D'}</div>
-                <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${noteStr}</div>
-                <div style="background: rgba(34,197,94,0.1); border: 1px solid #22c55e; border-radius: 6px; padding: 10px; margin-top: 10px; margin-bottom: 5px; display: flex; align-items: center; justify-content: space-between;">
-                    <label style="font-weight: bold; color: #15803d; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 8px; margin: 0;">
-                        <input type="checkbox" data-action="assegna-mag" data-index="${index}" style="width: 18px; height: 18px; cursor: pointer; accent-color: #16a34a;" ${p.assegnatoMagazzino ? 'checked' : ''}>
-                        📦 ASSEGNA MAG
-                    </label>
-                </div>
-                <div style="display:flex; gap:10px; margin-top: 15px;">
-                    <button class="btn btn-primary btn-sm" style="flex:1; padding:8px; font-size:0.85rem;" data-action="edit" data-index="${index}">✏ Modifica</button>
-                    <button class="btn btn-danger btn-sm" style="flex:1; padding:8px; font-size:0.85rem; background:#b45309;" data-action="delete" data-index="${index}">🗑 Elimina</button>
-                </div>
-            </div>
-        `;
-        
-        setupAccordionCard(div);
-        
-        const magCb2 = div.querySelector('input[data-action="assegna-mag"]');
-        if (magCb2) {
-            magCb2.addEventListener('change', async (e) => {
-                const idx = e.target.getAttribute('data-index');
-                const isChecked = e.target.checked;
-                const plannedItem = plannedInterventions[idx];
-                plannedItem.assegnatoMagazzino = isChecked;
-                try {
-                    const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                    await updateDoc(doc(db, "programmati", plannedItem.idFb || plannedItem.id), { assegnatoMagazzino: isChecked });
-                } catch(err) { e.target.checked = !isChecked; plannedItem.assegnatoMagazzino = !isChecked; }
-            });
-        }
-        
-        div.querySelector('button[data-action="edit"]')?.addEventListener('click', (e) => editProgrammatoAppJs(e.target.getAttribute('data-index')));
-        div.querySelector('button[data-action="delete"]')?.addEventListener('click', (e) => deleteProgrammatoAppJs(e.target.getAttribute('data-index')));
-        
-        div.querySelector('button[data-action="avvia"]').addEventListener('click', (e) => {
-            const idx = e.target.getAttribute('data-index');
-            editProgrammatoAppJs(idx);
-        });
-
-        npList.appendChild(div);
-    });
-}
-
-// LOGICA MODALE GIUSTIFICAZIONE
-btnCancelJustify.addEventListener('click', () => {
-    justifyModal.classList.add('hidden');
-    interventionToJustify = null;
-});
-
-btnConfirmJustify.addEventListener('click', async () => {
-    const reason = justifyReason.value.trim();
-    if(!reason) return alert("Devi inserire una motivazione!");
-    
-    if(interventionToJustify) {
-        interventionToJustify.status = 'justified_not_executed';
-        interventionToJustify.motivazione = reason;
-        
-        if (isFirebaseConfigured && interventionToJustify.id) {
-            try {
-                const { doc, updateDoc, collection, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                const q = query(collection(db, "programmati"), where("id", "==", interventionToJustify.id));
-                const snaps = await getDocs(q);
-                
-                let updated = false;
-                snaps.forEach(async (d) => {
-                    await updateDoc(doc(db, "programmati", d.id), {
-                        status: 'justified_not_executed',
-                        motivazione: reason
-                    });
-                    updated = true;
-                });
-                
-                if(!updated && interventionToJustify.id.startsWith('plan_')) {
-                     // Fallback se per caso non era ancora salito
-                     const { addDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                     await addDoc(collection(db, "programmati"), interventionToJustify);
-                }
-            } catch(e) {
-                console.error("Errore giustificazione", e);
-            }
-        }
-        
-        // Rimuoviamolo dalla vista locale
-        plannedInterventions = plannedInterventions.filter(p => p.id !== interventionToJustify.id);
-        saveState();
-    }
-    
-    justifyModal.classList.add('hidden');
-    interventionToJustify = null;
-    
-    if(isFirebaseConfigured) {
-        syncPlannedInterventions(); // resetta Ui e conteggi
+window.confirmMultiSelect = () => {
+    const checks = Array.from(document.querySelectorAll('#multiSelectCheckboxes input[type=checkbox]:checked'));
+    const btn = document.getElementById('btnMultiSelect');
+    const container = document.getElementById('multiSelectContainer');
+    if(checks.length === 0) {
+        btn.innerHTML = "Seleziona Beneficiari... <span>▼</span>";
     } else {
-        updateUI();
-        updateInterventiCount();
+        const names = checks.map(c => c.parentElement.textContent.trim()).join(', ');
+        const fmt = names.length > 35 ? names.substring(0,32) + "..." : names;
+        btn.innerHTML = fmt + " <span>▼</span>";
     }
-});
+    container.style.display = 'none';
+    btn.style.display = 'flex';
+};
 
-// IMPOSTAZIONI EVENT LISTENERS
-if(btnSettings) {
-    btnSettings.addEventListener('click', () => {
-        toggleRequireKm.checked = requireKm;
-        settingsModal.classList.remove('hidden');
+window.confirmMultiSelectExp = () => {
+    const checks = Array.from(document.querySelectorAll('#multiSelectContainerExp .we-alloc:checked'));
+    const btn = document.getElementById('btnMultiSelectExp');
+    const container = document.getElementById('multiSelectContainerExp');
+    if(checks.length === 0) {
+        btn.innerHTML = "Seleziona Beneficiari... <span>▼</span>";
+    } else {
+        const names = checks.map(c => c.textContent.trim() || c.parentElement.textContent.trim()).join(', ');
+        const fmt = names.length > 35 ? names.substring(0,32) + "..." : names;
+        btn.innerHTML = fmt + " <span>▼</span>";
+    }
+    container.style.display = 'none';
+    btn.style.display = 'flex';
+};
+
+window.openApproveWizard = (reqId) => {
+    const r = liveRequests.find(x=>x.id===reqId);
+    const b = document.getElementById('wizardBody'); document.getElementById('wizardTitle').textContent="Assegna e Pianifica";
+    
+    let dtHtml = '';
+    if(r.scheduledStart) {
+        dtHtml = `<label class="mt-3">Conferma Data e Ora</label><input type="datetime-local" id="was" value="${r.scheduledStart.slice(0,16)}">`;
+    } else {
+        dtHtml = `<label class="mt-3">Pianifica Data (Opzionale, lascia vuoto per mantenere Senza Data)</label><input type="datetime-local" id="was">`;
+    }
+
+    b.innerHTML = `<form id="waF">
+        <label>Seleziona Tecnico</label>
+        <select id="waw" required>${Object.values(appCache.people).filter(p=>p.roles.includes('technician') && p.id !== 'worker_luca').map(p=>`<option value="${p.id}" ${p.id==='worker_paolo'?'selected':''}>${p.fullName}</option>`).join('')}</select>
+        ${dtHtml}
+        <button type="submit" class="btn btn-success mt-4">Definitivo: Assegna e Crea Task</button>
+    </form>`;
+
+    b.querySelector('#waF').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const was = b.querySelector('#was').value;
+        await updateDoc(doc(db,"requests",reqId),{status:'assigned'});
+        await addDoc(collection(db,"tasks"),{
+            requestId:reqId, title:r.title, description:r.description, attachments: r.attachments||[],
+            locationId:r.locationId, familyIds:r.familyIds, organizationIds:r.organizationIds, priority:r.priority||'medium',
+            assignedTo:b.querySelector('#waw').value, 
+            scheduledStart: was ? was : null, 
+            scheduledEnd: r.scheduledEnd || null,
+            status:'assigned', 
+            createdAt:serverTimestamp()
+        });
+        document.getElementById('actionWizardModal').classList.remove('open');
     });
-}
-if(btnCloseSettings) {
-    btnCloseSettings.addEventListener('click', () => {
-        settingsModal.classList.add('hidden');
-    });
-}
-if(toggleRequireKm) {
-    toggleRequireKm.addEventListener('change', (e) => {
-        requireKm = e.target.checked;
-        localStorage.setItem('antimo_requireKm', JSON.stringify(requireKm));
-        updateUI();
-    });
-}
+    document.getElementById('actionWizardModal').classList.add('open');
+};
 
-// BACKUP E VERISONI EVENT LISTENERS
-if(btnOpenBackup) {
-    btnOpenBackup.addEventListener('click', () => {
-        settingsModal.classList.add('hidden'); // Chiude impostazioni
-        
-        // Version Update Dinamico
-        const currentVersionEl = document.getElementById('appVersionStamp');
-        let currentVersion = "v61.3"; 
-        if(currentVersionEl) {
-            let fullText = currentVersionEl.innerText || currentVersionEl.textContent;
-            currentVersion = fullText.split(' - ')[0].trim();
-        }
-        
-        const backupManualeVersionTxt = document.getElementById('backupManualeVersionTxt');
-        if(backupManualeVersionTxt) backupManualeVersionTxt.innerText = currentVersion + " (Custom)";
-        
-        const backupOggiVersionTxt = document.getElementById('backupOggiVersionTxt');
-        if(backupOggiVersionTxt) backupOggiVersionTxt.innerText = currentVersion + " (Attuale)";
-        
-        document.querySelectorAll('.btn-desc-version[data-version="v61.3"]').forEach(b => b.setAttribute('data-version', currentVersion));
-        document.querySelectorAll('.btn-reinstall-version[data-version="v61.3"]').forEach(b => b.setAttribute('data-version', currentVersion));
-        document.querySelectorAll('.btn-desc-version[data-version="v61.3-manual"]').forEach(b => b.setAttribute('data-version', currentVersion + "-manual"));
-        document.querySelectorAll('.btn-reinstall-version[data-version="v61.3-manual"]').forEach(b => b.setAttribute('data-version', currentVersion + "-manual"));
-
-        // Calcola le date da mostrare
-        const today = new Date();
-        
-        if(backupManualeDate) {
-            let savedTime = localStorage.getItem('antimo_manualBackupTime');
-            backupManualeDate.innerHTML = `Oggi (Manuale) - ${savedTime ? savedTime : '--:--'}`;
-        }
-
-        if(backupOggiDate) backupOggiDate.innerText = formatDateDMY(today) + " (Automatica)";
-        const d2 = new Date(); d2.setDate(today.getDate() - 2);
-        if(backup2giorniDate) backup2giorniDate.innerText = formatDateDMY(d2);
-        const d7 = new Date(); d7.setDate(today.getDate() - 7);
-        if(backup7giorniDate) backup7giorniDate.innerText = formatDateDMY(d7);
-        
-        backupModal.classList.remove('hidden');
-    });
-}
-
-if(btnSaveManualBackup) {
-    btnSaveManualBackup.addEventListener('click', () => {
-        const now = new Date();
-        const timeStr = padZ(now.getHours()) + ":" + padZ(now.getMinutes());
-        localStorage.setItem('antimo_manualBackupTime', timeStr);
-        if(backupManualeDate) backupManualeDate.innerHTML = `Oggi (Manuale) - ${timeStr}`;
-        alert("Versione manuale della giornata salvata con successo!");
-    });
-}
-
-if(btnCloseBackup) {
-    btnCloseBackup.addEventListener('click', () => {
-        backupModal.classList.add('hidden');
-    });
-}
-
-// Apertura modale singola versione
-document.querySelectorAll('.btn-desc-version').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        const version = e.target.getAttribute('data-version');
-        let contentHtml = "";
-        
-        const currentVersionEl = document.getElementById('appVersionStamp');
-        const currentVersion = currentVersionEl ? (currentVersionEl.innerText || currentVersionEl.textContent).split(' - ')[0].trim() : "v61.3";
-        const isCurrent = (version === currentVersion || version === currentVersion + "-manual");
-
-        // Genera il changelog
-        if(isCurrent && version !== "v61.3" && version !== "v61.3-manual") {
-            contentHtml = `
-                <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px;">🌟 Ultima Versione</h4>
-                <div style="padding: 10px; background: #e0f2fe; color: #0284c7; border-left: 4px solid #0ea5e9; border-radius: 4px; font-size: 0.9rem;">
-                    <strong>${version}</strong>: Aggiornamento automatico con ottimizzazioni alle logiche di sistema ed interfaccia utente.
+window.openExpenseWizard = (taskId=null) => {
+    if(typeof taskId !== 'string') taskId = null;
+    const b = document.getElementById('wizardBody'); document.getElementById('wizardTitle').textContent="Aggiungi Spesa";
+    const opts = liveTasks.filter(t=>t.status!=='completed').map(t=>`<option value="${t.id}" ${t.id===taskId?'selected':''}>${t.title}</option>`).join('');
+    const fams = Object.values(appCache.families).map(f=>`<label class="check-item"><input type="checkbox" class="we-alloc" value="fam_${f.id}">${f.name}</label>`).join('');
+    const orgs = Object.values(appCache.organizations).map(o=>`<label class="check-item"><input type="checkbox" class="we-alloc" value="org_${o.id}">${o.name}</label>`).join('');
+    b.innerHTML = `<form id="weF">
+        <label>Categoria</label>
+        <select id="weCat"><option value="materiali">Materiali / Generico</option><option value="carburante">Carburante Veicolo</option></select>
+        <div id="weVeicDiv" style="display:none;"><label>Veicolo</label><select id="weVeic"><option value="furgone">Furgone Aziendale</option><option value="auto">Auto</option><option value="altro">Altro</option></select></div>
+        <label>Importo (€)</label>
+        <input type="number" id="wea" step="0.01" placeholder="0.00" required>
+        <label>Descrizione / Causale</label>
+        <input type="text" id="wed" placeholder="Es. Viti e tasselli" required>
+        <label>Seleziona Task (Applica automaticamente i centri di costo)</label>
+        <select id="wet"><option value="">Nessun Task</option>${opts}</select>
+        <div id="weAllocDiv" style="margin-top:10px; padding:10px; border:1px solid #ddd; background:#fafafa; border-radius:8px;">
+            <label style="font-size:0.85rem; color:var(--danger); margin-bottom:8px; display:block;">Seleziona esplicitamente almeno un centro di costo se non hai scelto un Task:</label>
+            <button type="button" id="btnMultiSelectExp" class="btn btn-outline" style="width:100%; text-align:left; display:flex; justify-content:space-between; align-items:center; background:#fff; border:1px solid #ccc; color:#333; padding:10px;" onclick="document.getElementById('multiSelectContainerExp').style.display='block'; this.style.display='none';">Seleziona Beneficiari... <span>▼</span></button>
+            <div id="multiSelectContainerExp" style="display:none; background:#fff; border:1px solid #ccc; border-radius:8px; padding:10px; margin-top:8px;">
+                <div style="max-height:180px; overflow-y:auto; margin-bottom:10px; display:flex; flex-direction:column; gap:8px;">
+                    ${fams}${orgs}
                 </div>
-            `;
-        } else if(version === "v61.3" || version === "v61.3-manual") {
-            contentHtml = `
-                <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px;">🌟 Novità Principali</h4>
-                <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 15px;">
-                    <li><strong>Backup Versioni e AI:</strong> Integrata la nuova tabella per visualizzare lo storico delle versioni.</li>
-                    <li><strong>Ricerca Intelligente:</strong> Nuova funzionalità per chiedere all'AI i dettagli sulle caratteristiche dell'app.</li>
-                    <li><strong>Layout Unificato PC/Mobile:</strong> Interfaccia utente ottimizzata dinamicamente per entrambi i dispositivi.</li>
-                </ul>
-                <h4 style="color: #166534; border-bottom: 1px solid #ddd; padding-bottom: 5px;">🔧 Dettagli Tecnici</h4>
-                <ul style="padding-left: 20px; margin-bottom: 15px;">
-                    <li>Modali separati per settings, backup e note versione.</li>
-                    <li>Implementazione Event Listeners asincroni protetti.</li>
-                </ul>
-            `;
-        } else if(version === "v61.2") {
-            contentHtml = `
-                <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px;">🌟 Novità Principali</h4>
-                <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 15px;">
-                    <li><strong>Modulo Interventi Rapido:</strong> Fusione di 'in corso' e 'nuovo', con singola schermata e modulo chilometri incluso sin da subito.</li>
-                    <li><strong>Statistiche Superiori:</strong> Icone statistiche divise per Oggi, Domani e Programmati con evidenza di 'non eseguiti' (NP).</li>
-                </ul>
-                <h4 style="color: #ea580c; border-bottom: 1px solid #ddd; padding-bottom: 5px;">⚠️ Bug Fixes</h4>
-                <ul style="padding-left: 20px; margin-bottom: 15px;">
-                    <li>Riparato lo scorrimento e il caricamento dei modali da mobile iOS/Android.</li>
-                </ul>
-            `;
-        } else if(version === "v61.0") {
-            contentHtml = `
-                <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px;">🚀 Lancio Major Update</h4>
-                <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 15px;">
-                    <li><strong>Architettura Firebase Firestore:</strong> I dati passano da Google Sheets a sistema real-time in Cloud Firebase.</li>
-                    <li><strong>Funzione Offline-First:</strong> Se manca internet, tutto si salva in IndexedDB e si auto-sincronizza al ritorno della rete.</li>
-                    <li><strong>Gestione Anagrafiche:</strong> Sezione esterna integrata e dinamica per clienti e fornitori.</li>
-                </ul>
-            `;
+                <button type="button" class="btn btn-primary" style="width:100%; padding:8px;" onclick="window.confirmMultiSelectExp()">Conferma Selezione</button>
+            </div>
+        </div>
+        <label class="mt-2">Giustificativo</label>
+        <input type="file" id="weFile" accept="image/*" capture="environment" style="margin-bottom:10px; width:100%;">
+        <textarea id="weNote" placeholder="Nota giustificativa (se non hai lo scontrino)" rows="2" style="width:100%; border:1px solid #ccc; border-radius:8px; padding:8px;"></textarea>
+        <button type="submit" class="btn btn-success mt-4">Registra Spesa e Scala Cassa</button>
+    </form>`;
+
+    b.querySelector('#weCat').addEventListener('change', (e) => {
+        b.querySelector('#weVeicDiv').style.display = e.target.value==='carburante' ? 'block' : 'none';
+    });
+
+    const tSel = b.querySelector('#wet');
+    const allocDiv = b.querySelector('#weAllocDiv');
+    const updateAllocVis = () => { allocDiv.style.display = tSel.value ? 'none' : 'block'; };
+    tSel.addEventListener('change', updateAllocVis);
+    updateAllocVis();
+
+    b.querySelector('#weF').addEventListener('submit', async(e)=>{
+        e.preventDefault(); 
+        const amt = parseFloat(b.querySelector('#wea').value);
+        const tId = b.querySelector('#wet').value;
+        const cat = b.querySelector('#weCat').value;
+        const veic = b.querySelector('#weVeic').value;
+        const desc = b.querySelector('#wed').value;
+        const note = b.querySelector('#weNote').value;
+        const fileInput = b.querySelector('#weFile');
+        
+        let allocs = [];
+        let hasAlloc = !!tId;
+        
+        if(tId) {
+            const t = liveTasks.find(x=>x.id===tId);
+            if(t) {
+                const checks = [...(t.familyIds||[]).map(x=>'fam_'+x), ...(t.organizationIds||[]).map(x=>'org_'+x)];
+                if(checks.length > 0) {
+                    const q = amt / checks.length, pc = 100 / checks.length;
+                    allocs = checks.map(s => ({
+                        type: s.startsWith('fam_') ? 'family' : 'organization', 
+                        entityId: s.replace('fam_','').replace('org_',''), 
+                        amount: q, percentage: pc
+                    }));
+                }
+            }
+        } else {
+            const checks = Array.from(b.querySelectorAll('.we-alloc:checked')).map(x=>x.value);
+            if(checks.length === 0) return alert("Devi selezionare un Task o almeno un Centro di Costo!");
+            hasAlloc = true;
+            const q = amt / checks.length, pc = 100 / checks.length;
+            allocs = checks.map(s => ({
+                type: s.startsWith('fam_') ? 'family' : 'organization', 
+                entityId: s.replace('fam_','').replace('org_',''), 
+                amount: q, percentage: pc
+            }));
         }
-        
-        verTitleDesc.innerText = version;
-        versionDescContent.innerHTML = contentHtml;
-        versionDescModal.classList.remove('hidden');
-    });
-});
 
-// Logica Reinstalla Versione
-document.querySelectorAll('.btn-reinstall-version').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        const version = e.target.getAttribute('data-version');
-        if (confirm(`Sei sicuro di voler reinstallare la versione ${version}?\nQuesta operazione ripristinerà l'app a quello stato.`)) {
-            alert(`Sincronizzazione completata: Versione ${version} pronta. L'app verrà riavviata.`);
-            window.location.reload(true);
-        }
-    });
-});
+        const hasReceipt = fileInput.files.length > 0;
+        const hasJust = note.trim().length > 0;
+        let finalStatus = 'pending_approval';
 
-if(btnAllVersions) {
-    btnAllVersions.addEventListener('click', () => {
-        let contentHtml = "";
-        const now = new Date();
-        const d2 = new Date(); d2.setDate(now.getDate() - 2);
-        const d7 = new Date(); d7.setDate(now.getDate() - 7);
-        
-        let savedTime = localStorage.getItem('antimo_manualBackupTime');
-        
-        // 1. Manuale
-        if(savedTime) {
-            contentHtml += `<div style="background: #f0fdf4; padding: 10px; border-radius: 8px; border: 1px solid #bbf7d0; margin-bottom: 20px;">
-                                <h3 style="margin:0; color:#15803d; font-size: 1.1rem;">Oggi - ${savedTime} (Salvataggio Manuale)</h3>
-                                <p style="margin: 5px 0 0; font-size: 0.9rem; color: #166534; font-weight: 500;">Ultima versione dell'app salvata direttamente dall'utente in locale.</p>
-                            </div>`;
-        }
-        
-        // 2. Oggi
-        const currentVersionEl = document.getElementById('appVersionStamp');
-        const currentVersion = currentVersionEl ? (currentVersionEl.innerText || currentVersionEl.textContent).split(' - ')[0].trim() : "v61.3";
-        
-        contentHtml += `<div style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px dashed #eee;">
-                            <h3 style="margin:0 0 10px; color:#ea580c; font-size: 1.1rem;">📅 Oggi (${formatDateDMY(now)} - Mattina) - ${currentVersion}</h3>
-                            <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top:5px;">🌟 Novità Principali</h4>
-                            <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 10px;">
-                                <li><strong>Backup Versioni e AI:</strong> Integrata la nuova tabella per visualizzare lo storico delle versioni e i salvataggi personalizzati.</li>
-                                <li><strong>Ricerca Intelligente:</strong> Nuova funzionalità per chiedere all'AI i dettagli sulle caratteristiche dell'app.</li>
-                                <li><strong>Layout Unificato PC/Mobile:</strong> Interfaccia utente ottimizzata dinamicamente per entrambi i dispositivi.</li>
-                            </ul>
-                        </div>`;
-                        
-        // 3. 2 Giorni fa
-        contentHtml += `<div style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px dashed #eee;">
-                            <h3 style="margin:0 0 10px; color:#ea580c; font-size: 1.1rem;">📅 ${formatDateDMY(d2)} - v61.2</h3>
-                            <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top:5px;">🌟 Novità Principali</h4>
-                            <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 10px;">
-                                <li><strong>Modulo Interventi Rapido:</strong> Fusione di 'in corso' e 'nuovo', con modulo chilometri incluso sin da subito.</li>
-                                <li><strong>Statistiche Superiori:</strong> Icone statistiche divise per Oggi, Domani e Programmati con evidenza di 'NP'.</li>
-                            </ul>
-                        </div>`;
-                        
-        // 4. 1 Settimana fa
-        contentHtml += `<div>
-                            <h3 style="margin:0 0 10px; color:#ea580c; font-size: 1.1rem;">📅 ${formatDateDMY(d7)} - v61.0</h3>
-                            <h4 style="color: var(--blue-primary); border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top:5px;">🚀 Lancio Major Update</h4>
-                            <ul style="padding-left: 20px; list-style-type: square; margin-bottom: 10px;">
-                                <li><strong>Architettura Firebase Firestore:</strong> Passaggio da Google Sheets a sistema real-time in Cloud Firebase.</li>
-                                <li><strong>Funzione Offline-First:</strong> Auto-sincronizzazione al ritorno della rete tramite IndexedDB.</li>
-                                <li><strong>Gestione Anagrafiche:</strong> Sezione esterna integrata e dinamica per clienti e fornitori.</li>
-                            </ul>
-                        </div>`;
-
-        verTitleDesc.innerText = "Tutte le Versioni (Cronologia)";
-        versionDescContent.innerHTML = contentHtml;
-        versionDescModal.classList.remove('hidden');
-    });
-}
-
-if(btnCloseVersionDesc) {
-    btnCloseVersionDesc.addEventListener('click', () => {
-        versionDescModal.classList.add('hidden');
-    });
-}
-
-// Motore ricerca AI mock
-if(btnAiSearch) {
-    btnAiSearch.addEventListener('click', () => {
-        const query = aiSearchInput.value.trim().toLowerCase();
-        if(!query) return;
-        
-        aiSearchResult.classList.remove('hidden');
-        aiSearchResult.innerHTML = "<em>L'AI sta analizzando la tua richiesta... 🤖</em>";
-        
-        setTimeout(() => {
-            let response = "";
-            if(query.includes("km") || query.includes("chilometri") || query.includes("rimborso") || query.includes("distanza")) {
-                response = "<strong>🚗 Gestione Chilometri:</strong> L'app prevede l'opzione (attivabile in Impostazioni) di richiedere obbligatoriamente i km percorsi per ogni intervento, utile per i rimborsi spese di trasferta. Sono registrati a fine attività.";
-            } else if (query.includes("allegat") || query.includes("foto") || query.includes("pdf") || query.includes("scatta")) {
-                response = "<strong>📎 Gestione Allegati:</strong> L'app supporta il caricamento di immagini dirette da fotocamera mobile o file multimediali per ogni attività sia in avvio (Programmazione) che a fine intervento (Operatore Campo), inviati direttamente nello Storage Firebase.";
-            } else if (query.includes("sincro") || query.includes("cloud") || query.includes("internet") || query.includes("offline") || query.includes("connessione")) {
-                 response = "<strong>☁️ Offline-First & Sync:</strong> Se non c'è connessione, i tuoi interventi vengono salvati prima sul dispositivo locale (IndexedDB). Non appena l'app rileva una connessione o premi 'Sincronizza Dati', verranno sparati in Firebase.";
-            } else if (query.includes("anagrafich") || query.includes("pazient") || query.includes("utent")) {
-                 response = "<strong>📇 Anagrafiche:</strong> Tramite il portale dedicato (raggiungibile cliccando 'GESTIONE ANAGRAFICHE'), puoi inserire Clienti, Pazienti ed Enti. Essi si autocompleteranno nei moduli di creazione intervento.";
+        if(currentUser.id === 'worker_paolo') {
+            if(amt <= 50) {
+                if(hasAlloc && desc.trim().length > 0 && (hasReceipt || hasJust)) {
+                    finalStatus = 'self_approved_by_paolo';
+                }
             } else {
-                 response = "<strong>🧠 AI-Assistant:</strong> Attualmente la versione 24.3 dell'app permette registrazione interventi in un click, gestione anagrafiche, salvataggi allegati in cloud offline-ready, e organizzazione programmati Ognuno categorizzato per giorno. Prova a chiedermi di 'allegati', 'sincronizzazione', 'chilometri' o 'anagrafiche'!";
+                if(cat === 'carburante' && veic === 'furgone' && hasAlloc && hasReceipt) {
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    const fuelCount = liveExpenses.filter(ex => 
+                        ex.paidBy === currentUser.id && 
+                        ex.category === 'carburante' && 
+                        ex.status === 'self_approved_by_paolo' && 
+                        ex.dateStr === todayStr
+                    ).length;
+                    
+                    if(fuelCount < 2) {
+                        finalStatus = 'self_approved_by_paolo';
+                    }
+                }
             }
-            aiSearchResult.innerHTML = response;
+        }
+
+        const receiptMock = hasReceipt ? ('receipt_' + Date.now() + '_' + fileInput.files[0].name) : null;
+        
+        const exp=await addDoc(collection(db,"expenses"),{
+            taskId: tId, amount: amt, description: desc, category: cat, veicolo: cat==='carburante'?veic:null, 
+            paidBy: currentUser.id, allocations: allocs, status: finalStatus, receiptUrl: receiptMock, justification: note,
+            dateStr: new Date().toISOString().split('T')[0], createdAt: serverTimestamp()
+        });
+        
+        if(currentUser.roles.includes('technician')) { 
+            await addDoc(collection(db,"cash_movements"),{type:'expense',givenBy:currentUser.id,givenTo:currentUser.id,amount:amt,reason:desc, relatedExpenseId:exp.id,balanceAfter:(currentUser.wallet||0)-amt,createdAt:serverTimestamp()}); 
+        }
+        
+        await logActivity('ADD_EXPENSE','expense',exp.id);
+        sendNotification('admin', 'Nuova Spesa', `${currentUser.fullName} ha inserito spesa di €${amt} (${finalStatus})`);
+        
+        document.getElementById('bsBackdrop').classList.remove('open'); document.getElementById('actionWizardModal').classList.remove('open'); 
+        const tdm=document.getElementById('taskDetailModal'); if(tdm) tdm.classList.remove('open');
+    });
+    document.getElementById('bsBackdrop').classList.add('open'); document.getElementById('actionWizardModal').classList.add('open');
+};
+
+window.openAllocationWizard = (itemId, coll='expenses') => {
+    const e = coll==='expenses' ? liveExpenses.find(x=>x.id===itemId) : liveWorkSessions.find(x=>x.id===itemId); if(!e) return;
+    const b = document.getElementById('wizardBody'); document.getElementById('wizardTitle').textContent="Ripartizione";
+    let autoS = []; 
+    if(coll==='expenses' && e.taskId) { const t=liveTasks.find(x=>x.id===e.taskId); if(t) autoS=[...(t.familyIds||[]).map(x=>'fam_'+x), ...(t.organizationIds||[]).map(x=>'org_'+x)]; }
+    if(coll==='work_sessions' && e.tasks) { e.tasks.forEach(tid=>{const t=liveTasks.find(x=>x.id===tid); if(t){ (t.familyIds||[]).forEach(x=>{if(!autoS.includes('fam_'+x))autoS.push('fam_'+x)}); (t.organizationIds||[]).forEach(x=>{if(!autoS.includes('org_'+x))autoS.push('org_'+x)}); }}); }
+    
+    b.innerHTML = `<h2 class="text-center" style="color:var(--danger);">€${(e.amount||e.totalCost).toFixed(2)}</h2><div class="mt-4">${Object.values(appCache.families).map(f=>`<label class="check-item flex-between">Fam: ${f.name} <input type="checkbox" class="wa-sel" value="fam_${f.id}" ${autoS.includes('fam_'+f.id)?'checked':''}></label>`).join('')}${Object.values(appCache.organizations).map(o=>`<label class="check-item flex-between">Az: ${o.name} <input type="checkbox" class="wa-sel" value="org_${o.id}" ${autoS.includes('org_'+o.id)?'checked':''}></label>`).join('')}</div><div id="waRes" class="text-center mt-4 font-bold text-primary"></div><button id="waBtn" class="btn btn-primary mt-4">Salva Divisione Equa</button>`;
+    
+    const upd = () => { const c = b.querySelectorAll('.wa-sel:checked').length; const baseCost=e.amount||e.totalCost; b.querySelector('#waRes').textContent = c>0 ? `Quota: €${(baseCost/c).toFixed(2)} (${(100/c).toFixed(1)}%)` : 'Seleziona!'; };
+    b.querySelectorAll('.wa-sel').forEach(x=>x.addEventListener('change', upd)); upd();
+    
+    b.querySelector('#waBtn').addEventListener('click', async () => {
+        const sels = Array.from(b.querySelectorAll('.wa-sel:checked')).map(x=>x.value);
+        if(sels.length===0) return;
+        const baseCost=e.amount||e.totalCost;
+        const q = baseCost/sels.length, pc = 100/sels.length;
+        await updateDoc(doc(db,coll,itemId),{status: 'approved', allocations: sels.map(s => ({type:s.startsWith('fam_')?'family':'organization', entityId:s.replace('fam_','').replace('org_',''), amount:q, percentage:pc}))});
+        document.getElementById('actionWizardModal').classList.remove('open'); document.getElementById('bsBackdrop').classList.remove('open');
+    });
+    document.getElementById('bsBackdrop').classList.add('open'); document.getElementById('actionWizardModal').classList.add('open');
+};
+
+window.attachReceipt = async (expId) => {
+    const input = document.getElementById('nativeCameraInput');
+    if(!input) return;
+    const onCapture = async (e) => {
+        if(e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+            await updateDoc(doc(db,"expenses",expId), {receiptUrl: 'receipt_' + Date.now() + '_' + file.name});
+            await logActivity('ATTACH_RECEIPT','expense',expId, `Acquisito file: ${file.name}`);
+        }
+        input.removeEventListener('change', onCapture);
+    };
+    input.addEventListener('change', onCapture);
+    input.click();
+};
+
+window.topUpWallet = async (workerId) => {
+    const w = appCache.people[workerId];
+    if(confirm(`Versare Acconto Cassa di €500 a ${w.fullName}?`)) {
+        const cList = liveCash.filter(z=>z.givenTo===workerId).sort((a,b)=>b.createdAt-a.createdAt);
+        const oldBal = cList.length > 0 ? cList[0].balanceAfter : 0;
+        const newBal = oldBal + 500;
+        await addDoc(collection(db,"cash_movements"),{type:'advance',givenBy:currentUser.id,givenTo:workerId,amount:500,reason:'Ricarica Cassa Operativa',balanceAfter:newBal,createdAt:serverTimestamp()});
+    }
+};
+
+window.openRescheduleWizard = (taskId) => {
+    const t = liveTasks.find(x=>x.id===taskId); if(!t) return;
+    const b = document.getElementById('wizardBody'); document.getElementById('wizardTitle').textContent="Riprogramma";
+    b.innerHTML = `<form id="wresF"><h3 style="margin-bottom:15px; color:var(--text-muted); font-size:1rem;">${t.title}</h3><label>Nuovo Inizio Previsto:</label><input type="datetime-local" id="wresDate" value="${(t.scheduledStart||'').slice(0,16)}" required><button type="submit" class="btn btn-info mt-4" style="background:var(--info); color:white;">Sposta e Salva</button></form>`;
+    b.querySelector('#wresF').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await updateDoc(doc(db,"tasks",taskId), { scheduledStart: b.querySelector('#wresDate').value });
+        document.getElementById('actionWizardModal').classList.remove('open');
+    });
+    document.getElementById('actionWizardModal').classList.add('open');
+};
+
+window.openWorkerSessionWizard = () => {
+    const b = document.getElementById('wizardBody'); document.getElementById('wizardTitle').textContent="Giornata Manovale";
+    const myTodayTasks = liveTasks.filter(t=>t.assignedTo===currentUser.id && t.status!=='completed');
+    const taskChecks = myTodayTasks.map(t=>`<label class="check-item"><input type="checkbox" value="${t.id}"> ${t.title}</label>`).join('');
+    if(myTodayTasks.length===0) return alert("Non hai task attivi a cui associare il manovale!");
+    const wOpts = Object.values(appCache.external_workers).filter(w=>w.active && w.id !== 'worker_luca').map(w=>`<option value="${w.id}" data-rate="${w.dailyRate}">${w.fullName}</option>`).join('');
+    b.innerHTML = `<form id="wwF">
+        <label>Seleziona Manovale</label>
+        <select id="wwn" required><option value="">-- Scegliere Manovale --</option>${wOpts}</select>
+        <label>Costo Giornaliero Concordato (€)</label><input type="number" id="wwc" step="1" placeholder="Es. 80" required>
+        <label>Seleziona i Task in cui ha aiutato (obbligatorio):</label>
+        <div style="max-height:150px; overflow-y:auto; border:1px solid #ccc; padding:10px;">${taskChecks}</div>
+        <button type="submit" class="btn btn-success mt-4">Salva Sessione Lavoro</button>
+    </form>`;
+    b.querySelector('#wwn').addEventListener('change', (e) => {
+        const o = e.target.options[e.target.selectedIndex];
+        if(o && o.dataset.rate) b.querySelector('#wwc').value = o.dataset.rate;
+    });
+    b.querySelector('#wwF').addEventListener('submit', async(e)=>{
+        e.preventDefault();
+        const tks = Array.from(b.querySelectorAll('input[type=checkbox]:checked')).map(x=>x.value);
+        if(tks.length===0) return alert("Devi associare il manovale ad almeno un task!");
+        const amt = parseFloat(b.querySelector('#wwc').value);
+        const wId = b.querySelector('#wwn').value;
+        const wName = appCache.external_workers[wId]?.fullName || wId;
+        const nw = await addDoc(collection(db,"work_sessions"),{workerId:wId, date:new Date().toISOString().split('T')[0], assignedBy:currentUser.id, tasks:tks, dailyRate:amt, totalCost:amt, status:'worked', allocations:[], createdAt:serverTimestamp()});
+        for(let tid of tks) {
+            const tkObj = liveTasks.find(x=>x.id===tid);
+            if(tkObj) {
+                const arr = tkObj.supportWorkers || [];
+                if(!arr.includes(wId)) { arr.push(wId); updateDoc(doc(db,"tasks",tid),{supportWorkers: arr}); }
+            }
+        }
+        await logActivity('ADD_WORK_SESSION','work_sessions',nw.id, `Manovale ${wName} inserito per €${amt}`);
+        sendNotification('admin', 'Nuovo Costo Manovalanza', `${currentUser.fullName} ha inserito giornata per ${wName} (${amt}€)`);
+        document.getElementById('bsBackdrop').classList.remove('open'); document.getElementById('actionWizardModal').classList.remove('open');
+    });
+    document.getElementById('bsBackdrop').classList.add('open'); document.getElementById('actionWizardModal').classList.add('open');
+};
+
+/* ===============================================================
+   AI ASSISTANCE LAYER (Aiuto AI)
+   =============================================================== */
+
+window.openAiModal = () => {
+    document.getElementById('aiInput').value = '';
+    document.getElementById('aiResponseContainer').style.display = 'none';
+    document.getElementById('aiLoadingIndicator').style.display = 'none';
+    document.getElementById('aiHistory').innerHTML = '<div class="text-muted" style="font-size:0.8rem">Caricamento dello storico... (Mocked)</div>';
+    
+    const banner = document.getElementById('aiContextBanner');
+    let ctx = 'Generale';
+    if(document.getElementById('view-home').classList.contains('active')) ctx = 'Dashboard / Home';
+    if(document.getElementById('view-finance').classList.contains('active')) ctx = 'Finanza / Spese';
+    if(document.getElementById('taskDetailModal').classList.contains('open')) ctx = 'Dettaglio Task';
+    banner.innerText = `Contesto attuale: ${ctx}`;
+    banner.dataset.ctx = ctx;
+
+    document.getElementById('aiAssistModal').classList.add('open');
+};
+
+document.getElementById('btnCloseAiModal').addEventListener('click', () => document.getElementById('aiAssistModal').classList.remove('open'));
+
+// Phase 1 Mock / Client-side proxy for Gemini 
+window.sendAIRequest = async (promptText, context, role) => {
+    // TODO: implement actual fetch to backend serverless function pointing to Google AI Studio
+    return new Promise(resolve => {
+        setTimeout(() => {
+            if(promptText.toLowerCase().includes('problema') || promptText.toLowerCase().includes('segnala')) {
+                resolve({ type: "ISSUE_MODE", shortAnswer: "Vuoi segnalare un problema o anomalia. Posso preparare un Ticket Strutturato per te.", suggestedAction: "Confermi la creazione del ticket di supporto?", structuredOutput: { title: "Problema Segnalato", category: "technical_issue", priority: "high", summary: promptText } });
+            } else if(promptText.toLowerCase().includes('richiesta')) {
+                resolve({ type: "STRUCTURE_MODE", shortAnswer: "Ho capito che vuoi istituire una nuova richiesta operativa per la squadra.", suggestedAction: "Generiamo il record strutturato nel sistema?", structuredOutput: { detectedType: "request", title: "Nuova Richiesta da AI", summary: promptText } });
+            } else {
+                resolve({ type: "HELP_MODE", shortAnswer: "La piattaforma gestisce flussi di manutenzione con logica di dominio. Assicurati di usare l'apposita scheda in base al tuo ruolo (Tecnico, Super o Normale).", suggestedAction: "Procedi navigando tramite i tab in basso.", structuredOutput: null });
+            }
         }, 1200);
     });
-}
+};
 
+window.logAIInteraction = async (interactionData) => {
+    try { await addDoc(collection(db, "ai_interactions"), interactionData); } catch(e) { console.error("Logging AI err:", e); }
+};
 
-
-function renderAttachmentsPreview() {
-    filePreviewContainer.innerHTML = '';
-    if(currentAttachments.length === 0) {
-        filePreviewContainer.classList.add('hidden');
-        return;
-    }
-    
-    filePreviewContainer.classList.remove('hidden');
-    currentAttachments.forEach((att, index) => {
-        const div = document.createElement('div');
-        div.style.cssText = "position: relative; border: 1px solid #ccc; border-radius: 8px; padding: 5px; text-align: center; width: 100px; display: flex; flex-direction: column; align-items: center; background: white;";
-        
-        const removeBtn = document.createElement('button');
-        removeBtn.innerHTML = "&times;";
-        removeBtn.style.cssText = "position: absolute; top: -5px; right: -5px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-weight: bold;";
-        removeBtn.onclick = () => {
-            currentAttachments.splice(index, 1);
-            renderAttachmentsPreview();
-        };
-        
-        if (att.type.startsWith('image/')) {
-            const img = document.createElement('img');
-            img.src = att.data;
-            img.style.cssText = "width: 80px; height: 80px; object-fit: cover; border-radius: 4px;";
-            div.appendChild(img);
-        } else {
-            const icon = document.createElement('div');
-            icon.style.cssText = "width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; font-size: 2rem; background: #f1f5f9; border-radius: 4px;";
-            icon.innerText = "📎";
-            div.appendChild(icon);
-            const nameObj = document.createElement('div');
-            nameObj.style.cssText = "font-size: 0.6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; margin-top: 4px;";
-            nameObj.innerText = att.name;
-            div.appendChild(nameObj);
-        }
-        
-        div.appendChild(removeBtn);
-        filePreviewContainer.appendChild(div);
-    });
-}
-
-inputAllegato.addEventListener('change', (e) => {
-    const files = Array.from(e.target.files);
-    if (!files || files.length === 0) return;
-    
-    files.forEach(file => {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            currentAttachments.push({
-                data: event.target.result,
-                type: file.type,
-                name: file.name
-            });
-            renderAttachmentsPreview();
-        };
-        reader.readAsDataURL(file);
-    });
-    
-    // Non azzeriamo l'input per permettere selezioni successive se desiderato,
-    // o lo azzeriamo per forzare il re-trigger a parità di file. È meglio azzerarlo
-    // dato che gestiamo l'array in JS.
-    inputAllegato.value = "";
-});
-
-function renderProgAttachmentsPreview() {
-    progPreviewContainer.innerHTML = '';
-    if(currentProgAttachments.length === 0) {
-        progPreviewContainer.classList.add('hidden');
-        return;
-    }
-    
-    progPreviewContainer.classList.remove('hidden');
-    currentProgAttachments.forEach((att, index) => {
-        const div = document.createElement('div');
-        div.style.cssText = "position: relative; border: 1px solid #ea580c; border-radius: 8px; padding: 5px; text-align: center; width: 100px; display: flex; flex-direction: column; align-items: center; background: white;";
-        
-        const removeBtn = document.createElement('button');
-        removeBtn.innerHTML = "&times;";
-        removeBtn.style.cssText = "position: absolute; top: -5px; right: -5px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-weight: bold;";
-        removeBtn.onclick = () => {
-            currentProgAttachments.splice(index, 1);
-            renderProgAttachmentsPreview();
-        };
-        
-        if (att.type.startsWith('image/')) {
-            const img = document.createElement('img');
-            img.src = att.data;
-            img.style.cssText = "width: 80px; height: 80px; object-fit: cover; border-radius: 4px;";
-            div.appendChild(img);
-        } else {
-            const icon = document.createElement('div');
-            icon.style.cssText = "width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; font-size: 2rem; background: #fff7ed; border-radius: 4px; color: #ea580c;";
-            icon.innerText = "📎";
-            div.appendChild(icon);
-            const nameObj = document.createElement('div');
-            nameObj.style.cssText = "font-size: 0.6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; margin-top: 4px; color: #ea580c;";
-            nameObj.innerText = att.name;
-            div.appendChild(nameObj);
-        }
-        
-        div.appendChild(removeBtn);
-        progPreviewContainer.appendChild(div);
-    });
-}
-
-inputAllegatoProgrammazione.addEventListener('change', (e) => {
-    const files = Array.from(e.target.files);
-    if (!files || files.length === 0) return;
-    
-    files.forEach(file => {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            currentProgAttachments.push({
-                data: event.target.result,
-                type: file.type,
-                name: file.name
-            });
-            renderProgAttachmentsPreview();
-        };
-        reader.readAsDataURL(file);
-    });
-    
-    inputAllegatoProgrammazione.value = "";
-});
-
-
-
-// Logic for Multi-Select Checklists
-function setupCustomChecklist(btnAddId, inputId, wrapperClass) {
-    const btnAdd = document.getElementById(btnAddId);
-    const input = document.getElementById(inputId);
-    if(btnAdd && input) {
-        btnAdd.addEventListener('click', () => {
-            const val = input.value.trim();
-            if(val) {
-                const label = document.createElement('label');
-                label.style.cssText = "display:flex; align-items:center; gap:8px; cursor:pointer;";
-                label.innerHTML = `<input type="checkbox" value="${val}" class="${wrapperClass}" checked> ${val}`;
-                input.parentElement.parentElement.insertBefore(label, input.parentElement);
-                input.value = '';
-            }
-        });
-        input.addEventListener('keypress', (e) => {
-            if(e.key === 'Enter') { e.preventDefault(); btnAdd.click(); }
-        });
-    }
-}
-setupCustomChecklist('btnAddAltroTipoIdx', 'altroTipoIdx', 'cb-tipo-idx');
-setupCustomChecklist('btnAddAltroDispIdx', 'altroDispIdx', 'cb-disp-idx');
-
-function getChecklistValues(className) {
-    return Array.from(document.querySelectorAll('.' + className + ':checked')).map(cb => cb.value).join(', ');
-}
-
-
-btnPlanIntervention.addEventListener('click', async () => {
-    const blocksData = extractDynamicBlocksData('dynamicInterventionsContainer');
-    if(!blocksData.tipoStr || !iPaziente.value || !iLocalita.value || !iIndirizzo.value) {
-        return alert("Compila Tipo intervento, Paziente, Località e Indirizzo per salvare l'intervento programmato!");
-    }
-    
-    let tipiSelezionati = blocksData.tipoStr;
-    let dispFinale = blocksData.dispStr || "Nessuno";
-    let matricolaText = blocksData.matStr;
-
-    // Calcola data prevista (default: domani)
-    let dProgrammata = inputDataProgrammata.value;
-    if (!dProgrammata) {
-        let domani = new Date();
-        domani.setDate(domani.getDate() + 1);
-        dProgrammata = domani.toISOString().split('T')[0];
-    }
-    const inputOraProgrammata = document.getElementById('oraProgrammata');
-    let oProgrammata = inputOraProgrammata ? inputOraProgrammata.value : "";
-
-    const plannedId = "plan_" + Date.now().toString();
-
-    const oldBtnPlanHtml = btnPlanIntervention.innerHTML;
-    btnPlanIntervention.innerHTML = `<span class="btn-icon">⏳</span> CARICAMENTO...`;
-    btnPlanIntervention.disabled = true;
-
-    // Upload prog attachments on Firebase
-    let fileUrlsProgrammati = [];
-    if(isFirebaseConfigured && currentProgAttachments.length > 0) {
-        try {
-            const { ref, uploadString, getDownloadURL } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js");
-            for(let i = 0; i < currentProgAttachments.length; i++) {
-                const att = currentProgAttachments[i];
-                let ext = "jpg";
-                if(att.name) ext = att.name.split('.').pop();
-                else if(att.type === "application/pdf") ext = "pdf";
-                else if(att.type && att.type.startsWith("video/")) ext = "mp4";
-
-                const storageRef = ref(storage, `allegatiProg/${plannedId}_${i}.${ext}`);
-                await uploadString(storageRef, att.data, 'data_url');
-                const url = await getDownloadURL(storageRef);
-                fileUrlsProgrammati.push(url);
-            }
-        } catch(err) {
-            console.error("Errore upload allegati programmazione", err);
-        }
-    }
-
-    const planned = {
-        id: plannedId,
-        tipo: tipiSelezionati,
-        paziente: iPaziente.value,
-        localita: iLocalita.value,
-        indirizzo: iIndirizzo.value,
-        telefono: iTelefono ? iTelefono.value : "",
-        dispositivi: dispFinale,
-        matricola: matricolaText,
-        operatoreValutazione: blocksData.operatoreValutazioneStr,
-        esito: blocksData.esitoStr,
-        statoValutazione: blocksData.statoValutazioneStr,
-        tecnicoAssegnato: document.getElementById('tecnicoAssegnato') ? document.getElementById('tecnicoAssegnato').value : "",
-        programmatoDa: localStorage.getItem('antimo_user_name') || "Sconosciuto",
-        interventiList: blocksData.array, // Nuovo payload strutturato
-        note: iNote.value,
-        dataPrevista: dProgrammata,
-        oraPrevista: oProgrammata,
-        status: 'planned',
-        timestamp: new Date().getTime(),
-        fileUrlsProgrammati: fileUrlsProgrammati
-    };
-
-    // Salvataggio DIRETTO sul cloud VERO (Firestore programmati)
-    if (isFirebaseConfigured) {
-        try {
-            const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-            // Usiamo l'id fisso per facilitare cancellazioni future
-            await addDoc(collection(db, "programmati"), planned);
-            console.log("Programmato salvato su Cloud");
-        } catch(e) {
-            console.error("Errore salvataggio programmato in Cloud", e);
-            alert("Errore salvataggio nel Cloud. Salvo solo in locale.");
-            plannedInterventions.push(planned);
-            saveState();
-        }
-    } else {
-        plannedInterventions.push(planned);
-        saveState();
-    }
-    
-    // Aggiorniamo la lista globale prendendola da Firestore
-    if(isFirebaseConfigured) {
-        await syncPlannedInterventions();
-    } else {
-        updateUI();
-    }
-    
-    // Reset form
-    newInterventionForm.reset();
-    inputAllegato.value = ""; 
-    currentAttachments = [];
-    filePreviewContainer.innerHTML = '';
-    filePreviewContainer.classList.add('hidden');
-    inputAllegatoProgrammazione.value = "";
-    currentProgAttachments = [];
-    progPreviewContainer.innerHTML = '';
-    progPreviewContainer.classList.add('hidden');
-    
-    btnPlanIntervention.innerHTML = oldBtnPlanHtml;
-    btnPlanIntervention.disabled = false;
-
-    interventionSection.classList.add('hidden'); // Chiude la scheda dopo il salvataggio
-    
-    updateUI();
-});
-
-newInterventionForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    // Validazione KM (Obbligatori se impostato su ON nelle Impostazioni)
-    if (requireKm && !inputKmPercorsi.value) {
-        return alert("Inserisci i Km percorsi prima di salvare l'attività (Obbligatorio dalle Impostazioni).");
-    }
-
-    const blocksData = extractDynamicBlocksData('dynamicInterventionsContainer');
-    if(blocksData.array.length === 0 || !blocksData.tipoStr) {
-        return alert("Devi inserire almeno un intervento compilando la tipologia.");
-    }
-    
-    let tipiSelezionati = blocksData.tipoStr;
-    let dispFinale = blocksData.dispStr || "Nessuno";
-    let matricolaTxt = blocksData.matStr;
-
-    // UI Loading state indication
-    const oldBtnText = btnStartIntervention.innerHTML;
-    btnStartIntervention.innerHTML = `<span class="btn-icon">⏳</span> SALVATAGGIO IN CORSO...`;
-    btnStartIntervention.disabled = true;
-
-    // Creazione Oggetto Intervento (Ora inizia e finisce nello stesso momento base)
-    let invToSave = {
-        id: Date.now().toString(),
-        dataObj: new Date().getTime(),
-        tipo: tipiSelezionati,
-        paziente: iPaziente.value,
-        localita: iLocalita.value,
-        indirizzo: iIndirizzo.value,
-        telefono: iTelefono ? iTelefono.value : "",
-        dispositivi: dispFinale,
-        matricola: matricolaTxt,
-        accessoriStr: blocksData.accStr || "",
-        operatoreValutazione: blocksData.operatoreValutazioneStr,
-        esito: blocksData.esitoStr,
-        statoValutazione: blocksData.statoValutazioneStr,
-        tecnicoAssegnato: document.getElementById('tecnicoAssegnato') ? document.getElementById('tecnicoAssegnato').value : (localStorage.getItem('antimo_user_name') || "Sconosciuto"),
-        interventiList: blocksData.array,
-        note: iNote.value,
-        operatore: localStorage.getItem('antimo_user_name') || "Sconosciuto",
-        attachments: currentAttachments, // Base64 Array se offline
-        fileUrlsProgrammati: pendingFileUrlsProgrammati, 
-        startTime: new Date().getTime(),
-        endTime: new Date().getTime(), // Immediato in modalità 1-Step
-        kmPercorsi: inputKmPercorsi.value || "0"
-    };
-    
-    pendingFileUrlsProgrammati = [];
-    
-    let cloudSaveSuccess = false;
-    let uploadedUrls = [];
-
+window.createSupportRequestFromAI = async (struct) => {
     try {
-        if(isFirebaseConfigured) {
-            // Upload multiplo file dal Tecnico
-            if(invToSave.attachments && invToSave.attachments.length > 0) {
-                const { ref: storageRefCall, uploadString, getDownloadURL } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js");
-                for(let i = 0; i < invToSave.attachments.length; i++) {
-                    const att = invToSave.attachments[i];
-                    let ext = "jpg";
-                    if(att.name) ext = att.name.split('.').pop();
-                    else if(att.type === "application/pdf") ext = "pdf";
-                    else if(att.type && att.type.startsWith("video/")) ext = "mp4";
-
-                    const storageRef = storageRefCall(storage, `allegati/${invToSave.id}_${i}.${ext}`);
-                    await uploadString(storageRef, att.data, 'data_url');
-                    const url = await getDownloadURL(storageRef);
-                    uploadedUrls.push(url);
-                }
-            }
-            
-            // Fonde eventuali allegati di programmazione se erano link esistenti
-            if(invToSave.fileUrlsProgrammati && invToSave.fileUrlsProgrammati.length > 0) {
-                uploadedUrls = [...uploadedUrls, ...invToSave.fileUrlsProgrammati];
-            }
-
-            // Upload Firestore
-            const { collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-            const payloadToSave = {
-                timestamp: serverTimestamp(),
-                id: invToSave.id,
-                tipo: invToSave.tipo || "Gen",
-                paziente: invToSave.paziente || "Sconosciuto",
-                localita: invToSave.localita || "",
-                indirizzo: invToSave.indirizzo || "",
-                telefono: invToSave.telefono || "",
-                dispositivi: invToSave.dispositivi || "",
-                matricola: invToSave.matricola || "",
-                interventiList: invToSave.interventiList || [], 
-                note: invToSave.note || "",
-                operatore: invToSave.operatore || "Sconosciuto",
-                startTime: invToSave.startTime,
-                endTime: invToSave.endTime,
-                kmPercorsi: invToSave.kmPercorsi,
-                fileUrls: uploadedUrls.length > 0 ? uploadedUrls : null,
-                haAllegato: uploadedUrls.length > 0
-            };
-
-            Object.keys(payloadToSave).forEach(k => payloadToSave[k] === undefined && delete payloadToSave[k]);
-            await addDoc(collection(db, "interventi"), payloadToSave);
-            
-            if (activeProgFbId) {
-                // Nuova aggiunta: rimuoviamo dall'array locale solo ora che il salvataggio è andato a buon fine
-                plannedInterventions = plannedInterventions.filter(p => (p.idFb || p.id) !== activeProgFbId);
-                
-                try {
-                    const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                    await deleteDoc(doc(db, "programmati", activeProgFbId));
-                    console.log(`Programmato ${activeProgFbId} eliminato definitivamente dopo esecuzione`);
-                } catch(e) {
-                    console.error("Non sono riuscito ad aggiornare lo status in Firebase", e);
-                }
-                activeProgFbId = null;
-                activeProgItem = null;
-            }
-            
-            // Nuova logica: se salvo un intervento per un paziente, chiudo in automatico i suoi vecchi N.ESEG.
-            try {
-                const { collection, query, where, getDocs, doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                const qNeseg = query(
-                    collection(db, "programmati"), 
-                    where("paziente", "==", invToSave.paziente),
-                    where("status", "==", "justified_not_executed")
-                );
-                const snapsNeseg = await getDocs(qNeseg);
-                snapsNeseg.forEach(async (d) => {
-                    await updateDoc(doc(db, "programmati", d.id), { status: "completed" });
-                    console.log(`Vecchio N.ESEG ${d.id} chiuso automaticamente per il paziente ${invToSave.paziente}`);
-                });
-            } catch(e) {
-                console.error("Errore pulizia vecchi N.ESEG", e);
-            }
-            
-            cloudSaveSuccess = true;
-        }
-    } catch (error) {
-        console.error("Errore salvataggio Cloud, forzo modalità offline:", error);
-        alert("Rete instabile o errore Cloud. L'intervento è stato SALVATO IN LOCALE offline. Clicca poi su 'Sincronizza' appena la rete torna.");
-    }
-
-    // Passaggio logico locale completato
-    invToSave.cloudSynced = cloudSaveSuccess;
-    invToSave.fileUrls = (uploadedUrls && uploadedUrls.length > 0) ? uploadedUrls : (invToSave.fileUrlsProgrammati || null);
-    invToSave.haAllegato = !!(invToSave.attachments?.length > 0 || invToSave.fileUrls?.length > 0);
-    
-    // Pulizia dei pesanti base64 prima di salvare in mem locale
-    delete invToSave.attachments; 
-    delete invToSave.fileData; 
-    delete invToSave.fileUrlsProgrammati;
-
-    completedInterventions.push(invToSave);
-    
-    // Se stiamo per saturare il localStorage eliminiamo le foto Base64 appena dopo il salvataggio in Cloud
-    if (cloudSaveSuccess) {
-        completedInterventions.forEach(i => { delete i.fileData; });
-    }
-    saveState(); 
-    updateUI(); 
-    updateInterventiCount();
-    
-    // Reset Globale della Form e Componenti
-    newInterventionForm.reset();
-    inputKmPercorsi.value = ""; 
-    const dynamicContainer = document.getElementById('dynamicInterventionsContainer');
-    if (dynamicContainer) {
-        // Reinserisci il blocco iniziale vuoto sfruttando la funziona di init
-        initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
-    }
-    inputAllegato.value = ""; 
-    currentAttachments = [];
-    filePreviewContainer.innerHTML = '';
-    filePreviewContainer.classList.add('hidden');
-    inputAllegatoProgrammazione.value = "";
-    currentProgAttachments = [];
-    progPreviewContainer.innerHTML = '';
-    progPreviewContainer.classList.add('hidden');
-
-    btnStartIntervention.innerHTML = oldBtnText;
-    btnStartIntervention.disabled = false;
-    
-    interventionSection.classList.add('hidden'); // Chiude la scheda
-    
-    alert("Intervento salvato correttamente! ✅");
-});
-
-if(btnManualSyncMobile) {
-    btnManualSyncMobile.addEventListener('click', async () => {
-        const oldHtml = btnManualSyncMobile.innerHTML;
-        try {
-            btnManualSyncMobile.innerHTML = `<span class="btn-icon">⏳</span> RISOLUZIONE...`;
-            btnManualSyncMobile.disabled = true;
-            
-            // Forziamo il controllo della configurazione
-            if (!isFirebaseConfigured) {
-                alert("Errore: Firebase risulta non configurato in questo momento. Aspetta qualche secondo che si colleghi alla rete.");
-                return;
-            }
-            
-            // Forziamo il flag per far scattare l'alert di debug in syncLocalDataToCloud
-            window._antimo_forcing_sync = true;
-            
-            const count = await syncLocalDataToCloud();
-            window._antimo_forcing_sync = false;
-            
-            if (count === 0) {
-                alert("Ottimo! Non ci sono dati bloccati sul tuo telefono. Tutto quello che hai registrato risulta già sincronizzato (oppure è stato perso dalla cache precedentemente).");
-            } else {
-                alert(`Perfetto! ${count} interventi bloccati sono stati salvati forzatamente nel Cloud!`);
-            }
-            
-        } catch(e) {
-            alert("ERRORE DI RETE o PERMESSI FIREBASE: " + e.message);
-        } finally {
-            btnManualSyncMobile.innerHTML = oldHtml;
-            btnManualSyncMobile.disabled = false;
-        }
-    });
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    if(btnShareCSV) {
-        btnShareCSV.addEventListener('click', async () => {
-             // Generiamo CSV come nell'export
-            let interventiDaEsportare = completedInterventions;
-            if(isFirebaseConfigured) {
-                try {
-                    btnShareCSV.innerHTML = `<span class="btn-icon">⏳</span> PREPARO...`;
-                    const snap = await getDocs(collection(db, "interventi"));
-                    const fetched = [];
-                    snap.forEach(doc => fetched.push(doc.data()));
-                    if(fetched.length > 0) {
-                        fetched.sort((a,b) => a.startTime - b.startTime);
-                        interventiDaEsportare = fetched;
-                    }
-                } catch(e) { console.error("Cloud fetch share err", e); }
-            }
-            
-            if(interventiDaEsportare.length === 0) {
-                btnShareCSV.innerHTML = `<span class="btn-icon">📤</span> ESTRAI & CONDIVIDI`;
-                return alert("Nessun intervento da condividere.");
-            }
-
-            let header = ["Data", "Partenza", "Destinazione", "Tipo attivita", "Paziente / Ente", "Km A/R", "Dispositivi", "Matricola", "Note", "Ora Inizio", "Ora Fine", "Ha_Allegato", "URL_Allegato_Cloud"];
-            let csvContent = header.join(";") + "\n";
-            interventiDaEsportare.forEach(inv => {
-                let d = new Date(inv.startTime), e = new Date(inv.endTime);
-                let row = [
-                    `"${formatDateDMY(d)}"`, `"${inv.tipo}"`, `"${inv.destinazione.replace(/"/g, '""')}"`,
-                    `"${(inv.tipo + ' ' + inv.dispositivi + ' ' + inv.paziente + ' ' + inv.destinazione).trim().replace(/"/g, '""')}"`,
-                    `"${inv.paziente.replace(/"/g, '""')}"`, `"${inv.kmPercorsi}"`, `"${inv.dispositivi.replace(/"/g, '""')}"`, `"${inv.matricola ? inv.matricola.replace(/"/g, '""') : ''}"`,
-                    `"${inv.note.replace(/"/g, '""')}"`, `"${padZ(d.getHours())}:${padZ(d.getMinutes())}"`, `"${padZ(e.getHours())}:${padZ(e.getMinutes())}"`,
-                    `"${inv.haAllegato ? 'SI' : 'NO'}"`, `"${inv.fileUrl || ""}"`
-                ];
-                csvContent += row.join(";") + "\n";
-            });
-
-            try {
-                // Su Android/PWA a volte i blob CSV generati a runtime vengono bloccati dalle policy di sicurezza.
-                // Proviamo a condividere direttamente il testo ben formattato a WhatsApp/Telegram
-                let textShare = "📝 *REPORT ATTIVITÀ:*\n\n";
-                interventiDaEsportare.forEach(inv => {
-                    let d = new Date(inv.startTime), e = new Date(inv.endTime);
-                    textShare += `🔹 *${inv.paziente}* (${inv.destinazione})\n` +
-                                 `   ⌚ ${padZ(d.getHours())}:${padZ(d.getMinutes())} - ${padZ(e.getHours())}:${padZ(e.getMinutes())} | Km: ${inv.kmPercorsi}\n` +
-                                 `   📌 ${inv.tipo} (${inv.dispositivi})\n`;
-                    if(inv.fileUrl) textShare += `   📎 Link: ${inv.fileUrl}\n`;
-                    if(inv.note) textShare += `   📝 Note: ${inv.note}\n`;
-                    textShare += "\n";
-                });
-
-                if (navigator.share) {
-                    await navigator.share({
-                        title: 'Attività Giornata',
-                        text: textShare
-                    });
-                } else {
-                    // Fallback
-                    const blob = new Blob(["\uFEFF"+csvContent], { type: 'text/csv;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `Attivita_Esterne_${formatDateDMY(new Date())}.csv`;
-                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                }
-            } catch(err) {
-                 console.error(err);
-            } finally {
-                btnShareCSV.innerHTML = `<span class="btn-icon">📤</span> ESTRAI & CONDIVIDI`;
-            }
+        await addDoc(collection(db, "support_requests"), {
+            createdBy: currentUser.id,
+            createdByName: currentUser.fullName,
+            createdByRole: currentUser.roles[0] || 'user',
+            title: struct.title || 'Nuovo Problema',
+            description: struct.summary || '',
+            category: struct.category || 'functional_doubt',
+            priority: struct.priority || 'medium',
+            status: 'new',
+            aiGeneratedSummary: true,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
         });
-    }
-});
+        alert('Ticket di supporto strutturato creato con successo!');
+        document.getElementById('aiAssistModal').classList.remove('open');
+    } catch(e) { alert("Errore creazione ticket."); }
+};
 
-if(btnViewActivities) {
-    btnViewActivities.addEventListener('click', () => {
-        if(activitiesListContainer.classList.contains('hidden')) {
-            activitiesListContainer.classList.remove('hidden');
-            renderActivitiesList();
-            btnViewActivities.innerHTML = `<span class="btn-icon">🙈</span> NASCONDI ATTIVITÀ`;
-        } else {
-            activitiesListContainer.classList.add('hidden');
-            btnViewActivities.innerHTML = `<span class="btn-icon">👁</span> VISUALIZZA ATTIVITÀ`;
-        }
-    });
-}
+window.submitAiPrompt = async () => {
+    const prompt = document.getElementById('aiInput').value.trim();
+    if(!prompt) return;
 
-function renderActivitiesList() {
-    activitiesList.innerHTML = '';
+    document.getElementById('btnSubmitAi').style.display = 'none';
+    document.getElementById('aiLoadingIndicator').style.display = 'block';
+    document.getElementById('aiResponseContainer').style.display = 'none';
+
+    const ctx = document.getElementById('aiContextBanner').dataset.ctx;
     
-    // Filtrare per data odierna (Mezzanotte)
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const endOfToday = startOfToday + 24 * 60 * 60 * 1000 - 1;
-
-    // 1. Interventi Programmati (Da fare oggi) - Rossi
-    const targetFilter = filterTecnicoOggi ? filterTecnicoOggi.value : "MIO";
-    const myName = localStorage.getItem('antimo_user_name') || "";
-    const filterName = targetFilter === "MIO" ? myName : targetFilter;
-
-    let toDO = plannedInterventions.filter(inv => {
-        if (inv.status !== 'planned') return false;
+    try {
+        const response = await window.sendAIRequest(prompt, ctx, currentUser.roles[0]);
+        document.getElementById('btnSubmitAi').style.display = 'flex';
+        document.getElementById('aiLoadingIndicator').style.display = 'none';
         
-        if (targetFilter !== "TUTTI") {
-            if (inv.tecnicoAssegnato && inv.tecnicoAssegnato !== filterName) return false;
-            if (!inv.tecnicoAssegnato) return false; // Nascondi quelli non assegnati se il filtro MIO è attivo
+        const acts = document.getElementById('aiSuggestedActions');
+        document.getElementById('aiResponseText').innerHTML = `<strong>L'AI dice:</strong><br/>${response.shortAnswer}`;
+        let htmlActs = `<p style="font-size:0.85rem; color:#666; margin-top:10px;"><em>Suggerimento: ${response.suggestedAction}</em></p>`;
+        
+        if(response.type === "ISSUE_MODE" || response.type === "STRUCTURE_MODE") {
+            const safeObj = encodeURIComponent(JSON.stringify(response.structuredOutput));
+            htmlActs += `<button class="btn btn-primary" style="margin-top:10px; background:#10b981; width:100%;" onclick="window.createSupportRequestFromAI(JSON.parse(decodeURIComponent('${safeObj}')))">✅ Salva e Procedi</button>`;
         }
         
-        // Multi-Select Additive Logic
-        if (window.selectedIncarichi && window.selectedIncarichi.length > 0 && !window.selectedIncarichi.includes("TUTTI")) {
-            if (!window.selectedIncarichi.includes(inv.tecnicoAssegnato) && !window.selectedIncarichi.includes(inv.operatore) && !window.selectedIncarichi.includes(inv.programmatoDa)) return false;
-        }
+        acts.innerHTML = htmlActs;
+        document.getElementById('aiResponseContainer').style.display = 'block';
 
-        if (inv.dataPrevista) {
-            const dpString = inv.dataPrevista; // "YYYY-MM-DD"
-            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-            if (isNesegVisible) {
-                // Return all past and present missed
-                return dpString <= todayStr;
-            } else {
-                // Default Oggi view
-                return dpString === todayStr;
-            }
+        window.logAIInteraction({
+            userId: currentUser.id, userName: currentUser.fullName, userRoles: currentUser.roles,
+            screen: ctx, messageType: response.type,
+            userInput: prompt, aiResponse: response.shortAnswer, suggestedAction: response.suggestedAction,
+            createdAt: serverTimestamp(), modelName: "gemini-2.5-flash-mock", success: true
+        });
+
+    } catch(e) {
+        document.getElementById('btnSubmitAi').style.display = 'flex';
+        document.getElementById('aiLoadingIndicator').style.display = 'none';
+        alert('Errore di connessione con AI.');
+    }
+};
+
+window.deleteWorkSession = async (id) => {
+    if(!confirm("Vuoi annullare questa sessione di lavoro e stornare il costo?")) return;
+    try {
+        await deleteDoc(doc(db, "work_sessions", id));
+        document.getElementById('taskDetailModal').classList.remove('open');
+        renderReport();
+        renderFinance();
+    } catch(e) { alert("Errore durante l'eliminazione."); }
+};
+
+window.editWorkSession = async (id) => {
+    const ws = liveWorkSessions.find(x => x.id === id);
+    if(!ws) return;
+    const nCost = prompt("Nuovo Costo Totale da imputare al Manovale (€):", ws.cost || 0);
+    if(nCost === null) return;
+    const nCostFloat = parseFloat(nCost);
+    if(isNaN(nCostFloat) || nCostFloat < 0) { alert("Importo non valido"); return; }
+    
+    try {
+        await updateDoc(doc(db, "work_sessions", id), { cost: nCostFloat });
+        document.getElementById('taskDetailModal').classList.remove('open');
+        renderReport();
+        renderFinance();
+    } catch(e) { alert("Errore durante la modifica."); }
+};
+
+init();
+
+window.deleteExpense = async (id, isFromWorker = false) => {
+    if(!confirm("Sicuro di voler eliminare questa spesa?")) return;
+    try {
+        const e = liveExpenses.find(x => x.id === id);
+        if(!e) return;
+        if(isFromWorker && e.paidBy === currentUser.id && currentUser.roles.includes('technician')) {
+            const cList = liveCash.filter(c=>c.givenTo===currentUser.id).sort((a,b)=>b.createdAt-a.createdAt);
+            const currentBal = cList.length > 0 ? cList[0].balanceAfter : 0;
+            const balAfter = currentBal + e.amount;
+            await addDoc(collection(db,"cash_movements"),{
+                type: 'adjustment', givenBy: currentUser.id, givenTo: currentUser.id,
+                amount: e.amount, reason: "Storno eliminazione spesa: " + e.description,
+                balanceAfter: balAfter, createdAt: serverTimestamp()
+            });
+        }
+        await deleteDoc(doc(db,"expenses", id));
+        await logActivity('DELETE_EXPENSE','expense',id);
+        const tm = document.getElementById('taskDetailModal');
+        if(tm && tm.classList.contains('open') && e.taskId) window.openTaskDetail(e.taskId);
+        else { const b = document.getElementById('bottomNav').querySelector('.nav-item.active'); if(b && b.dataset.target === 'view-finance') renderFinance(); }
+    } catch(err) { alert("Errore: " + err.message); }
+};
+
+window.editExpense = async (id) => {
+    const e = liveExpenses.find(x => x.id === id);
+    if(!e) return;
+    const newDesc = prompt("Modifica causale della spesa:", e.description);
+    if(newDesc === null) return;
+    const newAmtStr = prompt(`Modifica l'importo (attuale: €${e.amount.toFixed(2)}):`, e.amount);
+    if(newAmtStr === null) return;
+    const newAmt = parseFloat(newAmtStr);
+    if(isNaN(newAmt) || newAmt <= 0) return alert("Importo non valido.");
+    try {
+        const diff = newAmt - e.amount;
+        await updateDoc(doc(db, "expenses", id), { description: newDesc.trim(), amount: newAmt });
+        if(diff !== 0 && e.paidBy === currentUser.id && currentUser.roles.includes('technician')) {
+            const cList = liveCash.filter(c=>c.givenTo===currentUser.id).sort((a,b)=>b.createdAt-a.createdAt);
+            const currentBal = cList.length > 0 ? cList[0].balanceAfter : 0;
+            const balAfter = currentBal - diff; 
+            await addDoc(collection(db,"cash_movements"),{
+                type: 'adjustment', givenBy: currentUser.id, givenTo: currentUser.id,
+                amount: Math.abs(diff), reason: `Conguaglio per modifica spesa (${newDesc.trim()})`,
+                balanceAfter: balAfter, createdAt: serverTimestamp()
+            });
+        }
+        await logActivity('EDIT_EXPENSE','expense',id);
+        const tm = document.getElementById('taskDetailModal');
+        if(tm && tm.classList.contains('open') && e.taskId) window.openTaskDetail(e.taskId);
+        else { const b = document.getElementById('bottomNav').querySelector('.nav-item.active'); if(b && b.dataset.target === 'view-finance') renderFinance(); }
+    } catch(err) { alert("Errore modifica: " + err.message); }
+};
+
+window.openPivotModal = (filterType) => {
+    let tasks = [];
+    const todayIso = new Date().toISOString().split('T')[0];
+    const wD = new Date(); wD.setDate(wD.getDate()-7);
+    const mD = new Date(); mD.setMonth(mD.getMonth()-1);
+    const currY = new Date().getFullYear().toString();
+
+    const isAdmin = currentUser.roles.includes('admin') || currentUser.roles.includes('owner');
+    const isSupervisor = currentUser.roles.includes('management_control') || currentUser.roles.includes('admin_support');
+    const isDomainApprover = currentUser.roles.includes('domain_approver');
+    const isWorker = currentUser.roles.includes('technician');
+    const myFam = [...(currentUser.familyIds||[]), ...(currentUser.familyIds||[]).map(f=>f.replace('famiglia_','fam_'))];
+    const myOrgs = (currentUser.organizationRoles||[]).map(x=>x.organizationId);
+
+    const canSee = (item) => {
+        if(isAdmin) return true;
+        if(isSupervisor) {
+            if(item.status === 'pending_approval' || item.status === 'new' || item.status === 'completed' || item.status === 'accounted') return true;
+            if((item.familyIds||[]).includes('famiglia_teresa') || (item.familyIds||[]).includes('fam_teresa')) return true;
+            if((item.organizationIds||[]).includes('eubios') || (item.organizationIds||[]).includes('org_eubios')) return true;
+            return false;
+        }
+        if(isDomainApprover) {
+            if(item.status === 'pending_approval' && (
+                (item.familyIds||[]).some(x=>myFam.includes(x)) || 
+                (item.organizationIds||[]).some(x=>myOrgs.includes(x))
+            )) return true;
+            if((item.familyIds||[]).some(x=>myFam.includes(x))) return true;
+            if((item.organizationIds||[]).some(x=>myOrgs.includes(x))) return true;
+            return false;
+        }
+        if(isWorker) {
+            if(item.assignedTo === currentUser.id) return true;
+            if(item.requestedBy === currentUser.id) return true;
+            return false;
         }
         return false;
+    };
+
+    liveTasks.forEach(t => {
+        if(!canSee(t)) return;
+        
+        let match = false;
+        if(filterType === 'all') match = true;
+        else if (filterType === 'completed') { if(t.status === 'completed') match = true; }
+        else if (filterType === 'accounted') { if(t.status === 'accounted') match = true; }
+        else if (filterType === 'today') { if((t.status==='completed'||t.status==='accounted') && t.actualEnd && t.actualEnd.startsWith(todayIso)) match=true; }
+        else if (filterType === 'week') { if((t.status==='completed'||t.status==='accounted') && t.actualEnd && new Date(t.actualEnd) >= wD) match=true; }
+        else if (filterType === 'month') { if((t.status==='completed'||t.status==='accounted') && t.actualEnd && new Date(t.actualEnd) >= mD) match=true; }
+        else if (filterType === 'year') { if((t.status==='completed'||t.status==='accounted') && t.actualEnd && t.actualEnd.startsWith(currY)) match=true; }
+        else if(t.status !== 'completed' && t.status !== 'accounted') {
+            if(filterType === 'high') { if(t.priority==='high') match=true; }
+            else if(filterType === 'medium') { if(t.priority==='medium' || !t.priority) match=true; }
+            else if(filterType === 'low') { if(t.priority==='low') match=true; }
+            else if(filterType === 'scheduled') { if(t.scheduledStart) match=true; }
+        }
+        if(match) tasks.push(t);
     });
 
-    // 2. Interventi Completati (Eseguiti oggi) - Verdi
+    const labels = {
+        'high': 'Alta Priorità', 'medium': 'Media Priorità', 'low': 'Bassa Priorità',
+        'scheduled': 'Programmati', 'all': 'Tutti i Task', 'completed': 'Tutti Completati', 'accounted': 'Contabilizzati',
+        'today': 'Completati/Contab. Oggi', 'week': 'Complessivi (7gg)', 'month': 'Mensilità', 'year': "Quest'Anno"
+    };
+    document.getElementById('pivotTitle').textContent = `Pivot: ${labels[filterType] || filterType}`;
+    document.getElementById('pivotModal').classList.add('open');
     
-    let done = [];
-    if (!isNesegVisible) {
-        if (targetFilter === "MIO" || targetFilter === "" || !window.firebaseEseguitiOggi) {
-            done = completedInterventions.filter(inv => {
-                const d = new Date(inv.startTime).getTime();
-                return (d >= startOfToday && d <= endOfToday);
-            });
-            if (window.selectedIncarichi && window.selectedIncarichi.length > 0 && !window.selectedIncarichi.includes("TUTTI")) {
-                done = done.filter(inv => window.selectedIncarichi.includes(inv.operatore) || window.selectedIncarichi.includes(inv.tecnicoAssegnato));
-            }
-        } else {
-            if (targetFilter === "TUTTI") {
-                done = window.firebaseEseguitiOggi;
-            } else {
-                done = window.firebaseEseguitiOggi.filter(inv => inv.operatore === targetFilter || inv.tecnicoAssegnato === targetFilter);
-            }
-            if (window.selectedIncarichi && window.selectedIncarichi.length > 0 && !window.selectedIncarichi.includes("TUTTI")) {
-                done = done.filter(inv => window.selectedIncarichi.includes(inv.operatore) || window.selectedIncarichi.includes(inv.tecnicoAssegnato));
-            }
-            // Ordiniamo
-            done.sort((a,b) => a.startTime - b.startTime);
+    window.originalPivotTasks = tasks;
+    window.renderPivotTable('none', 'all');
+};
+
+window.renderPivotTable = (groupBy = 'none', dateFilter = null) => {
+    if (dateFilter !== null) window.currentPivotDateFilter = dateFilter;
+    else dateFilter = window.currentPivotDateFilter || 'all';
+
+    let tasks = window.originalPivotTasks || [];
+    
+    if(dateFilter !== 'all') {
+        const todayIso = new Date().toISOString().split('T')[0];
+        const wD = new Date(); wD.setDate(wD.getDate()-7);
+        const mD = new Date(); mD.setMonth(mD.getMonth()-1);
+        const currY = new Date().getFullYear().toString();
+        
+        let customStart = null, customEnd = null;
+        if(dateFilter === 'custom') {
+            const sd = document.getElementById('pivotStartDt')?.value;
+            const ed = document.getElementById('pivotEndDt')?.value;
+            if(sd) customStart = new Date(sd);
+            if(ed) { customEnd = new Date(ed); customEnd.setHours(23,59,59); }
         }
-    }
 
-    if (isEseguitiVisible) {
-        toDO.length = 0; // Svuotiamo Rossi
-    }
-
-    if(toDO.length === 0 && done.length === 0) {
-        activitiesList.innerHTML = '<p style="text-align:center; color:gray; font-size:0.9rem;">Nessuna attività programmata o eseguita per oggi.</p>';
-        return;
-    }
-
-    // Rendering DA FARE (Rossi)
-    if(toDO.length > 0) {
-        const title1 = document.createElement('h4');
-        title1.style.cssText = "color: #ef4444; margin-bottom: 8px;";
-        title1.innerText = "🔴 DA FARE OGGI";
-        activitiesList.appendChild(title1);
-
-        toDO.forEach((inv, index) => {
-            const origIndex = plannedInterventions.findIndex(p => p.id === inv.id);
-            const div = document.createElement('div');
-            div.className = "card-item-container";
-            div.style.borderLeft = "4px solid #ef4444";
-            
-            let fileBadget = (inv.fileUrlsProgrammati && inv.fileUrlsProgrammati.length > 0) ? `<span style="font-size:0.8rem; background:var(--orange-light); color:white; padding:2px 5px; border-radius:4px; margin-left:5px;">📎</span>` : '';
-            
-            let attachHtml = '';
-            if (inv.fileUrlsProgrammati && inv.fileUrlsProgrammati.length > 0) {
-                attachHtml = `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dotted #ccc;">
-                    <strong>📎 Allegati Sede:</strong><br>
-                    ${inv.fileUrlsProgrammati.map((url, i) => `<a href="${url}" target="_blank" style="color: var(--blue-primary); font-size: 0.85rem; text-decoration: underline;">Allegato ${i+1}</a>`).join('<br>')}
-                </div>`;
+        tasks = tasks.filter(t => {
+            const dtField = t.actualEnd || t.scheduledStart;
+            if(!dtField) return false;
+            const d = new Date(dtField);
+            if(dateFilter === 'today') return dtField.startsWith(todayIso);
+            if(dateFilter === 'week') return d >= wD;
+            if(dateFilter === 'month') return d >= mD;
+            if(dateFilter === 'year') return dtField.startsWith(currY);
+            if(dateFilter === 'custom') {
+                if(customStart && d < customStart) return false;
+                if(customEnd && d > customEnd) return false;
+                return true;
             }
-
-            const showOra = inv.oraPrevista ? ` ore ${inv.oraPrevista}` : '';
-            div.innerHTML = `
-                <div class="card-compact-view">
-                    <div style="flex:1;">
-                        <div style="font-size:0.80rem; color:red; margin-bottom:4px;"><strong>⏳ PROGRAMMATO${showOra}</strong></div>
-                        <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${inv.paziente} ${fileBadget}</div>
-                        <div style="font-size:0.85rem; color:#555;">📍 ${inv.localita || inv.destinazione} | 🔧 ${window.decodeCodeToLabel(inv.tipo, 'interventi')}</div>
-                    </div>
-                    <div style="display: flex; gap: 8px; align-items: center; padding-left: 10px;">
-                        <button class="btn btn-primary btn-orange btn-sm" style="padding:6px 10px; font-size:0.8rem; line-height:1; min-width:auto;" data-action="avvia" data-index="${origIndex}">▶ AVVIA</button>
-                        <span class="expand-icon" style="font-size:1.2rem; color:var(--blue-light); padding:10px;">▼</span>
-                    </div>
-                </div>
-                
-                <div class="card-expanded-view hidden">
-                    <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${inv.indirizzo || ''}</div>
-                    <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${inv.telefono || '-'}</div>
-                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi') || 'Nessuno'}</div>
-                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Accessori:</strong> ${inv.accessoriStr || 'Nessuno'}</div>
-                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Matricola:</strong> ${inv.matricola || 'N/D'}</div>
-                    <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:5px;"><strong>Note:</strong> ${inv.note || 'Nessuna'}</div>
-                    <div style="font-size:0.85rem; color:#0f172a; margin-top:5px; padding-bottom:10px;"><strong>⏳ Prog. da:</strong> ${inv.programmatoDa || 'N/D'}</div>
-                    ${attachHtml}
-                    <div style="background: rgba(34,197,94,0.1); border: 1px solid #22c55e; border-radius: 6px; padding: 10px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
-                        <label style="font-weight: bold; color: #15803d; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 8px; margin: 0;">
-                            <input type="checkbox" data-action="assegna-mag" data-index="${origIndex}" style="width: 18px; height: 18px; cursor: pointer; accent-color: #16a34a;" ${inv.assegnatoMagazzino ? 'checked' : ''}>
-                            📦 ASSEGNA MAG
-                        </label>
-                    </div>
-                </div>
-            `;
-            
-            setupAccordionCard(div);
-            
-            const magCb3 = div.querySelector('input[data-action="assegna-mag"]');
-            if (magCb3) {
-                magCb3.addEventListener('change', async (e) => {
-                    const idx = e.target.getAttribute('data-index');
-                    const isChecked = e.target.checked;
-                    const plannedItem = plannedInterventions[idx];
-                    plannedItem.assegnatoMagazzino = isChecked;
-                    try {
-                        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                        await updateDoc(doc(db, "programmati", plannedItem.idFb || plannedItem.id), { assegnatoMagazzino: isChecked });
-                    } catch(err) { e.target.checked = !isChecked; plannedItem.assegnatoMagazzino = !isChecked; }
-                });
-            }
-            
-            div.querySelector('button[data-action="avvia"]').addEventListener('click', () => {
-                editProgrammatoAppJs(origIndex);
-            });
-            
-            activitiesList.appendChild(div);
+            return true;
         });
     }
 
-    // Rendering ESEGUITI (Verdi)
-    if(done.length > 0) {
-        const title2 = document.createElement('h4');
-        title2.style.cssText = "color: #22c55e; margin-bottom: 8px; margin-top: 15px;";
-        title2.innerText = "✅ ESEGUITI OGGI";
-        activitiesList.appendChild(title2);
+    window.currentPivotTasks = tasks; // Update for rendering
 
-        // Mostriamo dalla più recente alla più vecchia
-        const revList = [...done].reverse();
-        revList.forEach(inv => {
-            const d = new Date(inv.startTime);
-            const e = new Date(inv.endTime);
-            const div = document.createElement('div');
-            div.className = "card-item-container";
-            div.style.borderLeft = "4px solid #22c55e";
-            
-            let fileBadget = inv.haAllegato ? `<span style="font-size:0.8rem; background:var(--blue-light); color:white; padding:2px 5px; border-radius:4px; margin-left:5px;">📎</span>` : '';
-            
-            let attachHtml = '';
-            if (inv.fileUrls && inv.fileUrls.length > 0) {
-                attachHtml = `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dotted #ccc;">
-                    <strong>📎 Allegati:</strong><br>
-                    ${inv.fileUrls.map((url, i) => `<a href="${url}" target="_blank" style="color: var(--blue-primary); font-size: 0.85rem; text-decoration: underline;">Allegato ${i+1}</a>`).join('<br>')}
-                </div>`;
-            }
+    const container = document.getElementById('pivotContainer');
+    const controls = document.getElementById('pivotControls');
 
-            div.innerHTML = `
-                <div class="card-compact-view">
-                    <div style="flex:1;">
-                        <div style="font-size:0.80rem; color:#22c55e; margin-bottom:4px;"><strong>✅ Dalle ${padZ(d.getHours())}:${padZ(d.getMinutes())} alle ${padZ(e.getHours())}:${padZ(e.getMinutes())}</strong></div>
-                        <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${inv.paziente} ${fileBadget}</div>
-                        <div style="font-size:0.85rem; color:#555;">📍 ${inv.localita || inv.destinazione} | 🔧 ${window.decodeCodeToLabel(inv.tipo, 'interventi')}</div>
-                        ${inv.operatore && inv.operatore !== myName ? `<div style="font-size:0.80rem; color:#8b5cf6; margin-top:2px;">👨‍🔧 Eseguito da: <strong>${inv.operatore}</strong></div>` : ''}
-                    </div>
-                    <div style="display: flex; gap: 8px; align-items: center; padding-left: 10px;">
-                        <span class="expand-icon" style="font-size:1.2rem; color:var(--blue-light); padding:10px;">▼</span>
-                    </div>
-                </div>
-                
-                <div class="card-expanded-view hidden">
-                    <div style="font-size:0.85rem; color:#666;"><strong>📍 Indirizzo:</strong> ${inv.indirizzo || ''}</div>
-                    <div style="font-size:0.80rem; color:#555; margin-top:4px;">📞 ${inv.telefono || '-'}</div>
-                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Disp:</strong> ${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi') || 'Nessuno'}</div>
-                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Accessori:</strong> ${inv.accessoriStr || 'Nessuno'}</div>
-                    <div style="font-size:0.85rem; color:#333; margin-top:5px;"><strong>Matricola:</strong> ${inv.matricola || 'N/D'}</div>
-                    <div style="font-size:0.85rem; color:#333; margin-top:5px; padding-bottom:10px;"><strong>Note:</strong> ${inv.note || 'Nessuna'}</div>
-                    <div style="font-size:0.85rem; color:#15803d; margin-top:5px;"><strong>Km A/R:</strong> ${inv.kmPercorsi || '0'}</div>
-                    ${attachHtml}
-                </div>
-            `;
-            
-            setupAccordionCard(div);
-            activitiesList.appendChild(div);
-        });
-    }
-}
-
-// --- RUBRICA SMS IPHONE / ANDROID ---
-const btnOpenRubrica = document.getElementById('btnOpenRubrica');
-const rubricaModal = document.getElementById('rubricaModal');
-const btnCloseRubrica = document.getElementById('btnCloseRubrica');
-const newRubricaForm = document.getElementById('newRubricaForm');
-const rubricaNome = document.getElementById('rubricaNome');
-const rubricaTelefono = document.getElementById('rubricaTelefono');
-const rubricaList = document.getElementById('rubricaList');
-
-let localeRubrica = JSON.parse(localStorage.getItem('antimo_rubrica')) || [];
-
-function renderRubrica() {
-    if(!rubricaList) return;
-    rubricaList.innerHTML = '';
-    if(localeRubrica.length === 0) {
-        rubricaList.innerHTML = '<div style="text-align: center; color: #666; font-size: 0.9rem; padding: 10px;">Nessun contatto salvato in rubrica. Aggiungine uno qui sopra!</div>';
-        return;
-    }
-    
-    localeRubrica.forEach((contatto, i) => {
-        const div = document.createElement('div');
-        div.style.cssText = "display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; background: #f9fafb; border-radius: 6px;";
-        div.innerHTML = `
-            <div style="flex: 1;">
-                <strong style="color: var(--blue-dark); font-size: 1rem;">${contatto.nome}</strong><br>
-                <a href="tel:${contatto.numero}" style="font-size: 0.85rem; color: #555; text-decoration: none;">📞 ${contatto.numero}</a>
+    controls.innerHTML = `
+        <div style="display:flex; gap:15px; align-items:center;">
+            <div>
+                <strong>Filtra Data:</strong>
+                <select id="pivotDateFilter" onchange="window.renderPivotTable(document.getElementById('pivotGroupSelect').value, this.value)" style="padding:5px; border-radius:4px; margin-left:5px;">
+                    <option value="all" ${dateFilter==='all'?'selected':''}>Qualsiasi Data</option>
+                    <option value="today" ${dateFilter==='today'?'selected':''}>Oggi</option>
+                    <option value="week" ${dateFilter==='week'?'selected':''}>Ultimi 7 gg</option>
+                    <option value="month" ${dateFilter==='month'?'selected':''}>Questo Mese</option>
+                    <option value="year" ${dateFilter==='year'?'selected':''}>Quest'Anno</option>
+                    <option value="custom" ${dateFilter==='custom'?'selected':''}>Personalizzata...</option>
+                </select>
             </div>
-            <div style="display: flex; gap: 8px;">
-                <button class="btn btn-primary btn-sm btn-invia-sms" style="background:var(--orange); border:none; padding:8px 12px; font-weight: bold;" data-tel="${contatto.numero}">InvSMS</button>
-                <button class="btn btn-danger btn-sm btn-elimina-rubrica" style="padding:8px 12px; font-weight: bold;" data-index="${i}">✖</button>
+            <div id="pivotCustomDateDiv" style="display:${dateFilter==='custom'?'flex':'none'}; gap:5px; align-items:center;">
+                <input type="date" id="pivotStartDt" style="padding:4px; margin:0; border-radius:4px;" value="${document.getElementById('pivotStartDt')?.value||''}">
+                <input type="date" id="pivotEndDt" style="padding:4px; margin:0; border-radius:4px;" value="${document.getElementById('pivotEndDt')?.value||''}">
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.8rem; width:auto; border-radius:4px;" onclick="window.renderPivotTable(document.getElementById('pivotGroupSelect').value, 'custom')">Applica</button>
             </div>
-        `;
-        rubricaList.appendChild(div);
-    });
-    
-    document.querySelectorAll('.btn-elimina-rubrica').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const idx = e.target.getAttribute('data-index');
-            if(confirm('Eliminare questo contatto dalla rubrica?')) {
-                localeRubrica.splice(idx, 1);
-                localStorage.setItem('antimo_rubrica', JSON.stringify(localeRubrica));
-                renderRubrica();
-            }
-        });
-    });
-    
-    document.querySelectorAll('.btn-invia-sms').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const tel = e.target.getAttribute('data-tel');
-            const msgT = document.getElementById('msgText');
-            let bodyText = encodeURIComponent(msgT && msgT.value.trim() ? msgT.value.trim() : "Notifica dall'app.");
-            
-            const os = navigator.userAgent.toLowerCase();
-            if(os.includes("iphone") || os.includes("ipad")) {
-                 window.location.href = `sms:${tel}&body=${bodyText}`;
-            } else {
-                 window.location.href = `sms:${tel}?body=${bodyText}`;
-            }
-        });
-    });
-}
-
-if(btnOpenRubrica) {
-    btnOpenRubrica.addEventListener('click', () => {
-        renderRubrica();
-        rubricaModal.classList.remove('hidden');
-    });
-}
-if(btnCloseRubrica) {
-    btnCloseRubrica.addEventListener('click', () => {
-        rubricaModal.classList.add('hidden');
-    });
-}
-
-const btnOpenUsersList = document.getElementById('btnOpenUsersList');
-const appUsersModal = document.getElementById('appUsersModal');
-const btnCloseUsersList = document.getElementById('btnCloseUsersList');
-const appUsersList = document.getElementById('appUsersList');
-
-async function renderAppUsersList() {
-    if (!appUsersList) return;
-    appUsersList.innerHTML = '<div style="text-align: center; color: #666; font-size: 0.9rem;">Caricamento dipendenti in corso...</div>';
-    try {
-        if (!isFirebaseConfigured) {
-            appUsersList.innerHTML = '<div style="text-align: center; color: red; font-size: 0.9rem;">Firebase non configurato.</div>';
-            return;
-        }
-        const { collection, getDocs, query, where } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        const q = query(collection(db, "anagrafiche"), where("localita", "==", "App (Dipendente)"));
-        const snap = await getDocs(q);
-        
-        let usersHtml = '';
-        snap.forEach(doc => {
-            const data = doc.data();
-            const currentRole = data.ruolo || "";
-            const rolesOptions = (window.antimoDropdownLists && window.antimoDropdownLists.ruoli) 
-                ? window.antimoDropdownLists.ruoli.map(r => `<option value="${r.id}" ${currentRole === r.id ? "selected" : ""}>${r.desc}</option>`).join('')
-                : '';
-                
-            usersHtml += `
-            <div style="padding: 10px; border-bottom: 1px solid #eee; background: #f9fafb; border-radius: 6px; display:flex; flex-direction:column; gap:4px;">
-                <strong style="color: var(--blue-dark); font-size: 1rem;">${data.nome} ${data.cognome}</strong>
-                <a href="mailto:${data.email}" style="font-size: 0.85rem; color: var(--blue-primary); text-decoration: none;">📧 ${data.email}</a>
-                <a href="tel:${data.telefono1 || ''}" style="font-size: 0.85rem; color: #555; text-decoration: none;">📞 ${data.telefono1 || 'Nessun Telefono'}</a>
-                <div style="margin-top: 5px; font-size: 0.85rem;">
-                    <label>Ruolo:</label>
-                    <select onchange="window.updateUserRole('${doc.id}', this.value)" style="padding: 4px; border-radius: 4px; border: 1px solid #ccc; background: white; margin-left: 5px;">
-                        <option value="" ${currentRole === "" ? "selected" : ""}>Nessun Ruolo</option>
-                        ${rolesOptions}
-                    </select>
-                </div>
+            <div>
+                <strong>Raggruppa:</strong>
+                <select id="pivotGroupSelect" onchange="window.renderPivotTable(this.value, document.getElementById('pivotDateFilter').value)" style="padding:5px; border-radius:4px; margin-left:5px;">
+                    <option value="none" ${groupBy==='none'?'selected':''}>Nessuno</option>
+                    <option value="day" ${groupBy==='day'?'selected':''}>Giorno</option>
+                    <option value="location" ${groupBy==='location'?'selected':''}>Proprietario</option>
+                </select>
             </div>
-            `;
-        });
-        
-        if (!usersHtml) {
-            appUsersList.innerHTML = '<div style="text-align: center; color: #666; font-size: 0.9rem;">Nessun dipendente registrato.</div>';
-        } else {
-            appUsersList.innerHTML = usersHtml;
-        }
-    } catch(err) {
-        console.error("Errore caricamento utenti", err);
-        appUsersList.innerHTML = '<div style="text-align: center; color: red; font-size: 0.9rem;">Errore caricamento.</div>';
-    }
-}
-
-window.updateUserRole = async function(docId, newRole) {
-    try {
-        const { doc: fsDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        await updateDoc(fsDoc(db, "anagrafiche", docId), { ruolo: newRole });
-    } catch(err) {
-        console.error("Errore salvataggio ruolo", err);
-        alert("Errore salvataggio ruolo.");
-    }
-};
-
-if(btnOpenUsersList) {
-    btnOpenUsersList.addEventListener('click', () => {
-        appUsersModal.classList.remove('hidden');
-        renderAppUsersList();
-    });
-}
-if(btnCloseUsersList) {
-    btnCloseUsersList.addEventListener('click', () => {
-        appUsersModal.classList.add('hidden');
-    });
-}
-
-if(newRubricaForm) {
-    newRubricaForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        localeRubrica.push({
-            nome: rubricaNome.value.trim(),
-            numero: rubricaTelefono.value.trim()
-        });
-        localStorage.setItem('antimo_rubrica', JSON.stringify(localeRubrica));
-        rubricaNome.value = '';
-        rubricaTelefono.value = '';
-        renderRubrica();
-    });
-}
-
-// Auth Check e Login Aziendale
-async function checkLoginStatus() {
-    const userEmail = localStorage.getItem('antimo_user_email');
-    if (!userEmail) {
-        document.getElementById('loginModal').classList.remove('hidden');
-    } else {
-        let userName = localStorage.getItem('antimo_user_name');
-        
-        // MIGRATION: Retroactively assign antimo_user_name for users logged in before the update
-        if (!userName && userEmail.includes('@eubios.it')) {
-            try {
-                const parts = userEmail.split('@')[0].split('.');
-                let nome = parts[0] || '';
-                let cognome = parts.length > 1 ? parts[1] : '';
-                nome = nome ? nome.charAt(0).toUpperCase() + nome.slice(1) : '';
-                cognome = cognome ? cognome.charAt(0).toUpperCase() + cognome.slice(1) : '';
-                userName = (nome + ' ' + cognome).trim();
-                if(userName) localStorage.setItem('antimo_user_name', userName);
-            } catch(e) {
-                console.error("Migration error user name", e);
-            }
-        }
-        
-        if (!userName) userName = userEmail;
-
-        const userNameDisp = document.getElementById('loggedInUserDisplay');
-        if (userNameDisp) {
-            userNameDisp.innerText = `👤 ${userName}`;
-        }
-    }
-}
-
-const loginForm = document.getElementById('loginForm');
-if (loginForm) {
-    loginForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const email = document.getElementById('loginEmail').value.trim().toLowerCase();
-        const phone = document.getElementById('loginPhone').value.trim();
-        const errDiv = document.getElementById('loginError');
-        const btnLoginSubmit = document.getElementById('btnLoginSubmit');
-        
-        const emailRegex = /^[a-z]+\.[a-z]+@eubios\.it$/;
-        
-        if (!emailRegex.test(email)) {
-            errDiv.textContent = "Accesso negato. Usa formato valido: nome.cognome@eubios.it";
-            errDiv.style.display = "block";
-            return;
-        }
-        
-        errDiv.style.display = "none";
-        btnLoginSubmit.disabled = true;
-        btnLoginSubmit.innerHTML = "VERIFICA IN CORSO...";
-        
-        try {
-            const parts = email.split('@')[0].split('.');
-            let nome = parts[0] || '';
-            let cognome = parts.length > 1 ? parts[1] : '';
-            
-            nome = nome ? nome.charAt(0).toUpperCase() + nome.slice(1) : '';
-            cognome = cognome ? cognome.charAt(0).toUpperCase() + cognome.slice(1) : '';
-            const fullName = (nome + ' ' + cognome).trim();
-            
-            if (isFirebaseConfigured) {
-                const { collection, query, where, getDocs, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                const q = query(collection(db, "anagrafiche"), where("email", "==", email));
-                const snap = await getDocs(q);
-                
-                if (snap.empty) {
-                    await addDoc(collection(db, "anagrafiche"), {
-                        id: Date.now().toString(),
-                        timestamp: serverTimestamp(),
-                        nome: nome,
-                        cognome: cognome,
-                        email: email,
-                        telefono1: phone,
-                        localita: "App (Dipendente)",
-                        indirizzo: "-",
-                        codiceFiscale: "",
-                        provincia: ""
-                    });
-                }
-            }
-            localStorage.setItem('antimo_user_email', email);
-            localStorage.setItem('antimo_user_phone', phone);
-            localStorage.setItem('antimo_user_name', fullName);
-            
-            document.getElementById('loginModal').classList.add('hidden');
-        } catch(err) {
-            console.error("Errore login / anagrafiche", err);
-            errDiv.textContent = "Errore di connessione al database.";
-            errDiv.style.display = "block";
-            btnLoginSubmit.disabled = false;
-            btnLoginSubmit.innerHTML = "AUTENTICATI";
-        }
-    });
-}
-checkLoginStatus();
-
-// Inizializzazione Globale
-initApp();
-
-// ========================================================
-// REPARTO DATA BACKUP & RIPRISTINO (Esportazione Cloud .json)
-// ========================================================
-const btnOpenDataBackup = document.getElementById('btnOpenDataBackup');
-const dataBackupModal = document.getElementById('dataBackupModal');
-const btnCloseDataBackup = document.getElementById('btnCloseDataBackup');
-const btnExportDataJson = document.getElementById('btnExportDataJson');
-const btnImportDataJson = document.getElementById('btnImportDataJson');
-const importDataFile = document.getElementById('importDataFile');
-
-if(btnOpenDataBackup) {
-    btnOpenDataBackup.addEventListener('click', () => {
-        if(dataBackupModal) dataBackupModal.classList.remove('hidden');
-        const settingsModal = document.getElementById('settingsModal');
-        if(settingsModal) settingsModal.classList.add('hidden');
-    });
-}
-if(btnCloseDataBackup) {
-    btnCloseDataBackup.addEventListener('click', () => {
-        if(dataBackupModal) dataBackupModal.classList.add('hidden');
-    });
-}
-
-if(btnExportDataJson) {
-    btnExportDataJson.addEventListener('click', async () => {
-        if(!isFirebaseConfigured) { alert("Firebase non configurato! Nessun database reperibile."); return; }
-        try {
-            btnExportDataJson.textContent = "Elaborazione in corso...";
-            btnExportDataJson.disabled = true;
-            
-            const { getDocs, collection } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-            
-            const collectionsToExport = ["interventi", "programmati", "messaggi", "anagrafiche"];
-            const exportData = {};
-            
-            for(let collName of collectionsToExport) {
-                exportData[collName] = [];
-                const snap = await getDocs(collection(db, collName));
-                snap.forEach(d => {
-                    exportData[collName].push({ __firebaseDocId: d.id, ...d.data() });
-                });
-            }
-            
-            const jsonStr = JSON.stringify(exportData, null, 2);
-            const blob = new Blob([jsonStr], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            
-            const a = document.createElement('a');
-            a.href = url;
-            const now = new Date();
-            const pdZ = n => n.toString().padStart(2, '0');
-            a.download = `Backup_Antimo_${now.getFullYear()}${pdZ(now.getMonth()+1)}${pdZ(now.getDate())}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            
-            btnExportDataJson.innerHTML = `<span class="btn-icon">⬇️</span> Scarica Database (.json)`;
-            btnExportDataJson.disabled = false;
-        } catch(e) {
-            alert("Errore esportazione dati: " + e.message);
-            btnExportDataJson.innerHTML = `<span class="btn-icon">⬇️</span> Scarica Database (.json)`;
-            btnExportDataJson.disabled = false;
-        }
-    });
-}
-
-if(btnImportDataJson) {
-    btnImportDataJson.addEventListener('click', async () => {
-        if(!isFirebaseConfigured) { alert("Firebase non è configurato per il ripristino!"); return; }
-        
-        if(!importDataFile || !importDataFile.files[0]) {
-            alert("Devi prima selezionare un file JSON usando il tasto Scegli File!");
-            return;
-        }
-        
-        if(!confirm("ATTENZIONE CRITICA: Stai per inviare i dati di questo file JSON sul Server Cloud.\n\nQuesta operazione non cancellerà i dati esistenti che non sono nel file, ma AGGIUNGERÀ o SOVRASCRIVERÀ i documenti che hanno lo stesso ID. Continuare?")) return;
-        
-        const file = importDataFile.files[0];
-        const reader = new FileReader();
-        
-        reader.onload = async (e) => {
-            try {
-                btnImportDataJson.textContent = "Ripristino in corso...";
-                btnImportDataJson.disabled = true;
-                
-                const data = JSON.parse(e.target.result);
-                const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                
-                let successCount = 0;
-                for(let collName of Object.keys(data)) {
-                    for(let item of data[collName]) {
-                        // Identifichiamo l'ID del documento Firestore salvato precedentemente
-                        const itemFbId = item.__firebaseDocId || item.id || item.fbId || Date.now().toString();
-                        
-                        let payload = {...item};
-                        delete payload.__firebaseDocId; // rimuovo la traccia interna
-                        
-                        await setDoc(doc(db, collName, itemFbId), payload, { merge: true });
-                        successCount++;
-                    }
-                }
-                
-                alert(`✅ Ripristino Database Completato!\nSono stati letti ed elaborati ${successCount} record.\nL'applicazione si aggiornerà ora per mostrare i dati ripristinati.`);
-                
-                // Forza reinizializzazione per leggere il nuovo db
-                window.location.reload(true);
-            } catch(err) {
-                alert("Errore nel ripristino o formato file JSON non valido:\n" + err.message);
-                btnImportDataJson.innerHTML = `<span class="btn-icon">⬆️</span> Ripristina da File .json`;
-                btnImportDataJson.disabled = false;
-            }
-        };
-        reader.readAsText(file);
-    });
-}
-
-// ==========================================
-// AUTO-COMPLETAMENTO ASSISTITI E DATALIST
-// ==========================================
-window.renderAssistitiDatalist = function() {
-    const dlist = document.getElementById('assistitiDatalist');
-    if(!dlist) return;
-    const assistiti = JSON.parse(localStorage.getItem('antimo_assistiti') || '[]');
-    dlist.innerHTML = '';
-    assistiti.forEach(a => {
-        let opt = document.createElement('option');
-        opt.value = a.paziente;
-        dlist.appendChild(opt);
-    });
-};
-
-document.addEventListener('DOMContentLoaded', () => {
-    window.renderAssistitiDatalist(); // Run at startup
-});
-
-// Event Delegation for Autofill
-document.addEventListener('input', (e) => {
-    if (e.target.tagName === 'INPUT' && e.target.getAttribute('list') === 'assistitiDatalist') {
-        const assistiti = JSON.parse(localStorage.getItem('antimo_assistiti') || '[]');
-        const val = e.target.value.trim();
-        const found = assistiti.find(a => a.paziente === val);
-        
-        if (found) {
-            let prefix = "";
-            if (e.target.id.startsWith("editProg")) prefix = "editProg";
-            else if (e.target.id.startsWith("edit")) prefix = "edit";
-            else prefix = "";
-
-            const disEl = document.getElementById(prefix ? prefix + "Dispositivi" : "dispositivi");
-            const locEl = document.getElementById(prefix ? prefix + "Localita" : "localita");
-            const indEl = document.getElementById(prefix ? prefix + "Indirizzo" : "indirizzo");
-
-            // Solo auto-fill se sono vuoti (per non sovrascrivere roba scritta a mano)
-            if(disEl && found.dispositivi && !disEl.value) disEl.value = found.dispositivi;
-            if(locEl && found.localita && !locEl.value) locEl.value = found.localita;
-            if(indEl && found.indirizzo && !indEl.value) indEl.value = found.indirizzo;
-        }
-    }
-});
-
-// ==========================================
-// GESTIONE VOCI (DISP/INT)
-// ==========================================
-const btnOpenListsSetup = document.getElementById('btnOpenListsSetup');
-const listsSetupModal = document.getElementById('listsSetupModal');
-const btnCloseListsSetup = document.getElementById('btnCloseListsSetup');
-const btnTabInterventi = document.getElementById('btnTabInterventi');
-const btnTabDispositivi = document.getElementById('btnTabDispositivi');
-const listsSetupTable = document.getElementById('listsSetupTable');
-const newListItemDesc = document.getElementById('newListItemDesc');
-const btnAddListItem = document.getElementById('btnAddListItem');
-const btnSaveFirebaseLists = document.getElementById('btnSaveFirebaseLists');
-
-let currentListTab = 'interventi'; // 'interventi', 'dispositivi' o 'ruoli'
-
-function updateListsTabUI() {
-    if(btnTabInterventi) {
-        btnTabInterventi.className = currentListTab === 'interventi' ? 'btn btn-primary' : 'btn btn-secondary';
-        btnTabInterventi.style.background = currentListTab === 'interventi' ? 'var(--blue-primary)' : '';
-    }
-    if(btnTabDispositivi) {
-        btnTabDispositivi.className = currentListTab === 'dispositivi' ? 'btn btn-primary' : 'btn btn-secondary';
-        btnTabDispositivi.style.background = currentListTab === 'dispositivi' ? 'var(--blue-primary)' : '';
-    }
-    const btnTabRuoli = document.getElementById('btnTabRuoli');
-    if(btnTabRuoli) {
-        btnTabRuoli.className = currentListTab === 'ruoli' ? 'btn btn-primary' : 'btn btn-secondary';
-        btnTabRuoli.style.background = currentListTab === 'ruoli' ? 'var(--blue-primary)' : '';
-    }
-    const btnTabSeqex = document.getElementById('btnTabSeqex');
-    if(btnTabSeqex) {
-        btnTabSeqex.className = currentListTab === 'programmi_seqex' ? 'btn btn-primary' : 'btn btn-secondary';
-        btnTabSeqex.style.background = currentListTab === 'programmi_seqex' ? 'var(--blue-primary)' : '';
-    }
-    renderListsSetupTable();
-}
-
-if(btnOpenListsSetup) {
-    btnOpenListsSetup.addEventListener('click', () => {
-        listsSetupModal.classList.remove('hidden');
-        renderListsSetupTable();
-    });
-}
-
-if(btnCloseListsSetup) {
-    btnCloseListsSetup.addEventListener('click', () => {
-        listsSetupModal.classList.add('hidden');
-    });
-}
-
-if(btnTabInterventi) {
-    btnTabInterventi.addEventListener('click', () => {
-        currentListTab = 'interventi';
-        updateListsTabUI();
-    });
-}
-
-if(btnTabDispositivi) {
-    btnTabDispositivi.addEventListener('click', () => {
-        currentListTab = 'dispositivi';
-        updateListsTabUI();
-    });
-}
-
-const btnTabRuoli = document.getElementById('btnTabRuoli');
-if(btnTabRuoli) {
-    btnTabRuoli.addEventListener('click', () => {
-        currentListTab = 'ruoli';
-        updateListsTabUI();
-    });
-}
-
-const btnTabSeqex = document.getElementById('btnTabSeqex');
-if(btnTabSeqex) {
-    btnTabSeqex.addEventListener('click', () => {
-        currentListTab = 'programmi_seqex';
-        updateListsTabUI();
-    });
-}
-
-function renderListsSetupTable() {
-    if(!listsSetupTable) return;
-    listsSetupTable.innerHTML = '';
-    const list = window.antimoDropdownLists[currentListTab] || [];
-    
-    // Mostra/nascondi campo Valore in alto
-    const valInput = document.getElementById('newListItemVal');
-    if (valInput) {
-        valInput.style.display = currentListTab === 'interventi' ? 'block' : 'none';
-    }
-
-    if(list.length === 0) {
-        listsSetupTable.innerHTML = '<tr><td style="text-align:center; padding: 20px; color: #666;">Nessuna voce presente.</td></tr>';
-        return;
-    }
-
-    list.forEach((item, index) => {
-        const hasVal = currentListTab === 'interventi';
-        let valFieldHtml = '';
-        if (hasVal) {
-            valFieldHtml = `<div style="margin-top:5px; display:flex; gap: 5px; align-items:center;">
-                                <label style="font-size:0.75rem; color:#666;">Valore €</label>
-                                <input type="number" id="val_${item.id}" value="${item.val || 0}" step="0.01" style="width: 80px; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
-                            </div>`;
-        }
-
-        const tr = document.createElement('tr');
-        tr.style.borderBottom = '1px solid #eee';
-        
-        let accBtnHtml = '';
-        if (currentListTab === 'dispositivi') {
-            const numAcc = (item.accessori && Array.isArray(item.accessori)) ? item.accessori.length : 0;
-            accBtnHtml = `
-                <div style="margin-top: 8px;">
-                    <button class="btn btn-secondary btn-sm" onclick="window.openManageAccessori('${item.id}')" style="padding: 4px 8px; font-size: 0.75rem; border:1px solid var(--blue-primary); color:var(--blue-primary); background:white;">
-                        ⚙️ Accessori Dedicati (${numAcc})
-                    </button>
-                </div>
-            `;
-        }
-        
-        tr.innerHTML = `
-            <td style="padding: 10px; width: 30%; color: #888; font-size: 0.8rem; vertical-align: top;">
-                ID: ${item.id}
-            </td>
-            <td style="padding: 10px; width: 40%; vertical-align: top;">
-                <input type="text" id="desc_${item.id}" value="${item.desc.replace(/"/g, '&quot;')}" style="width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
-                ${valFieldHtml}
-                ${accBtnHtml}
-            </td>
-            <td style="padding: 10px; width: 30%; text-align: right; vertical-align: top; padding-top: 15px;">
-                <button class="btn btn-primary btn-sm" onclick="salvaVoceEdit('${item.id}')" style="padding: 6px 10px; margin: 0 0 5px 0; font-size: 0.8rem; width:100%;">Salva</button>
-                <button class="btn btn-danger btn-sm" onclick="eliminaVoce('${item.id}')" style="padding: 6px 10px; margin: 0; font-size: 0.8rem; width:100%;">X</button>
-            </td>
-        `;
-        listsSetupTable.appendChild(tr);
-    });
-}
-
-window.salvaVoceEdit = function(id) {
-    const input = document.getElementById('desc_' + id);
-    if(!input) return;
-    const newDesc = input.value.trim();
-    if(!newDesc) {
-        alert("La descrizione non può essere vuota.");
-        return;
-    }
-    const list = window.antimoDropdownLists[currentListTab];
-    const item = list.find(x => x.id === id);
-    if(item) {
-        item.desc = newDesc;
-        if(currentListTab === 'interventi') {
-            const valInput = document.getElementById('val_' + id);
-            item.val = valInput ? parseFloat(valInput.value || 0) : 0;
-        }
-        renderListsSetupTable();
-        alert("Modifica applicata! Ricordati di premere 'SALVA MODIFICHE E CHIUDI' per salvare su Cloud.");
-    }
-};
-
-window.eliminaVoce = function(id) {
-    if(!confirm("Sei sicuro di voler eliminare questa voce? I vecchi record mostreranno il codice invece del nome se la elimini.")) return;
-    let list = window.antimoDropdownLists[currentListTab];
-    window.antimoDropdownLists[currentListTab] = list.filter(x => x.id !== id);
-    renderListsSetupTable();
-};
-
-// --- GESTIONE ACCESSORI DEDICATI ---
-window.currentManageAccessoriDeviceId = null;
-
-window.openManageAccessori = function(deviceId) {
-    window.currentManageAccessoriDeviceId = deviceId;
-    const modal = document.getElementById('manageAccessoriModal');
-    const title = document.getElementById('manageAccessoriTitle');
-    if(!modal || !title) return;
-    
-    const list = window.antimoDropdownLists['dispositivi'] || [];
-    const device = list.find(d => d.id === deviceId);
-    if(!device) return;
-    
-    title.innerHTML = `<span class="btn-icon">⚙️</span> Accessori: ${device.desc}`;
-    const newAccDesc = document.getElementById('newAccessorioDesc');
-    if(newAccDesc) newAccDesc.value = '';
-    
-    window.renderAccessoriTable(device);
-    modal.classList.remove('hidden');
-};
-
-window.renderAccessoriTable = function(device) {
-    const table = document.getElementById('accessoriSetupTable');
-    if(!table) return;
-    table.innerHTML = '';
-    
-    if(!device.accessori || device.accessori.length === 0) {
-        table.innerHTML = '<tr><td style="text-align:center; padding: 20px; color: #666;">Nessun accessorio dedicato impostato.</td></tr>';
-        return;
-    }
-    
-    device.accessori.forEach((acc) => {
-        const tr = document.createElement('tr');
-        tr.style.borderBottom = '1px dotted #ccc';
-        tr.innerHTML = `
-            <td style="padding: 10px 5px; width: 70%;">
-                <input type="text" id="acc_desc_${acc.id}" value="${acc.desc.replace(/"/g, '&quot;')}" style="width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
-            </td>
-            <td style="padding: 10px 5px; width: 30%; text-align: right;">
-                <button class="btn btn-primary btn-sm" onclick="salvaAccessorioEdit('${device.id}', '${acc.id}')" style="padding: 4px 8px; font-size: 0.75rem; margin-right:4px;">Salva</button>
-                <button class="btn btn-danger btn-sm" onclick="eliminaAccessorio('${device.id}', '${acc.id}')" style="padding: 4px 8px; font-size: 0.75rem;">X</button>
-            </td>
-        `;
-        table.appendChild(tr);
-    });
-};
-
-window.salvaAccessorioEdit = function(deviceId, accId) {
-    const list = window.antimoDropdownLists['dispositivi'];
-    const device = list.find(d => d.id === deviceId);
-    if(!device || !device.accessori) return;
-    
-    const acc = device.accessori.find(a => a.id === accId);
-    const input = document.getElementById('acc_desc_' + accId);
-    if(acc && input && input.value.trim()) {
-        acc.desc = input.value.trim();
-        window.renderAccessoriTable(device);
-        renderListsSetupTable();
-    }
-};
-
-window.eliminaAccessorio = function(deviceId, accId) {
-    if(!confirm("Eliminare accessorio?")) return;
-    const list = window.antimoDropdownLists['dispositivi'];
-    const device = list.find(d => d.id === deviceId);
-    if(device && device.accessori) {
-        device.accessori = device.accessori.filter(a => a.id !== accId);
-        window.renderAccessoriTable(device);
-        renderListsSetupTable();
-    }
-};
-
-document.addEventListener('DOMContentLoaded', () => {
-    const btnAddAccessorio = document.getElementById('btnAddAccessorio');
-    const btnCloseManageAccessori = document.getElementById('btnCloseManageAccessori');
-    const btnSaveAccessoriFirebase = document.getElementById('btnSaveAccessoriFirebase');
-    const modal = document.getElementById('manageAccessoriModal');
-    
-    if(btnAddAccessorio) {
-        btnAddAccessorio.addEventListener('click', () => {
-            const input = document.getElementById('newAccessorioDesc');
-            const desc = input.value.trim();
-            if(!desc) return;
-            
-            const deviceId = window.currentManageAccessoriDeviceId;
-            const list = window.antimoDropdownLists['dispositivi'];
-            if(!list || list.length===0) return;
-            const device = list.find(d => d.id === deviceId);
-            if(!device) return;
-            
-            if(!device.accessori) device.accessori = [];
-            device.accessori.push({
-                id: 'ACC_' + Date.now(),
-                desc: desc
-            });
-            input.value = '';
-            window.renderAccessoriTable(device);
-            renderListsSetupTable();
-        });
-    }
-    
-    if(btnCloseManageAccessori) {
-        btnCloseManageAccessori.addEventListener('click', () => {
-            if(modal) modal.classList.add('hidden');
-        });
-    }
-    
-    if(btnSaveAccessoriFirebase) {
-        btnSaveAccessoriFirebase.addEventListener('click', () => {
-            const btnSaveFirebaseLists = document.getElementById('btnSaveFirebaseLists');
-            if(btnSaveFirebaseLists) btnSaveFirebaseLists.click();
-            if(modal) modal.classList.add('hidden');
-        });
-    }
-});
-
-if(btnAddListItem) {
-    btnAddListItem.addEventListener('click', () => {
-        const desc = newListItemDesc.value.trim();
-        if(!desc) return alert("Inserisci una descrizione valida.");
-        
-        let prefix = 'ID_';
-        if (currentListTab === 'interventi') prefix = 'INT_';
-        else if (currentListTab === 'dispositivi') prefix = 'DEV_';
-        else if (currentListTab === 'ruoli') prefix = 'RUO_';
-        else if (currentListTab === 'programmi_seqex') prefix = 'SQX_';
-        const newId = prefix + Date.now().toString();
-        
-        let newItem = { id: newId, desc: desc };
-        if (currentListTab === 'interventi') {
-            const valInput = document.getElementById('newListItemVal');
-            newItem.val = valInput ? parseFloat(valInput.value || 0) : 0;
-        }
-        
-        window.antimoDropdownLists[currentListTab].push(newItem);
-        newListItemDesc.value = '';
-        if (document.getElementById('newListItemVal')) document.getElementById('newListItemVal').value = '';
-        renderListsSetupTable();
-    });
-}
-
-if(btnSaveFirebaseLists) {
-    btnSaveFirebaseLists.addEventListener('click', async () => {
-        try {
-            btnSaveFirebaseLists.disabled = true;
-            btnSaveFirebaseLists.innerHTML = "Salvataggio...";
-            
-            // Auto-salva tutti gli input della tabella visibile prima di inviare al db
-            const list = window.antimoDropdownLists[currentListTab];
-            if(list) {
-                list.forEach(item => {
-                    const descInput = document.getElementById('desc_' + item.id);
-                    if(descInput) item.desc = descInput.value.trim();
-                    if(currentListTab === 'interventi') {
-                        const valInput = document.getElementById('val_' + item.id);
-                        if(valInput) item.val = parseFloat(valInput.value || 0);
-                    }
-                });
-            }
-
-            const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-            const docRef = doc(db, "configurazioni", "liste_dropdown");
-            await setDoc(docRef, window.antimoDropdownLists);
-            
-            localStorage.setItem('antimo_dropdown_lists', JSON.stringify(window.antimoDropdownLists));
-            alert("Liste aggiornate con successo su Cloud!");
-            listsSetupModal.classList.add('hidden');
-            initDynamicBlocks('dynamicInterventionsContainer', 'btnAddInterventionBlock');
-            initDynamicBlocks('dynamicProgInterventionsContainer', 'btnAddProgInterventionBlock');
-        } catch(e) {
-            console.error("Errore salvataggio liste", e);
-            alert("Errore durante il salvataggio.");
-        } finally {
-            btnSaveFirebaseLists.disabled = false;
-            btnSaveFirebaseLists.innerHTML = '<span class="btn-icon">💾</span> SALVA MODIFICHE E CHIUDI';
-        }
-    });
-}
-
-/* ==========================================
- * RICERCA MAGICA GLOBALE (index.html)
- * ========================================== */
-const magicSearchApp = document.getElementById('magicSearchApp');
-const btnCloseMagicSearch = document.getElementById('btnCloseMagicSearch');
-const magicSearchModal = document.getElementById('magicSearchModal');
-const magicSearchTermDisplay = document.getElementById('magicSearchTermDisplay');
-const magicSearchResultsContainer = document.getElementById('magicSearchResultsContainer');
-
-let magicSearchTimer = null;
-
-if(btnCloseMagicSearch) {
-    btnCloseMagicSearch.addEventListener('click', () => {
-        magicSearchModal.classList.add('hidden');
-        if(magicSearchApp) magicSearchApp.value = '';
-    });
-}
-
-if(magicSearchApp) {
-    magicSearchApp.addEventListener('input', (e) => {
-        // Ignora input vuoti o minori di 3 caratteri per non sovraccaricare il db
-        const term = e.target.value.trim().toLowerCase();
-        if(term.length < 3) {
-            magicSearchModal.classList.add('hidden');
-            return;
-        }
-        
-        clearTimeout(magicSearchTimer);
-        // Debounce 800ms
-        magicSearchTimer = setTimeout(async () => {
-            if(!isFirebaseConfigured) return alert("Firebase risulta offline nella configurazione.");
-            
-            magicSearchModal.classList.remove('hidden');
-            magicSearchTermDisplay.textContent = term;
-            magicSearchResultsContainer.innerHTML = '<div style="text-align:center; padding: 20px; color: #64748b;">Esecuzione ricerca nel Cloud globale in corso... ⏳</div>';
-            
-            try {
-                const { collection, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                const results = [];
-                
-                // Cerca negli Interventi Eseguiti
-                const intSnap = await getDocs(collection(db, "interventi"));
-                intSnap.forEach(doc => {
-                    const d = doc.data();
-                    const s = `${d.paziente || ''} ${d.localita || ''} ${d.indirizzo || ''} ${d.tipo || ''} ${d.note || ''}`.toLowerCase();
-                    if(s.includes(term)) results.push({ id: doc.id, ...d, isProg: false });
-                });
-                
-                // Cerca nei Programmati
-                const progSnap = await getDocs(collection(db, "programmati"));
-                progSnap.forEach(doc => {
-                    const d = doc.data();
-                    const s = `${d.paziente || ''} ${d.localita || ''} ${d.indirizzo || ''} ${d.tipo || ''} ${d.note || ''}`.toLowerCase();
-                    if(s.includes(term)) results.push({ id: doc.id, ...d, isProg: true });
-                });
-                
-                // Ordina dal più recente al più vecchio
-                results.sort((a,b) => {
-                    const tsA = a.timestamp?.seconds || a.startTime/1000 || 0;
-                    const tsB = b.timestamp?.seconds || b.startTime/1000 || 0;
-                    return tsB - tsA;
-                });
-                
-                magicSearchResultsContainer.innerHTML = '';
-                if(results.length === 0) {
-                    magicSearchResultsContainer.innerHTML = '<div style="text-align:center; padding: 20px; color: #ef4444; font-weight: bold;">Nessun risultato globale trovato nei server.</div>';
-                    return;
-                }
-                
-                // Limito a 50 per problemi di memoria su mobile
-                results.slice(0, 50).forEach(item => {
-                    const div = document.createElement('div');
-                    div.style.cssText = "background: #f8fafc; border: 1px solid #cbd5e1; padding: 12px; border-radius: 8px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 5px;";
-                    
-                    let dataStr = "Data Sconosciuta";
-                    if(item.dataEsecuzione) dataStr = "Eseguito: " + item.dataEsecuzione;
-                    else if(item.dataProgrammata) dataStr = "Prog: " + item.dataProgrammata;
-                    else if(item.timestamp) dataStr = "Creato: " + new Date(item.timestamp.seconds * 1000).toLocaleDateString('it-IT');
-                    
-                    const iconState = item.isProg ? "📅 PROG" : "✅ ESEG";
-                    const colorState = item.isProg ? "#ea580c" : "#166534";
-                    
-                    const pName = item.paziente || 'Sconosciuto';
-                    const locStr = `${item.localita || ''} ${item.indirizzo ? '- '+item.indirizzo : ''}`.trim();
-                    const techStr = item.operatore || item.tecnicoAssegnato || '';
-                    const tipoDecoded = window.decodeCodeToLabel ? window.decodeCodeToLabel(item.tipo, 'interventi') : (item.tipo || '');
-                    
-                    div.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center; color: var(--blue-dark); border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
-                            <strong style="font-size: 1.05rem;">${pName}</strong>
-                            <span style="font-size: 0.70rem; background: ${colorState}; color: white; padding: 3px 6px; border-radius: 12px; font-weight: bold; white-space: nowrap;">${iconState}</span>
-                        </div>
-                        <div style="font-size: 0.85rem; color: #475569; display: flex; justify-content: space-between; margin-top: 2px;">
-                            <span>📍 ${locStr || 'N/A'}</span>
-                            <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; white-space: nowrap;">${dataStr}</span>
-                        </div>
-                        ${tipoDecoded ? `<div style="font-size: 0.85rem; color: #b45309;">📝 ${tipoDecoded}</div>` : ''}
-                        ${techStr ? `<div style="font-size: 0.8rem; color: var(--blue-primary); font-weight: 600;">👨‍🔧 ${techStr}</div>` : ''}
-                        ${item.note ? `<div style="font-size: 0.8rem; color: #666; font-style: italic; background: #f1f5f9; padding: 6px; border-radius: 4px; margin-top: 4px;">Note: ${item.note}</div>` : ''}
-                        ${item.fileUrls && item.fileUrls.length > 0 ? 
-                            `<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
-                                ${item.fileUrls.map((url, i) => `<a href="${url}" target="_blank" style="font-size: 0.8rem; color: #2563eb; background: #e0f2fe; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; text-decoration: none; font-weight: 600; border: 1px solid #bae6fd; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">📎 Apri Allegato ${i+1}</a>`).join('')}
-                            </div>` 
-                            : ''}
-                    `;
-                    magicSearchResultsContainer.appendChild(div);
-                });
-                
-            } catch(e) {
-                console.error("Magic Search err:", e);
-                magicSearchResultsContainer.innerHTML = '<div style="color: #ef4444; text-align: center; padding: 20px; font-weight: bold;">Errore Firebase durante la ricerca.</div>';
-            }
-        }, 800); // end timeout
-    });
-}
-
-// ==========================================
-// CHANGELOG (MODIFICHE SOFTWARE) MODULE
-// ==========================================
-let changelogData = [];
-let unreadChangelogIds = [];
-
-async function initChangelog() {
-    if (!isFirebaseConfigured) return;
-    const btnOpenChangelog = document.getElementById('btnOpenChangelog');
-    if (!btnOpenChangelog) return; // Only run on index.html
-    
-    try {
-        const { collection, query, orderBy, onSnapshot, doc, updateDoc, arrayUnion, addDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        const q = query(collection(db, "changelog"), orderBy("timestamp", "desc"));
-        
-        onSnapshot(q, (snap) => {
-            changelogData = [];
-            unreadChangelogIds = [];
-            let total = 0;
-            let unread = 0;
-            const myName = localStorage.getItem('antimo_user_name') || "Sconosciuto";
-            
-            snap.forEach(d => {
-                const data = d.data();
-                data.idFb = d.id;
-                changelogData.push(data);
-                total++;
-                if (!data.lettiDa || !data.lettiDa.includes(myName)) {
-                    unread++;
-                    unreadChangelogIds.push(d.id);
-                }
-            });
-            
-            // Aggiorna UI Pulsante
-            if (unread > 0) {
-                btnOpenChangelog.innerHTML = `🆕 Modifiche Software <span style="background:#ef4444; color:white; padding:2px 8px; border-radius:12px; font-size:0.75rem; margin-left:6px; box-shadow:0 1px 3px rgba(0,0,0,0.3);">${unread} da leggere (su ${total})</span>`;
-                btnOpenChangelog.style.background = 'rgba(239, 68, 68, 0.8)';
-                btnOpenChangelog.style.border = '2px solid white';
-                // Animazione respiro definita altrove o custom (es. pulse)
-                btnOpenChangelog.style.animation = 'pulse 2s infinite';
-                
-                // Mostra notifica fluttuante
-                const notif = document.getElementById('changelogNotification');
-                if (notif) notif.classList.remove('hidden');
-            } else {
-                btnOpenChangelog.innerHTML = `✅ Modifiche Software <span style="background:rgba(255,255,255,0.3); padding:2px 8px; border-radius:12px; font-size:0.75rem; margin-left:6px; color:white;">${total} totali</span>`;
-                btnOpenChangelog.style.background = 'rgba(255,255,255,0.2)';
-                btnOpenChangelog.style.border = '1px solid white';
-                btnOpenChangelog.style.animation = 'none';
-                
-                // Nascondi notifica fluttuante
-                const notif = document.getElementById('changelogNotification');
-                if (notif) notif.classList.add('hidden');
-            }
-            
-            renderChangelogList();
-        });
-        
-        // Listener per aprire modale
-        btnOpenChangelog.addEventListener('click', async () => {
-            document.getElementById('changelogModal').classList.remove('hidden');
-            const notif = document.getElementById('changelogNotification');
-            if(notif) notif.classList.add('hidden');
-            
-            // Marca tutti come letti
-            if (unreadChangelogIds.length > 0) {
-                const myName = localStorage.getItem('antimo_user_name') || "Sconosciuto";
-                unreadChangelogIds.forEach(id => {
-                    updateDoc(doc(db, "changelog", id), {
-                        lettiDa: arrayUnion(myName)
-                    }).catch(e => console.error("Errore update letto:", e));
-                });
-                unreadChangelogIds = []; // reset locale per sicurezza immediata
-            }
-        });
-        
-        // Listener notifica fluttuante
-        const notif = document.getElementById('changelogNotification');
-        if (notif) {
-            notif.addEventListener('click', () => {
-                btnOpenChangelog.click();
-            });
-        }
-        
-        // Chiusura modale
-        document.getElementById('btnCloseChangelog').addEventListener('click', () => {
-            document.getElementById('changelogModal').classList.add('hidden');
-        });
-        
-        // Salvataggio nuova modifica
-        document.getElementById('btnSaveChangelog').addEventListener('click', async () => {
-            const tArea = document.getElementById('clTesto');
-            const tVal = tArea.value.trim();
-            if(!tVal) return;
-            
-            const myName = localStorage.getItem('antimo_user_name') || "Sconosciuto";
-            const now = new Date();
-            const formatZ = num => num.toString().padStart(2, '0');
-            const dataOra = formatZ(now.getDate()) + "/" + formatZ(now.getMonth()+1) + "/" + now.getFullYear() + " " + formatZ(now.getHours()) + ":" + formatZ(now.getMinutes());
-            
-            try {
-                const clBtn = document.getElementById('btnSaveChangelog');
-                const oldHtml = clBtn.innerHTML;
-                clBtn.innerHTML = "⏳ Salvataggio...";
-                clBtn.disabled = true;
-                
-                await addDoc(collection(db, "changelog"), {
-                    testo: tVal,
-                    timestamp: Date.now(),
-                    dataOra: dataOra,
-                    autore: myName,
-                    lettiDa: [myName] // L'autore l'ha già letto
-                });
-                
-                tArea.value = "";
-                clBtn.innerHTML = oldHtml;
-                clBtn.disabled = false;
-            } catch(e) {
-                console.error("Errore invio changelog", e);
-                alert("Errore durante l'invio.");
-                document.getElementById('btnSaveChangelog').disabled = false;
-                document.getElementById('btnSaveChangelog').innerHTML = `<span class="btn-icon">✅</span> Pubblica`;
-            }
-        });
-        
-    } catch(e) {
-        console.error("Errore initChangelog:", e);
-    }
-}
-
-function renderChangelogList() {
-    const container = document.getElementById('changelogList');
-    if (!container) return;
-    
-    container.innerHTML = '';
-    if (changelogData.length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">Nessuna modifica registrata.</div>';
-        return;
-    }
-    
-    const myName = localStorage.getItem('antimo_user_name') || "Sconosciuto";
-    
-    changelogData.forEach(item => {
-        const isNew = !item.lettiDa || !item.lettiDa.includes(myName);
-        const div = document.createElement('div');
-        div.style.cssText = `
-            background: ${isNew ? '#fff7ed' : '#ffffff'};
-            border: 1px solid ${isNew ? '#fdba74' : '#e2e8f0'};
-            border-left: 4px solid ${isNew ? '#ea580c' : '#cbd5e1'};
-            padding: 12px;
-            border-radius: 8px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            position: relative;
-        `;
-        
-        let header = `
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div style="font-size:0.75rem; color:#64748b; font-weight:600;">👤 ${item.autore || 'Admin'}</div>
-                <div style="font-size:0.75rem; color:#64748b;">🕒 ${item.dataOra || ''}</div>
-            </div>
-        `;
-        
-        // Aggiungiamo il parsing dei link se abbiamo window.linkify (dalla bacheca)
-        let safeText = item.testo || '';
-        if (typeof window.linkify === 'function') safeText = window.linkify(safeText);
-        
-        let bodyText = `<div style="font-size:0.95rem; color:#334155; line-height:1.4; white-space:pre-wrap;">${safeText}</div>`;
-        
-        if (isNew) {
-            bodyText += `<div style="position:absolute; top:-8px; right:-8px; background:#ef4444; color:white; font-size:0.6rem; font-weight:bold; padding:2px 6px; border-radius:10px; box-shadow:0 1px 2px rgba(0,0,0,0.2);">NUOVO</div>`;
-        }
-        
-        div.innerHTML = header + bodyText;
-        container.appendChild(div);
-    });
-}
-
-// ==========================================
-// INCARICHI MULTI-SELECT MODULE EVENTS
-// ==========================================
-document.addEventListener('DOMContentLoaded', () => {
-    const btnIncarichiFilter = document.getElementById('btnIncarichiFilter');
-    const incarichiModal = document.getElementById('incarichiModal');
-    const btnCloseIncarichi = document.getElementById('btnCloseIncarichi');
-    const btnApplyIncarichi = document.getElementById('btnApplyIncarichi');
-    const cbxIncarichiTutti = document.getElementById('cbxIncarichiTutti');
-    
-    if(btnIncarichiFilter && incarichiModal) {
-        btnIncarichiFilter.addEventListener('click', () => {
-            incarichiModal.classList.remove('hidden');
-        });
-    }
-    if(btnCloseIncarichi && incarichiModal) {
-        btnCloseIncarichi.addEventListener('click', () => {
-            incarichiModal.classList.add('hidden');
-        });
-    }
-    
-    // Toggle Tutti behavior
-    if (cbxIncarichiTutti) {
-        cbxIncarichiTutti.addEventListener('change', (e) => {
-            const isTutti = e.target.checked;
-            const checkboxes = document.querySelectorAll('.cbx-incarico');
-            checkboxes.forEach(cbx => cbx.checked = isTutti);
-        });
-    }
-    
-    // Handle individual box changes
-    document.addEventListener('change', (e) => {
-        if(e.target && e.target.classList.contains('cbx-incarico')) {
-            if(!e.target.checked && cbxIncarichiTutti) {
-                cbxIncarichiTutti.checked = false;
-            }
-            const allCbx = document.querySelectorAll('.cbx-incarico');
-            let allChecked = true;
-            allCbx.forEach(c => { if(!c.checked) allChecked = false; });
-            if(allChecked && cbxIncarichiTutti) cbxIncarichiTutti.checked = true;
-        }
-    });
-
-    if(btnApplyIncarichi) {
-        btnApplyIncarichi.addEventListener('click', () => {
-            const checkboxes = document.querySelectorAll('.cbx-incarico');
-            let selected = [];
-            checkboxes.forEach(cbx => {
-                if(cbx.checked) selected.push(cbx.value);
-            });
-            
-            if(cbxIncarichiTutti && cbxIncarichiTutti.checked) {
-                selected = ["TUTTI"];
-            } else if (selected.length === 0) {
-                selected = [localStorage.getItem('antimo_user_name') || "TUTTI"];
-            } else if (selected.length === checkboxes.length) {
-                selected = ["TUTTI"];
-            }
-            
-            window.selectedIncarichi = selected;
-            localStorage.setItem('antimo_incarichi_filter', JSON.stringify(selected));
-            
-            if(incarichiModal) incarichiModal.classList.add('hidden');
-            
-            // Rilancia Pipeline
-            if(typeof updateInterventiCount === 'function') updateInterventiCount();
-            if(typeof updateUI === 'function') updateUI();
-            
-            const alContainer = document.getElementById('activitiesListContainer');
-            if(typeof renderActivitiesList === 'function' && alContainer && !alContainer.classList.contains('hidden')) {
-                renderActivitiesList();
-            }
-        });
-    }
-});
-
-// ==========================================
-/* =========================================
-   LOGICA GESTIONE PREPARAZIONE MAGAZZINO E PDF
-   ========================================= */
-const btnMostraMagazzino = document.getElementById('btnMostraMagazzino');
-const magFilterModal = document.getElementById('magFilterModal');
-const btnCloseMagFilter = document.getElementById('btnCloseMagFilter');
-const btnMagProssimi = document.getElementById('btnMagProssimi');
-const btnMagCercaDate = document.getElementById('btnMagCercaDate');
-const magFilterDataDa = document.getElementById('magFilterDataDa');
-const magFilterDataA = document.getElementById('magFilterDataA');
-
-const magListModal = document.getElementById('magListModal');
-const btnCloseMagList = document.getElementById('btnCloseMagList');
-const magListTableBody = document.getElementById('magListTableBody');
-const btnMagStampaRiepilogo = document.getElementById('btnMagStampaRiepilogo');
-
-if (btnMostraMagazzino) {
-    btnMostraMagazzino.addEventListener('click', () => {
-        if(magFilterModal) magFilterModal.classList.remove('hidden');
-    });
-}
-if (btnCloseMagFilter) {
-    btnCloseMagFilter.addEventListener('click', () => {
-        magFilterModal.classList.add('hidden');
-    });
-}
-if (btnCloseMagList) {
-    btnCloseMagList.addEventListener('click', () => {
-        magListModal.classList.add('hidden');
-    });
-}
-
-if (btnMagProssimi) {
-    btnMagProssimi.addEventListener('click', () => {
-        // Mostra programmati futuri e odierni con assegnatoMagazzino == true
-        const filtered = plannedInterventions.filter(p => p.assegnatoMagazzino === true && p.status !== 'completed' && p.status !== 'justified_not_executed');
-        renderMagazzinoList(filtered);
-        magFilterModal.classList.add('hidden');
-        magListModal.classList.remove('hidden');
-    });
-}
-
-if (btnMagCercaDate) {
-    btnMagCercaDate.addEventListener('click', () => {
-        const da = magFilterDataDa.value;
-        const a = magFilterDataA.value;
-        if (!da || !a) return alert("Seleziona entrambe le date (Da e A).");
-
-        const dateDa = new Date(da);
-        dateDa.setHours(0,0,0,0);
-        const dateA = new Date(a);
-        dateA.setHours(23,59,59,999);
-        
-        const filtered = plannedInterventions.filter(p => {
-            if (p.assegnatoMagazzino !== true || p.status === 'completed' || p.status === 'justified_not_executed') return false;
-            if (!p.dataPrevista) return false;
-            const pDate = new Date(p.dataPrevista);
-            return pDate >= dateDa && pDate <= dateA;
-        });
-
-        renderMagazzinoList(filtered);
-        magFilterModal.classList.add('hidden');
-        magListModal.classList.remove('hidden');
-    });
-}
-
-let currentMagList = []; // Array salvato per export
-
-window.renderMagazzinoList = function(dataArray) {
-    currentMagList = dataArray;
-    
-    // Sort per data
-    dataArray.sort((a,b) => {
-        const da = a.dataPrevista ? new Date(a.dataPrevista).getTime() : 9999999999999;
-        const db = b.dataPrevista ? new Date(b.dataPrevista).getTime() : 9999999999999;
-        return da - db;
-    });
-
-    if(!magListTableBody) return;
-    magListTableBody.innerHTML = '';
-    
-    if (dataArray.length === 0) {
-        magListTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px; color: #666;">Nessuna attività programmata in magazzino per i filtri selezionati.</td></tr>';
-        return;
-    }
-
-    dataArray.forEach(p => {
-        // Cerchiamo l'indice reale nell'array globale per Modifica/Elimina
-        const index = plannedInterventions.findIndex(orig => orig.id === p.id);
-        
-        let dateStr = p.dataPrevista ? p.dataPrevista.split('-').reverse().join('/') : 'NP';
-        
-        const tr = document.createElement('tr');
-        tr.style.borderBottom = "1px solid #e2e8f0";
-        tr.innerHTML = `
-            <td style="padding: 15px; font-weight: bold; color: var(--blue-dark);">${dateStr}</td>
-            <td style="padding: 15px;">
-                <div style="font-weight: bold; font-size: 1.05rem;">${p.paziente || 'Sconosciuto'}</div>
-                <div style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">
-                    Prog. da: <strong>${p.programmatoDa || 'N/D'}</strong><br>
-                    Tecnico: <strong>${p.tecnicoAssegnato || 'Da Assegnare'}</strong>
-                </div>
-            </td>
-            <td style="padding: 15px;">${p.localita || ''}</td>
-            <td style="padding: 15px;">
-                <div>${p.indirizzo || ''}</div>
-                <div style="font-size: 0.85rem; color: #64748b;">${p.telefono || ''}</div>
-            </td>
-            <td style="padding: 15px;">
-                <span style="background: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; border: 1px solid #cbd5e1;">${window.decodeCodeToLabel ? window.decodeCodeToLabel(p.tipo, 'interventi') : p.tipo || 'N/D'}</span>
-            </td>
-            <td style="padding: 15px; font-size: 0.9rem;">
-                <strong>Disp:</strong> ${window.decodeCodeToLabel ? window.decodeCodeToLabel(p.dispositivi, 'dispositivi') : p.dispositivi || 'Nessuno'}<br>
-                <strong>Matricola:</strong> ${p.matricola || 'N/D'}<br>
-                <strong>Accessori:</strong> ${p.accessoriStr || 'Nessuno'}<br>
-                <strong>Note:</strong> ${p.note || 'Nessuna nota'}
-            </td>
-            <td style="padding: 15px; text-align: center;">
-                <div style="display: flex; flex-direction: column; gap: 5px; align-items: center;">
-                    <button class="btn btn-sm" style="margin: 0; background: #f1f5f9; color: #333; font-weight: 600; width: 100%; border: 1px solid #ccc; padding: 6px;" onclick="window.editProgrammatoAppJs(${index})">Modifica</button>
-                    <button class="btn btn-danger btn-sm" style="margin: 0; background: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; font-weight: 600; width: 100%; padding: 6px;" onclick="window.deleteProgrammatoAppJs(${index})">Elimina</button>
-                    <button class="btn btn-primary btn-sm" style="margin: 0; background: #6366f1; border: none; color: white; font-weight: bold; width: 100%; padding: 6px; box-shadow: 0 2px 4px rgba(99,102,241,0.2);" onclick="window.stampaBollaMagazzinoSingola('${p.idFb || p.id}')">
-                        🖨️ Bolla Mag.
-                    </button>
-                    ${p.materialePronto 
-                        ? `<button class="btn btn-sm" style="margin: 0; margin-top: 5px; background: #dcfce7; color: #16a34a; border: 1px solid #86efac; font-weight: bold; width: 100%; padding: 6px; cursor: default;">✅ Materiale Preparato</button>
-                           <div style="text-align:center; margin-top:2px;"><a href="#" onclick="window.toggleMaterialePronto('${p.idFb || p.id}', false); return false" style="font-size:0.7rem; color:#94a3b8; text-decoration:underline;">Annulla</a></div>`
-                        : `<button class="btn btn-sm" style="margin: 0; margin-top: 5px; background: #22c55e; color: white; border: none; font-weight: bold; width: 100%; padding: 6px; box-shadow: 0 2px 4px rgba(34,197,94,0.3);" onclick="window.toggleMaterialePronto('${p.idFb || p.id}', true)">📦 Certifica Preparato</button>`
-                    }
-                </div>
-            </td>
-        `;
-        magListTableBody.appendChild(tr);
-    });
-};
-
-window.toggleMaterialePronto = async function(idFb, state) {
-    if(!idFb) return alert("Errore ID mancante per questo record.");
-    try {
-        // dynamic import just to be 100% sure we have access despite scoping
-        const { updateDoc, doc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        const dRef = doc(db, "programmati", idFb);
-        await updateDoc(dRef, { materialePronto: state });
-        
-        // Non occorre ricaricare: Firestore onSnapshot triggererà update counters e re-render
-        if (state) {
-            // Optional mini popup feedback
-        }
-    } catch(err) {
-        alert("Errore aggiornamento magazzino: " + err.message);
-    }
-};
-
-window.stampaBollaMagazzinoSingola = function(idFb) {
-    const item = currentMagList.find(p => p.idFb === idFb || p.id === idFb);
-    if(!item) return alert("Errore: Elemento non trovato in memoria.");
-    
-    const htmlContent = `
-        <html><head><title>Bolla Magazzino - ${item.paziente}</title>
-        <style>
-            body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 40px; color: #333; line-height: 1.5; }
-            h1 { color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; font-size: 24px; }
-            .box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 20px; margin-bottom: 20px; background: #f8fafc; }
-            .box h3 { margin-top: 0; color: #0f172a; font-size: 18px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 8px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-            th, td { text-align: left; padding: 12px; border-bottom: 1px solid #e2e8f0; }
-            th { font-weight: bold; color: #475569; width: 30%; }
-            .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #94a3b8; }
-        </style>
-        </head><body>
-            <h1>📦 BOLLA DI PREPARAZIONE MAGAZZINO</h1>
-            <div class="box">
-                <h3>Dati Destinazione (Paziente)</h3>
-                <table>
-                    <tr><th>Paziente / Ente</th><td><strong>${item.paziente || ''}</strong></td></tr>
-                    <tr><th>Data Prevista</th><td>${item.dataPrevista ? item.dataPrevista.split('-').reverse().join('/') : 'N/D'}</td></tr>
-                    <tr><th>Località</th><td>${item.localita || ''}</td></tr>
-                    <tr><th>Indirizzo</th><td>${item.indirizzo || ''}</td></tr>
-                    <tr><th>Telefono</th><td>${item.telefono || 'N/D'}</td></tr>
-                    <tr><th>Tecnico Assegnato</th><td>${item.tecnicoAssegnato || 'Da Assegnare'}</td></tr>
-                </table>
-            </div>
-            <div class="box">
-                <h3>Dettagli Materiale e Dispositivi</h3>
-                <table>
-                    <tr><th>Tipo Intervento</th><td>${window.decodeCodeToLabel ? window.decodeCodeToLabel(item.tipo, 'interventi') : item.tipo || 'N/D'}</td></tr>
-                    <tr><th>Dispositivo Base</th><td><strong>${window.decodeCodeToLabel ? window.decodeCodeToLabel(item.dispositivi, 'dispositivi') : item.dispositivi || 'Nessuno'}</strong></td></tr>
-                    <tr><th>Matricola Richiesta</th><td>${item.matricola || 'N/D'}</td></tr>
-                    <tr><th>Accessori Previsti</th><td><strong>${item.accessoriStr || 'Nessuno'}</strong></td></tr>
-                    <tr><th>Note Logistiche / Varie</th><td>${item.note || 'Nessuna'}</td></tr>
-                </table>
-            </div>
-            <div style="margin-top: 40px; display: flex; justify-content: space-between;">
-                <div style="width: 45%; border-top: 1px solid #333; padding-top: 10px; text-align: center;">Firma Preparatore Magazzino</div>
-                <div style="width: 45%; border-top: 1px solid #333; padding-top: 10px; text-align: center;">Firma Tecnico Ritirante</div>
-            </div>
-            <div class="footer">Generato automaticamente da Antimo Gestione Attività - ${new Date().toLocaleString()}</div>
-        </body></html>
+        </div>
+        <div style="flex:1;"></div>
+        <div style="display:flex; gap:10px; font-size:0.85rem;" id="pivotColumnsToggle">
+            <label><input type="checkbox" checked onchange="window.pivotToggleCol('col-start')"> Inizio</label>
+            <label><input type="checkbox" checked onchange="window.pivotToggleCol('col-end')"> Fine</label>
+            <label><input type="checkbox" checked onchange="window.pivotToggleCol('col-luogo')"> Destinatario</label>
+            <label><input type="checkbox" checked onchange="window.pivotToggleCol('col-costo')"> Costo Lavoro</label>
+            <label><input type="checkbox" checked onchange="window.pivotToggleCol('col-tech')"> Tecnico</label>
+        </div>
     `;
-    const printWindow = window.open('', '_blank');
-    if(printWindow) {
-        printWindow.document.write(htmlContent);
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => printWindow.print(), 500);
-    } else {
-        alert("Per favore abilita i pop-up per poter stampare il documento.");
-    }
-};
 
-if(btnMagStampaRiepilogo) {
-    btnMagStampaRiepilogo.addEventListener('click', () => {
-        if (currentMagList.length === 0) return alert("Nessun dato da stampare.");
+    let groups = {};
+    if (groupBy === 'none') {
+        groups['Tutti i Task'] = tasks;
+    } else if (groupBy === 'day') {
+        tasks.forEach(t => {
+            const date = t.actualEnd ? t.actualEnd.split('T')[0] : (t.scheduledStart ? t.scheduledStart.split('T')[0] : 'Senza Data');
+            if(!groups[date]) groups[date] = [];
+            groups[date].push(t);
+        });
+    } else if (groupBy === 'location') {
+        tasks.forEach(t => {
+            const names = [ ...(t.familyIds||[]).map(x=>appCache.families[x]?.name), ...(t.organizationIds||[]).map(x=>appCache.organizations[x]?.name) ].filter(x=>x);
+            const loc = names.length > 0 ? names.join(', ') : 'Nessun Proprietario';
+            if(!groups[loc]) groups[loc] = [];
+            groups[loc].push(t);
+        });
+    }
+
+    let html = `<table style="width:100%; border-collapse:collapse; min-width:800px;">
+        <thead>
+            <tr style="background:var(--surface); border-bottom:2px solid var(--border); text-align:left;">
+                <th style="padding:10px;">Titolo</th>
+                <th style="padding:10px;" class="pivot-col col-start">Inizio</th>
+                <th style="padding:10px;" class="pivot-col col-end">Fine</th>
+                <th style="padding:10px;" class="pivot-col col-luogo">Luogo</th>
+                <th style="padding:10px;" class="pivot-col col-tech">Incaricato</th>
+                <th style="padding:10px; text-align:right;" class="pivot-col col-costo">Costo Lavoro</th>
+                <th style="padding:10px; text-align:center;">Azioni</th>
+            </tr>
+        </thead>
+        <tbody>
+    `;
+
+    let totalGlobalCost = 0;
+
+    Object.keys(groups).sort((a,b)=>b.localeCompare(a)).forEach(gName => {
+        const gTasks = groups[gName];
+        let groupCost = 0;
         
-        let trs = '';
-        currentMagList.forEach(item => {
-            const dateStr = item.dataPrevista ? item.dataPrevista.split('-').reverse().join('/') : 'N/D';
-            trs += `
-                <tr>
-                    <td><strong>${dateStr}</strong><br><span style="font-size:12px; color:#666;">${item.tecnicoAssegnato||'Da Assegnare'}</span></td>
-                    <td><strong>${item.paziente||''}</strong><br><span style="font-size:12px;">${item.localita||''} - ${item.indirizzo||''}</span></td>
-                    <td>${window.decodeCodeToLabel ? window.decodeCodeToLabel(item.tipo, 'interventi') : item.tipo || 'N/D'}</td>
-                    <td><strong>${window.decodeCodeToLabel ? window.decodeCodeToLabel(item.dispositivi, 'dispositivi') : item.dispositivi || 'Nessuno'}</strong><br><em style="font-size:12px;">Mat: ${item.matricola||'N/D'}</em></td>
-                    <td>${item.accessoriStr || 'Nessuno'}<br><span style="font-size:12px; color:#555;">Note: ${item.note||'-'}</span></td>
-                </tr>
-            `;
+        let rowHtml = '';
+        gTasks.forEach(t => {
+            const cost = t.laborCost || 0;
+            groupCost += cost;
+            totalGlobalCost += cost;
+            
+            const startStr = t.actualStart ? new Date(t.actualStart).toLocaleString() : (t.scheduledStart ? new Date(t.scheduledStart).toLocaleDateString() : '-');
+            const endStr = t.actualEnd ? new Date(t.actualEnd).toLocaleString() : '-';
+            const names = [ ...(t.familyIds||[]).map(x=>appCache.families[x]?.name), ...(t.organizationIds||[]).map(x=>appCache.organizations[x]?.name) ].filter(x=>x);
+            const locName = names.length > 0 ? names.join(', ') : '-';
+            const workerName = appCache.people[t.assignedTo]?.name || appCache.people[t.assignedTo]?.fullName || '-';
+
+            rowHtml += `<tr style="border-bottom:1px solid #eee;">
+                <td style="padding:8px; font-weight:bold;">${t.title} <span class="status-badge status-${t.status}" style="font-size:0.7rem; padding:2px 4px;">${window.getStatusText(t.status)}</span></td>
+                <td style="padding:8px; font-size:0.85rem;" class="pivot-col col-start">${startStr}</td>
+                <td style="padding:8px; font-size:0.85rem;" class="pivot-col col-end">${endStr}</td>
+                <td style="padding:8px; font-size:0.85rem;" class="pivot-col col-luogo">${locName}</td>
+                <td style="padding:8px; font-size:0.85rem;" class="pivot-col col-tech">${workerName}</td>
+                <td style="padding:8px; text-align:right; color:var(--danger); font-weight:bold;" class="pivot-col col-costo">€${cost.toFixed(2)}</td>
+                <td style="padding:8px; text-align:center;">
+                    ${(() => {
+                        let actsHtml = `<button class="btn btn-outline" style="padding:4px 8px; font-size:0.8rem; margin:2px;" onclick="window.openTaskDetail('${t.id}')">Apri</button>`;
+                        const isTechAssigned = currentUser.roles.includes('technician') && t.assignedTo===currentUser.id;
+                        const isSuper = currentUser.roles.includes('admin') || currentUser.roles.includes('owner') || currentUser.roles.includes('management_control');
+                        
+                        if(t.status === 'assigned' && (isTechAssigned || isSuper)) {
+                            actsHtml += `<button class="btn btn-primary" style="padding:4px 8px; font-size:0.8rem; margin:2px;" onclick="window.execAction('START_TASK','${t.id}')">▶️ Inizia</button>`;
+                        } else if(t.status === 'in_progress' && (isTechAssigned || isSuper)) {
+                            actsHtml += `<button class="btn btn-success" style="padding:4px 8px; font-size:0.8rem; margin:2px;" onclick="window.execAction('COMP_TASK','${t.id}')">✔️ Fine</button>`;
+                        }
+
+                        if(t.status === 'completed' || t.status === 'accounted') {
+                            actsHtml += `<button class="btn btn-primary" style="padding:4px 8px; font-size:0.8rem; margin:2px;" onclick="window.openCompleteTaskWizard('${t.id}')">€ Costi</button>`;
+                        } else {
+                            actsHtml += `<button class="btn btn-warning" style="padding:4px 8px; font-size:0.8rem; margin:2px; color:black;" onclick="window.openNewRequestWizard('${t.id}')">✏️ Mod</button>`;
+                        }
+                        
+                        if(t.status === 'completed' && isSuper) {
+                            actsHtml += `<button class="btn btn-success" style="padding:4px 8px; font-size:0.8rem; margin:2px;" onclick="window.execAction('ACCOUNT_TASK','${t.id}')">🆗 Contabilizza</button>`;
+                        }
+
+                        actsHtml += `<button class="btn btn-danger" style="padding:4px 8px; font-size:0.8rem; margin:2px;" onclick="window.execAction('DEL_TASK','${t.id}')">🗑️ Canc</button>`;
+                        return actsHtml;
+                    })()}
+                </td>
+            </tr>`;
         });
 
-        const htmlContent = `
-            <html><head><title>Riepilogo Magazzino</title>
-            <style>
-                body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 20px; color: #333; font-size: 14px; }
-                h1 { color: #d97706; border-bottom: 2px solid #d97706; padding-bottom: 10px; font-size: 24px; text-transform: uppercase; margin-bottom: 5px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { text-align: left; padding: 10px; border-bottom: 1px solid #cbd5e1; vertical-align: top; }
-                th { background: #f1f5f9; font-weight: bold; color: #334155; }
-                tr:nth-child(even) { background-color: #f8fafc; }
-                .footer { margin-top: 30px; text-align: center; font-size: 11px; color: #94a3b8; }
-            </style>
-            </head><body>
-                <h1>🖨️ RIEPILOGO PREPARAZIONE MAGAZZINO</h1>
-                <p style="margin:0; color:#475569;">Elenco delle attività programmate in attesa di preparazione magazzino. Totale elementi: <strong>${currentMagList.length}</strong>.</p>
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 12%;">Data / Tec</th>
-                            <th style="width: 25%;">Paziente / Luogo</th>
-                            <th style="width: 15%;">Tipo Int.</th>
-                            <th style="width: 20%;">Dispositivo</th>
-                            <th style="width: 28%;">Accessori & Note</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${trs}
-                    </tbody>
-                </table>
-                <div class="footer">Documento Riepilogativo Generato il ${new Date().toLocaleString()}</div>
-            </body></html>
-        `;
-        const printWindow = window.open('', '_blank');
-        if(printWindow) {
-            printWindow.document.write(htmlContent);
-            printWindow.document.close();
-            printWindow.focus();
-            setTimeout(() => printWindow.print(), 500);
-        } else {
-            alert("Per favore abilita i pop-up per poter stampare il documento.");
+        if(groupBy !== 'none') {
+            html += `<tr style="background:#f1f5f9; border-top:2px solid #cbd5e1; border-bottom:1px solid #cbd5e1;">
+                <td colspan="5" style="padding:10px; font-weight:bold; color:var(--primary);">📁 ${gName} (${gTasks.length} task)</td>
+                <td style="padding:10px; text-align:right; font-weight:bold; color:var(--danger);" class="pivot-col col-costo">€${groupCost.toFixed(2)}</td>
+                <td></td>
+            </tr>`;
         }
+        html += rowHtml;
     });
-}
+
+    html += `</tbody>
+        <tfoot style="background:var(--surface); border-top:2px solid var(--border);">
+            <tr>
+                <td colspan="5" style="padding:12px; font-weight:800; text-align:right;">TOTALE GENERALE:</td>
+                <td style="padding:12px; font-weight:800; text-align:right; color:var(--danger);" class="pivot-col col-costo">€${totalGlobalCost.toFixed(2)}</td>
+                <td></td>
+            </tr>
+        </tfoot>
+    </table>`;
+
+    container.innerHTML = html;
+    
+    document.querySelectorAll('#pivotColumnsToggle input').forEach(cb => {
+        const cls = cb.getAttribute('onchange').match(/'([^']+)'/)[1];
+        window.pivotToggleCol(cls, cb.checked);
+    });
+};
+
+window.pivotToggleCol = (colClass, forcedState) => {
+    const cb = document.querySelector(`input[onchange*="${colClass}"]`);
+    const isVisible = forcedState !== undefined ? forcedState : (cb ? cb.checked : true);
+    document.querySelectorAll('.' + colClass).forEach(el => {
+        el.style.display = isVisible ? '' : 'none';
+    });
+};
+
