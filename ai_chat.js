@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // ====== CONFIGURAZIONE FIREBASE ======
 const firebaseConfig = {
@@ -65,6 +65,7 @@ async function initAiAssistant() {
         console.error("AI Assistant Error:", err);
     }
 }
+initAiAssistant();
 
 // 2. Apri Modal e inizializza chat
 function openChatModal() {
@@ -177,7 +178,7 @@ async function callGemini(promptText, fileObj = null) {
         });
     }
 
-    // Prepare message structure matching Gemini v1beta
+    // Prepare message structure matching Gemini v61beta
     const promptObj = { role: "user", parts: userParts };
     let reqBodyContents = [];
 
@@ -202,7 +203,7 @@ async function callGemini(promptText, fileObj = null) {
             body: JSON.stringify(dataPayload)
         };
 
-        let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, fetchOptions);
+        let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`, fetchOptions);
         let data = await response.json();
 
         if (data.error && data.error.message && data.error.message.includes("is not found")) {
@@ -442,12 +443,408 @@ window.shareAiToBacheca = function(btn) {
     }
 };
 
-window.shareAiToWhatsapp = function(btn) {
-    const text = decodeURIComponent(btn.getAttribute('data-text'));
-    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
-};
-
 window.shareAiToEmail = function(btn) {
     const text = decodeURIComponent(btn.getAttribute('data-text'));
     window.open('mailto:?subject=Risultato%20Assistente%20In%20App&body=' + encodeURIComponent(text));
 };
+
+// ==========================================
+// ====== GENERATORE AI (AUDIO & DOCS) ======
+// ==========================================
+
+const btnOpenAiGenerator = document.getElementById('btnOpenAiGenerator');
+const aiGeneratorModal = document.getElementById('aiGeneratorModal');
+const btnCloseAiGenerator = document.getElementById('btnCloseAiGenerator');
+
+// Audio Elements
+const btnAiRecordAudio = document.getElementById('btnAiRecordAudio');
+const aiRecordingIndicator = document.getElementById('aiRecordingIndicator');
+const aiRecordingTime = document.getElementById('aiRecordingTime');
+const aiAudioStatusLabel = document.getElementById('aiAudioStatusLabel');
+const aiAudioPreviewContainer = document.getElementById('aiAudioPreviewContainer');
+const aiAudioPlayer = document.getElementById('aiAudioPlayer');
+const btnAiDeleteAudio = document.getElementById('btnAiDeleteAudio');
+
+// Files Elements
+const aiGeneratorFileInput = document.getElementById('aiGeneratorFileInput');
+const btnAiBrowseFiles = document.getElementById('btnAiBrowseFiles');
+const aiFilesPreviewGrid = document.getElementById('aiFilesPreviewGrid');
+
+// Action Elements
+const btnAiGenerateFinal = document.getElementById('btnAiGenerateFinal');
+const aiGeneratorLoaderOverlay = document.getElementById('aiGeneratorLoaderOverlay');
+
+// Archivio Elements
+const btnOpenAiDrafts = document.getElementById('btnOpenAiDrafts');
+const aiDraftsContainer = document.getElementById('aiDraftsContainer');
+const aiDraftsCount = document.getElementById('aiDraftsCount');
+const aiDraftsModal = document.getElementById('aiDraftsModal');
+const btnCloseAiDrafts = document.getElementById('btnCloseAiDrafts');
+const aiDraftsCardsContainer = document.getElementById('aiDraftsCardsContainer');
+
+// Generator State
+let mediaRecorder = null;
+let audioChunks = [];
+let audioBlob = null;
+let audioBase64 = null;
+let audioMimeType = null;
+let isRecording = false;
+let recordInterval = null;
+let recordSeconds = 0;
+let attachedFilesBase64 = [];
+
+// Audio Logic
+async function toggleRecording() {
+    if (!isRecording) {
+        try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error("I moderni browser bloccano l'accesso al Microfono se apri la pagina come file locale sul PC (ossia con indirizzo che inizia per file:///...). Per usare questa funzione, Antimo deve essere prima pubblicato online (su Netlify o Firebase) o aperto con un simulatore server locale.");
+            }
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+            
+            mediaRecorder.ondataavailable = e => {
+                if (e.data.size > 0) audioChunks.push(e.data);
+            };
+            
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                if (!audioBlob || audioBlob.size === 0) {
+                    audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/mp4' });
+                }
+                audioMimeType = audioBlob.type;
+                
+                const audioUrl = URL.createObjectURL(audioBlob);
+                if(aiAudioPlayer) aiAudioPlayer.src = audioUrl;
+                if(aiAudioPreviewContainer) aiAudioPreviewContainer.classList.remove('hidden');
+                if(btnAiRecordAudio) btnAiRecordAudio.style.display = 'none';
+                if(aiAudioStatusLabel) aiAudioStatusLabel.innerText = "Audio acquisito!";
+                
+                const reader = new FileReader();
+                reader.readAsDataURL(audioBlob);
+                reader.onloadend = () => {
+                    const fullBase64 = reader.result;
+                    audioBase64 = fullBase64.split(',')[1];
+                };
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            
+            if(btnAiRecordAudio) {
+                btnAiRecordAudio.innerHTML = '<span>⏹️</span> <span>FERMA REGISTRAZIONE</span>';
+                btnAiRecordAudio.style.transform = 'scale(1.05)';
+                btnAiRecordAudio.style.background = '#ef4444'; // Red recording
+                btnAiRecordAudio.style.boxShadow = '0 4px 15px rgba(239, 68, 68, 0.6)';
+            }
+            if(aiRecordingIndicator) aiRecordingIndicator.classList.remove('hidden');
+            if(aiAudioStatusLabel) aiAudioStatusLabel.innerText = "Parla ora...";
+            
+            recordSeconds = 0;
+            if(aiRecordingTime) aiRecordingTime.innerText = "00:00";
+            recordInterval = setInterval(() => {
+                recordSeconds++;
+                const m = String(Math.floor(recordSeconds / 60)).padStart(2, '0');
+                const s = String(recordSeconds % 60).padStart(2, '0');
+                if(aiRecordingTime) aiRecordingTime.innerText = `${m}:${s}`;
+            }, 1000);
+
+        } catch(err) {
+            alert("Errore accesso al microfono: " + err.message);
+        }
+    } else {
+        mediaRecorder.stop();
+        mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        isRecording = false;
+        clearInterval(recordInterval);
+        
+        if(btnAiRecordAudio) {
+            btnAiRecordAudio.innerHTML = '<span>🎤</span> <span>PREMI PER PARLARE</span>';
+            btnAiRecordAudio.style.transform = 'scale(1)';
+            btnAiRecordAudio.style.background = '#3b82f6'; // Blue idle
+            btnAiRecordAudio.style.boxShadow = '0 4px 10px rgba(59, 130, 246, 0.4)';
+        }
+        if(aiRecordingIndicator) aiRecordingIndicator.classList.add('hidden');
+    }
+}
+
+if(btnAiRecordAudio) {
+    btnAiRecordAudio.addEventListener('click', toggleRecording);
+}
+if(btnAiDeleteAudio) {
+    btnAiDeleteAudio.addEventListener('click', () => {
+        audioBlob = null;
+        audioBase64 = null;
+        if(aiAudioPlayer) aiAudioPlayer.src = "";
+        if(aiAudioPreviewContainer) aiAudioPreviewContainer.classList.add('hidden');
+        if(btnAiRecordAudio) btnAiRecordAudio.style.display = 'flex';
+        if(aiAudioStatusLabel) aiAudioStatusLabel.innerText = "Pronto per registrare";
+    });
+}
+
+// Files Logic
+function handleGeneratorFiles(files) {
+    for (let file of files) {
+        if (!file.type.startsWith('image/') && file.type !== 'application/pdf' && !file.type.startsWith('audio/')) {
+            alert("Formato non supportato: " + file.name + " (Solo Immagini, Audio o PDF)");
+            continue;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            attachedFilesBase64.push({
+                data: e.target.result.split(',')[1],
+                mimeType: file.type,
+                name: file.name
+            });
+            renderGeneratorFilesPreview();
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function renderGeneratorFilesPreview() {
+    if(!aiFilesPreviewGrid) return;
+    aiFilesPreviewGrid.innerHTML = '';
+    attachedFilesBase64.forEach((f, idx) => {
+        const div = document.createElement('div');
+        div.style.cssText = "position: relative; width: 60px; height: 60px; border-radius: 8px; border: 1px solid #ccc; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background: #f8fafc; display:flex; align-items:center; justify-content:center; font-size: 0.7rem; font-weight:bold; color: #475569;";
+        
+        if (f.mimeType.startsWith('image/')) {
+            div.innerHTML = `<img src="data:${f.mimeType};base64,${f.data}" style="width:100%; height:100%; object-fit:cover;">`;
+        } else if (f.mimeType === 'application/pdf') {
+            div.innerHTML = `PDF<br>Doc`;
+        } else if (f.mimeType.startsWith('audio/')) {
+            div.innerHTML = `🎵<br>Audio`;
+        }
+        
+        div.innerHTML += `<button onclick="window.removeAiGeneratorFile(${idx})" style="position:absolute; top: -5px; right: -5px; background: #ef4444; color: white; border: none; border-radius: 50%; font-size: 10px; width: 18px; height: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;">&times;</button>`;
+        aiFilesPreviewGrid.appendChild(div);
+    });
+}
+
+window.removeAiGeneratorFile = function(idx) {
+    attachedFilesBase64.splice(idx, 1);
+    renderGeneratorFilesPreview();
+};
+
+if(btnAiBrowseFiles) {
+    btnAiBrowseFiles.addEventListener('click', () => {
+        if(aiGeneratorFileInput) aiGeneratorFileInput.click();
+    });
+}
+if(aiGeneratorFileInput) {
+    aiGeneratorFileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) handleGeneratorFiles(e.target.files);
+        aiGeneratorFileInput.value = '';
+    });
+}
+window.addEventListener('paste', (e) => {
+    if (aiGeneratorModal && !aiGeneratorModal.classList.contains('hidden')) {
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        let files = [];
+        for (let item of items) {
+            if (item.type.indexOf("image") === 0 || item.type === "application/pdf") {
+                files.push(item.getAsFile());
+            }
+        }
+        if (files.length > 0) handleGeneratorFiles(files);
+    }
+});
+
+// Elaborazione AI
+if(btnAiGenerateFinal) {
+    btnAiGenerateFinal.addEventListener('click', async () => {
+        if (!audioBase64 && attachedFilesBase64.length === 0) {
+            return alert("Devi registrare un audio, o allegare un documento (PDF/Foto)!");
+        }
+        if (!geminiApiKey) {
+            return alert("Errore: Chiave Gemini non trovata (vedi Pannello Admin).");
+        }
+
+        if(aiGeneratorLoaderOverlay) aiGeneratorLoaderOverlay.classList.remove('hidden');
+
+        try {
+            const promptSpeciale = `SEI IL COORDINATORE LOGISTICO E MEDICO, ESPERTO NEL DECIFRARE AUDIO E PRESCRIZIONI. 
+Il tuo compito è analizzare la registrazione audio fornita e/o le immagini dei documenti (prescrizioni, impegnative cliniche, foto di macchinari). 
+MOLTO SPESSO L'AUDIO PUO' ESSERE STATO REGISTRATO DI FRETTA DA UN CELLULARE E QUINDI AVERE PAROLE TRONCATE O MAL PRONUNCIATE. DEVI USARE LA LOGICA E IL CONTESTO MEDICO/TECNICO (Home Care, Ossigenoterapia, Ventilatori, Ecografi, Letti Ortopedici) PER CORREGGERE EVENTUALI ERRORI DI RICONOSCIMENTO VOCALE.
+Estrai i dati esatti necessari per creare una scheda di intervento tecnico o sanitario.
+
+I campi JSON richiesti sono:
+- "paziente": nome/cognome. Se è sgrammaticato sistemane il senso se palese.
+- "indirizzo": via e numero.
+- "localita": città o provincia.
+- "telefono": recapito telefonico pulito da spazi.
+- "tipo": capisci l'intento logico (es. "Consegna", "Ritiro", "Manutenzione", "Guasto", "Urgenza") e scrivi qui la tipologia di intervento.
+- "dispositivi": l'apparecchio principale di cui si parla (es. Concentratore, Ventilatore, Ecografo, CPAP...).
+- "accessoriStr": accessori o maschere aggiuntive menzionate.
+- "matricola": eventuali numeri di serie o codici alfanumerici.
+- "note": compila qui tutte le istruzioni cliniche extra, direttive aggiuntive o urgenze.
+- "dataPrevista": se citata una data (anche approssimativa come "per domani"), elaborala e trasformala in stringa es. YYYY-MM-DD. Metti "" se omessa.
+
+!!! ATTENZIONE: DEVI RISPONDERE SOLO ED ESCLUSIVAMENTE CON UN FILE JSON PURO !!! Nessun markdown (no \`\`\`json), solo parentesi graffe iniziali e finali. Se un campo non è rilevato, usa stringa vuota "".`;
+
+            let contentsList = [{ text: promptSpeciale }];
+            
+            if (audioBase64) {
+                contentsList.push({
+                    inlineData: { mimeType: audioMimeType || "audio/webm", data: audioBase64 }
+                });
+            }
+            
+            attachedFilesBase64.forEach(f => {
+                contentsList.push({
+                    inlineData: { mimeType: f.mimeType, data: f.data }
+                });
+            });
+
+            const dataPayload = { contents: [{ role: "user", parts: contentsList }] };
+
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dataPayload)
+            });
+
+            const data = await response.json();
+            if (data.error) throw new Error(data.error.message);
+
+            let rawResponse = data.candidates[0].content.parts[0].text;
+            rawResponse = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+            
+            let parsedObj = {};
+            try {
+                parsedObj = JSON.parse(rawResponse);
+            } catch(e) {
+                throw new Error("Gemini ha prodotto un JSON invalido. Riprova.");
+            }
+
+            parsedObj.inviatoDa = localStorage.getItem('antimo_user_name') || "Utente";
+            parsedObj.registrazioneBase64 = !!audioBase64;
+            parsedObj.hasAllegati = attachedFilesBase64.length > 0;
+            parsedObj.creatoIl = serverTimestamp();
+            parsedObj.status = "da_valutare";
+
+            await addDoc(collection(db, "proposte_ai"), parsedObj);
+
+            // Cleanup success
+            audioBlob = null;
+            audioBase64 = null;
+            if(aiAudioPlayer) aiAudioPlayer.src = "";
+            if(aiAudioPreviewContainer) aiAudioPreviewContainer.classList.add('hidden');
+            if(btnAiRecordAudio) btnAiRecordAudio.style.display = 'flex';
+            if(aiAudioStatusLabel) aiAudioStatusLabel.innerText = "Pronto per registrare";
+            attachedFilesBase64 = [];
+            renderGeneratorFilesPreview();
+            
+            if(aiGeneratorModal) aiGeneratorModal.classList.add('hidden');
+            if(aiGeneratorLoaderOverlay) aiGeneratorLoaderOverlay.classList.add('hidden');
+            if(aiDraftsModal) aiDraftsModal.classList.remove('hidden');
+
+        } catch(err) {
+            console.error("Generazione Fallita", err);
+            alert("Errore AI: " + err.message);
+            if(aiGeneratorLoaderOverlay) aiGeneratorLoaderOverlay.classList.add('hidden');
+        }
+    });
+}
+
+// Archivio Drafts Logic
+let draftsDataList = [];
+const qDrafts = query(collection(db, "proposte_ai"), orderBy("creatoIl", "desc"));
+
+onSnapshot(qDrafts, (snapshot) => {
+    draftsDataList = [];
+    snapshot.forEach(docSnap => {
+        draftsDataList.push({ idFb: docSnap.id, ...docSnap.data() });
+    });
+    
+    if(aiDraftsCount) aiDraftsCount.innerText = draftsDataList.length;
+    if(aiDraftsContainer) {
+        aiDraftsContainer.style.display = draftsDataList.length > 0 ? 'block' : 'none';
+    }
+    renderDraftsList();
+});
+
+function renderDraftsList() {
+    if(!aiDraftsCardsContainer) return;
+    
+    if (draftsDataList.length === 0) {
+        aiDraftsCardsContainer.innerHTML = "<div style='text-align: center; color: #94a3b8; padding: 30px; font-weight:bold;'>Nessuna bozza da valutare. Le proposte dell'AI appariranno qui!</div>";
+        return;
+    }
+    
+    aiDraftsCardsContainer.innerHTML = '';
+    draftsDataList.forEach(draft => {
+        const div = document.createElement('div');
+        div.style.cssText = "background: white; border-radius: 12px; border: 1px solid #cbd5e1; box-shadow: 0 4px 6px rgba(0,0,0,0.05); padding: 20px; position: relative;";
+        
+        div.innerHTML = `
+            <div style="font-size: 0.7rem; color: #64748b; margin-bottom: 5px; text-transform:uppercase; font-weight:bold;">✨ Proposta Generata da: ${draft.inviatoDa}</div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div><label style="font-size:0.8rem; font-weight:bold;">Paziente/Ente</label><input type="text" id="draft_paz_${draft.idFb}" value="${draft.paziente || ''}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; font-weight:bold;"></div>
+                <div><label style="font-size:0.8rem; font-weight:bold;">Tipo Intervento</label><input type="text" id="draft_tipo_${draft.idFb}" value="${draft.tipo || ''}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;"></div>
+                <div><label style="font-size:0.8rem; font-weight:bold;">Località</label><input type="text" id="draft_loc_${draft.idFb}" value="${draft.localita || ''}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;"></div>
+                <div><label style="font-size:0.8rem; font-weight:bold;">Indirizzo</label><input type="text" id="draft_ind_${draft.idFb}" value="${draft.indirizzo || ''}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;"></div>
+                <div><label style="font-size:0.8rem; font-weight:bold;">Telefono</label><input type="text" id="draft_tel_${draft.idFb}" value="${draft.telefono || ''}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;"></div>
+                <div><label style="font-size:0.8rem; font-weight:bold;">Data (YYYY-MM-DD)</label><input type="text" id="draft_data_${draft.idFb}" value="${draft.dataPrevista || ''}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; background:#fef08a;"></div>
+                <div style="grid-column: span 2;"><label style="font-size:0.8rem; font-weight:bold;">Dispositivi</label><input type="text" id="draft_disp_${draft.idFb}" value="${draft.dispositivi || ''}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;"></div>
+                <div style="grid-column: span 2;"><label style="font-size:0.8rem; font-weight:bold;">Accessori/Matricola</label><input type="text" id="draft_acc_${draft.idFb}" value="${draft.accessoriStr || ''} MATRICOLA: ${draft.matricola || 'N/D'}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;"></div>
+                <div style="grid-column: span 2;"><label style="font-size:0.8rem; font-weight:bold;">Note</label><textarea id="draft_note_${draft.idFb}" rows="3" oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; resize:vertical; overflow:hidden;">${draft.note || ''}</textarea></div>
+            </div>
+
+            <div style="display: flex; gap: 10px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+                <button onclick="window.approvaDraftAi('${draft.idFb}')" style="flex:1; background: #22c55e; color: white; padding: 12px; border:none; border-radius: 8px; margin:0; font-weight:bold; cursor: pointer;">✔️ APPROVA IN PROGRAMMATI</button>
+                <button onclick="window.eliminaDraftAi('${draft.idFb}')" style="flex:1; background: #ef4444; color: white; padding: 12px; border:none; border-radius: 8px; margin:0; font-weight:bold; cursor: pointer;">🗑 ELIMINA BOZZA</button>
+            </div>
+        `;
+        aiDraftsCardsContainer.appendChild(div);
+    });
+    
+    // Auto-ridimensiona tutte le textareas appena renderizzate
+    setTimeout(() => {
+        const textareas = aiDraftsCardsContainer.querySelectorAll('textarea');
+        textareas.forEach(ta => {
+            ta.style.height = 'auto';
+            ta.style.height = ta.scrollHeight + 'px';
+        });
+    }, 10);
+}
+
+window.approvaDraftAi = async function(idFb) {
+    if(!confirm("Salvare in Programmati DEFINITIVI?")) return;
+    
+    const updatedData = {
+        paziente: document.getElementById(`draft_paz_${idFb}`).value,
+        tipo: document.getElementById(`draft_tipo_${idFb}`).value,
+        localita: document.getElementById(`draft_loc_${idFb}`).value,
+        indirizzo: document.getElementById(`draft_ind_${idFb}`).value,
+        telefono: document.getElementById(`draft_tel_${idFb}`).value,
+        dataPrevista: document.getElementById(`draft_data_${idFb}`).value,
+        dispositivi: document.getElementById(`draft_disp_${idFb}`).value,
+        accessoriStr: document.getElementById(`draft_acc_${idFb}`).value,
+        note: document.getElementById(`draft_note_${idFb}`).value,
+        status: "in_attesa",
+        programmatoDa: localStorage.getItem('antimo_user_name') || "Utente (via AI)",
+        tecnicoAssegnato: "Da Assegnare"
+    };
+    
+    try {
+        await addDoc(collection(db, "programmati"), updatedData);
+        await deleteDoc(doc(db, "proposte_ai", idFb));
+        alert("Perfetto! L'attività è in Programmati!");
+    } catch(err) {
+        alert("Errore salva bozza: " + err.message);
+    }
+};
+
+window.eliminaDraftAi = async function(idFb) {
+    if(!confirm("Eliminare definitivamente la bozza?")) return;
+    try {
+        await deleteDoc(doc(db, "proposte_ai", idFb));
+    } catch(err) {
+        alert("Errore: " + err.message);
+    }
+};
+

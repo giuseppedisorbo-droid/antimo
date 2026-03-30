@@ -1,0 +1,482 @@
+[
+  {
+    "line": 324,
+    "code": "    btnToggleAllCollapse.addEventListener('click', () => {"
+  },
+  {
+    "line": 351,
+    "code": "        compactView.addEventListener('click', (e) => {"
+  },
+  {
+    "line": 451,
+    "code": "if(btnMostraOggi) btnMostraOggi.addEventListener('click', () => toggleTarget('oggi'));"
+  },
+  {
+    "line": 452,
+    "code": "if(btnMostraDomani) btnMostraDomani.addEventListener('click', () => toggleTarget('domani'));"
+  },
+  {
+    "line": 453,
+    "code": "if(btnMostraP) btnMostraP.addEventListener('click', () => toggleTarget('planned'));"
+  },
+  {
+    "line": 454,
+    "code": "if(btnMostraNP) btnMostraNP.addEventListener('click', () => toggleTarget('np'));"
+  },
+  {
+    "line": 455,
+    "code": "if(btnMostraEseguiti) btnMostraEseguiti.addEventListener('click', () => toggleTarget('eseguiti'));"
+  },
+  {
+    "line": 456,
+    "code": "if(btnMostraNeseguiti) btnMostraNeseguiti.addEventListener('click', () => toggleTarget('neseg'));"
+  },
+  {
+    "line": 459,
+    "code": "if(btnCloseActivitiesList) btnCloseActivitiesList.addEventListener('click', () => { if(typeof toggleTarget === 'function') toggleTarget('eseguiti'); });"
+  },
+  {
+    "line": 462,
+    "code": "    btnToggleMessages.addEventListener('click', () => {"
+  },
+  {
+    "line": 471,
+    "code": "    btnTopNotification.addEventListener('click', () => {"
+  },
+  {
+    "line": 481,
+    "code": "    btnToggleNuovoIntervento.addEventListener('click', () => {"
+  },
+  {
+    "line": 490,
+    "code": "    btnCloseInterventionSection.addEventListener('click', () => {"
+  },
+  {
+    "line": 593,
+    "code": "        block.querySelector('.btn-remove-block').addEventListener('click', () => {"
+  },
+  {
+    "line": 703,
+    "code": "        dispSelectNode.addEventListener('change', (e) => {"
+  },
+  {
+    "line": 717,
+    "code": "        scanBtn.addEventListener('click', () => {"
+  },
+  {
+    "line": 729,
+    "code": "    btnAdd.addEventListener('click', () => addBlock());"
+  },
+  {
+    "line": 844,
+    "code": "if(btnMsgTabAll) btnMsgTabAll.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'all'; updateMsgTabsUI(); renderMessagesUI(); });"
+  },
+  {
+    "line": 845,
+    "code": "if(btnMsgTabReceived) btnMsgTabReceived.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'received'; updateMsgTabsUI(); renderMessagesUI(); });"
+  },
+  {
+    "line": 846,
+    "code": "if(btnMsgTabSent) btnMsgTabSent.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'sent'; updateMsgTabsUI(); renderMessagesUI(); });"
+  },
+  {
+    "line": 847,
+    "code": "if(btnMsgTabUnread) btnMsgTabUnread.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'unread'; updateMsgTabsUI(); renderMessagesUI(); });"
+  },
+  {
+    "line": 848,
+    "code": "if(btnMsgTabRead) btnMsgTabRead.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'read'; updateMsgTabsUI(); renderMessagesUI(); });"
+  },
+  {
+    "line": 849,
+    "code": "if(btnMsgTabDeleted) btnMsgTabDeleted.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'deleted'; updateMsgTabsUI(); renderMessagesUI(); });"
+  },
+  {
+    "line": 850,
+    "code": "if(btnMsgTabResolved) btnMsgTabResolved.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'resolved'; updateMsgTabsUI(); renderMessagesUI(); });"
+  },
+  {
+    "line": 851,
+    "code": "if(btnMsgTabInCharge) btnMsgTabInCharge.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'in_charge'; updateMsgTabsUI(); renderMessagesUI(); });"
+  },
+  {
+    "line": 852,
+    "code": "if(btnMsgTabReplied) btnMsgTabReplied.addEventListener('click', (e) => { e.preventDefault(); currentMsgTab = 'replied'; updateMsgTabsUI(); renderMessagesUI(); });"
+  },
+  {
+    "line": 854,
+    "code": "if(btnEmptyTrash) btnEmptyTrash.addEventListener('click', async (e) => {"
+  },
+  {
+    "line": 866,
+    "code": "if(msgSearchText) msgSearchText.addEventListener('input', () => renderMessagesUI());"
+  },
+  {
+    "line": 867,
+    "code": "if(msgSearchUser) msgSearchUser.addEventListener('change', () => renderMessagesUI());"
+  },
+  {
+    "line": 868,
+    "code": "if(msgSearchDate) msgSearchDate.addEventListener('change', () => renderMessagesUI());"
+  },
+  {
+    "line": 1353,
+    "code": "    msgAttachmentsInput.addEventListener('change', (e) => {"
+  },
+  {
+    "line": 1386,
+    "code": "    btnWhatsappNuovoIntervento.addEventListener('click', () => {"
+  },
+  {
+    "line": 1403,
+    "code": "document.addEventListener('paste', (e) => {"
+  },
+  {
+    "line": 1464,
+    "code": "    btnCloseWaSelect.addEventListener('click', () => {"
+  },
+  {
+    "line": 1528,
+    "code": "    newMessageForm.addEventListener('submit', async (e) => {"
+  },
+  {
+    "line": 1573,
+    "code": "    waSelectAll.addEventListener('change', (e) => {"
+  },
+  {
+    "line": 1579,
+    "code": "    btnWaSkip.addEventListener('click', async () => {"
+  },
+  {
+    "line": 1603,
+    "code": "    btnWaSend.addEventListener('click', async () => {"
+  },
+  {
+    "line": 1661,
+    "code": "    btnCloseWaQueue.addEventListener('click', () => {"
+  },
+  {
+    "line": 1759,
+    "code": "if(btnCancelEdit) btnCancelEdit.addEventListener('click', () => {});"
+  },
+  {
+    "line": 1762,
+    "code": "    btnSaveEdit.addEventListener('click', async () => {});"
+  },
+  {
+    "line": 2232,
+    "code": "    filterTecnicoOggi.addEventListener('change', (e) => {"
+  },
+  {
+    "line": 2303,
+    "code": "            magCb1.addEventListener('change', async (e) => {"
+  },
+  {
+    "line": 2315,
+    "code": "        div.querySelector('button[data-action=\"edit\"]')?.addEventListener('click', (e) => editProgrammatoAppJs(e.target.getAttribute('data-index')));"
+  },
+  {
+    "line": 2316,
+    "code": "        div.querySelector('button[data-action=\"delete\"]')?.addEventListener('click', (e) => deleteProgrammatoAppJs(e.target.getAttribute('data-index')));"
+  },
+  {
+    "line": 2318,
+    "code": "        div.querySelector('button[data-action=\"avvia\"]').addEventListener('click', (e) => {"
+  },
+  {
+    "line": 2323,
+    "code": "        div.querySelector('button[data-action=\"justify\"]').addEventListener('click', (e) => {"
+  },
+  {
+    "line": 2404,
+    "code": "            magCb2.addEventListener('change', async (e) => {"
+  },
+  {
+    "line": 2416,
+    "code": "        div.querySelector('button[data-action=\"edit\"]')?.addEventListener('click', (e) => editProgrammatoAppJs(e.target.getAttribute('data-index')));"
+  },
+  {
+    "line": 2417,
+    "code": "        div.querySelector('button[data-action=\"delete\"]')?.addEventListener('click', (e) => deleteProgrammatoAppJs(e.target.getAttribute('data-index')));"
+  },
+  {
+    "line": 2419,
+    "code": "        div.querySelector('button[data-action=\"avvia\"]').addEventListener('click', (e) => {"
+  },
+  {
+    "line": 2429,
+    "code": "btnCancelJustify.addEventListener('click', () => {"
+  },
+  {
+    "line": 2434,
+    "code": "btnConfirmJustify.addEventListener('click', async () => {"
+  },
+  {
+    "line": 2485,
+    "code": "    btnSettings.addEventListener('click', () => {"
+  },
+  {
+    "line": 2491,
+    "code": "    btnCloseSettings.addEventListener('click', () => {"
+  },
+  {
+    "line": 2496,
+    "code": "    toggleRequireKm.addEventListener('change', (e) => {"
+  },
+  {
+    "line": 2505,
+    "code": "    btnOpenBackup.addEventListener('click', () => {"
+  },
+  {
+    "line": 2546,
+    "code": "    btnSaveManualBackup.addEventListener('click', () => {"
+  },
+  {
+    "line": 2556,
+    "code": "    btnCloseBackup.addEventListener('click', () => {"
+  },
+  {
+    "line": 2563,
+    "code": "    btn.addEventListener('click', (e) => {"
+  },
+  {
+    "line": 2624,
+    "code": "    btn.addEventListener('click', (e) => {"
+  },
+  {
+    "line": 2634,
+    "code": "    btnAllVersions.addEventListener('click', () => {"
+  },
+  {
+    "line": 2692,
+    "code": "    btnCloseVersionDesc.addEventListener('click', () => {"
+  },
+  {
+    "line": 2699,
+    "code": "    btnAiSearch.addEventListener('click', () => {"
+  },
+  {
+    "line": 2767,
+    "code": "inputAllegato.addEventListener('change', (e) => {"
+  },
+  {
+    "line": 2831,
+    "code": "inputAllegatoProgrammazione.addEventListener('change', (e) => {"
+  },
+  {
+    "line": 2858,
+    "code": "        btnAdd.addEventListener('click', () => {"
+  },
+  {
+    "line": 2868,
+    "code": "        input.addEventListener('keypress', (e) => {"
+  },
+  {
+    "line": 2881,
+    "code": "btnPlanIntervention.addEventListener('click', async () => {"
+  },
+  {
+    "line": 2996,
+    "code": "newInterventionForm.addEventListener('submit', async (e) => {"
+  },
+  {
+    "line": 3183,
+    "code": "    btnManualSyncMobile.addEventListener('click', async () => {"
+  },
+  {
+    "line": 3216,
+    "code": "document.addEventListener('DOMContentLoaded', () => {"
+  },
+  {
+    "line": 3218,
+    "code": "        btnShareCSV.addEventListener('click', async () => {"
+  },
+  {
+    "line": 3291,
+    "code": "    btnViewActivities.addEventListener('click', () => {"
+  },
+  {
+    "line": 3446,
+    "code": "                magCb3.addEventListener('change', async (e) => {"
+  },
+  {
+    "line": 3458,
+    "code": "            div.querySelector('button[data-action=\"avvia\"]').addEventListener('click', () => {"
+  },
+  {
+    "line": 3559,
+    "code": "        btn.addEventListener('click', (e) => {"
+  },
+  {
+    "line": 3570,
+    "code": "        btn.addEventListener('click', (e) => {"
+  },
+  {
+    "line": 3586,
+    "code": "    btnOpenRubrica.addEventListener('click', () => {"
+  },
+  {
+    "line": 3592,
+    "code": "    btnCloseRubrica.addEventListener('click', () => {"
+  },
+  {
+    "line": 3660,
+    "code": "    btnOpenUsersList.addEventListener('click', () => {"
+  },
+  {
+    "line": 3666,
+    "code": "    btnCloseUsersList.addEventListener('click', () => {"
+  },
+  {
+    "line": 3672,
+    "code": "    newRubricaForm.addEventListener('submit', (e) => {"
+  },
+  {
+    "line": 3719,
+    "code": "    loginForm.addEventListener('submit', async (e) => {"
+  },
+  {
+    "line": 3797,
+    "code": "    btnOpenDataBackup.addEventListener('click', () => {"
+  },
+  {
+    "line": 3804,
+    "code": "    btnCloseDataBackup.addEventListener('click', () => {"
+  },
+  {
+    "line": 3810,
+    "code": "    btnExportDataJson.addEventListener('click', async () => {"
+  },
+  {
+    "line": 3853,
+    "code": "    btnImportDataJson.addEventListener('click', async () => {"
+  },
+  {
+    "line": 3917,
+    "code": "document.addEventListener('DOMContentLoaded', () => {"
+  },
+  {
+    "line": 3922,
+    "code": "document.addEventListener('input', (e) => {"
+  },
+  {
+    "line": 3984,
+    "code": "    btnOpenListsSetup.addEventListener('click', () => {"
+  },
+  {
+    "line": 3991,
+    "code": "    btnCloseListsSetup.addEventListener('click', () => {"
+  },
+  {
+    "line": 3997,
+    "code": "    btnTabInterventi.addEventListener('click', () => {"
+  },
+  {
+    "line": 4004,
+    "code": "    btnTabDispositivi.addEventListener('click', () => {"
+  },
+  {
+    "line": 4012,
+    "code": "    btnTabRuoli.addEventListener('click', () => {"
+  },
+  {
+    "line": 4020,
+    "code": "    btnTabSeqex.addEventListener('click', () => {"
+  },
+  {
+    "line": 4185,
+    "code": "document.addEventListener('DOMContentLoaded', () => {"
+  },
+  {
+    "line": 4192,
+    "code": "        btnAddAccessorio.addEventListener('click', () => {"
+  },
+  {
+    "line": 4215,
+    "code": "        btnCloseManageAccessori.addEventListener('click', () => {"
+  },
+  {
+    "line": 4221,
+    "code": "        btnSaveAccessoriFirebase.addEventListener('click', () => {"
+  },
+  {
+    "line": 4230,
+    "code": "    btnAddListItem.addEventListener('click', () => {"
+  },
+  {
+    "line": 4255,
+    "code": "    btnSaveFirebaseLists.addEventListener('click', async () => {"
+  },
+  {
+    "line": 4304,
+    "code": "    btnCloseMagicSearch.addEventListener('click', () => {"
+  },
+  {
+    "line": 4311,
+    "code": "    magicSearchApp.addEventListener('input', (e) => {"
+  },
+  {
+    "line": 4467,
+    "code": "        btnOpenChangelog.addEventListener('click', async () => {"
+  },
+  {
+    "line": 4487,
+    "code": "            notif.addEventListener('click', () => {"
+  },
+  {
+    "line": 4493,
+    "code": "        document.getElementById('btnCloseChangelog').addEventListener('click', () => {"
+  },
+  {
+    "line": 4498,
+    "code": "        document.getElementById('btnSaveChangelog').addEventListener('click', async () => {"
+  },
+  {
+    "line": 4590,
+    "code": "document.addEventListener('DOMContentLoaded', () => {"
+  },
+  {
+    "line": 4598,
+    "code": "        btnIncarichiFilter.addEventListener('click', () => {"
+  },
+  {
+    "line": 4603,
+    "code": "        btnCloseIncarichi.addEventListener('click', () => {"
+  },
+  {
+    "line": 4610,
+    "code": "        cbxIncarichiTutti.addEventListener('change', (e) => {"
+  },
+  {
+    "line": 4618,
+    "code": "    document.addEventListener('change', (e) => {"
+  },
+  {
+    "line": 4631,
+    "code": "        btnApplyIncarichi.addEventListener('click', () => {"
+  },
+  {
+    "line": 4681,
+    "code": "    btnMostraMagazzino.addEventListener('click', () => {"
+  },
+  {
+    "line": 4686,
+    "code": "    btnCloseMagFilter.addEventListener('click', () => {"
+  },
+  {
+    "line": 4691,
+    "code": "    btnCloseMagList.addEventListener('click', () => {"
+  },
+  {
+    "line": 4697,
+    "code": "    btnMagProssimi.addEventListener('click', () => {"
+  },
+  {
+    "line": 4707,
+    "code": "    btnMagCercaDate.addEventListener('click', () => {"
+  },
+  {
+    "line": 4878,
+    "code": "    btnMagStampaRiepilogo.addEventListener('click', () => {"
+  }
+]

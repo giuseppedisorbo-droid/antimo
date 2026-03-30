@@ -218,7 +218,7 @@ async function loadAiLogs() {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${new Date(lg.timestamp).toLocaleString()}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold; color: var(--blue-dark);">${lg.user || "Sconosciuto"}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold; color: var(--blue-dark);">${lg.user || lg.inseritoDa || "Pietro Cammarota"}</td>
                 <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${(lg.prompt || '').replace(/"/g, '&quot;')}">${lg.prompt || '-'}</td>
                 <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${lg.tokens || '0'}</td>
                 <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${(lg.durationMs ? (lg.durationMs / 1000).toFixed(2) : '0')}</td>
@@ -249,6 +249,23 @@ const filterSearch = document.getElementById('filterSearch');
 const toggleStoricoHeader = document.getElementById('toggleStoricoHeader');
 const storicoWrapper = document.getElementById('storicoWrapper');
 const storicoToggleIcon = document.getElementById('storicoToggleIcon');
+
+const toggleNonEseguitiHeader = document.getElementById('toggleNonEseguitiHeader');
+const nonEseguitiWrapper = document.getElementById('nonEseguitiWrapper');
+const nonEseguitiToggleIcon = document.getElementById('nonEseguitiToggleIcon');
+const badgeNonEseguitiHeader = document.getElementById('badgeNonEseguitiHeader');
+
+if (toggleNonEseguitiHeader && nonEseguitiWrapper && nonEseguitiToggleIcon) {
+    toggleNonEseguitiHeader.addEventListener('click', () => {
+        if (nonEseguitiWrapper.classList.contains('hidden')) {
+            nonEseguitiWrapper.classList.remove('hidden');
+            nonEseguitiToggleIcon.innerHTML = 'Chiudi ⬆️';
+        } else {
+            nonEseguitiWrapper.classList.add('hidden');
+            nonEseguitiToggleIcon.innerHTML = 'Apri ⬇️';
+        }
+    });
+}
 const quickFilters = document.querySelectorAll('.filter-quick');
 const btnToggleFilters = document.getElementById('btnToggleFilters');
 const filtersWrapper = document.getElementById('filtersWrapper');
@@ -281,15 +298,18 @@ function formatTime(ms) {
 
 async function loadData() {
     try {
-        // Fetch Operatori Sanitari
+        // Fetch Operatori Sanitari e Intera Anagrafica (Necessaria per Valorizzazione)
+        window.anagrafiche = [];
         window.operatoriSanitari = [];
-        const qOps = query(collection(db, "anagrafiche"), where("qualifica", "==", "Operatore sanitario"));
-        const opsSnap = await getDocs(qOps);
-        opsSnap.forEach(d => {
+        const anagsSnap = await getDocs(collection(db, "anagrafiche"));
+        anagsSnap.forEach(d => {
             const data = d.data();
-            window.operatoriSanitari.push({id: d.id, nome: (data.nome + " " + (data.cognome||"")).trim()});
+            window.anagrafiche.push({ id: d.id, ...data });
+            if(data.qualifica === "Operatore sanitario") {
+                window.operatoriSanitari.push({ id: d.id, nome: (data.nome + " " + (data.cognome||"")).trim() });
+            }
         });
-    } catch(e) { console.error("Errore fetch operatori", e); }
+    } catch(e) { console.error("Errore fetch anagrafiche/operatori", e); }
 
     try {
         const querySnapshot = await getDocs(collection(db, "interventi"));
@@ -389,7 +409,13 @@ function renderTable(dataArray) {
             <td>${inv.localita || inv.destinazione || "N/D"}</td>
             <td>${inv.indirizzo || ""} <br><small style="color:gray;">${inv.telefono || ""}</small></td>
             <td><span class="badge badge-success">${window.decodeCodeToLabel(inv.tipo, 'interventi')}</span><br><small style="color:gray;">${inv.note || ''}</small></td>
-            <td>${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi')}<br><small style="color:gray;">${inv.matricola ? 'SN: ' + inv.matricola : ''}</small><br>${badgeVal}</td>
+            <td>
+                ${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi')}<br>
+                <small style="color:gray;">
+                    ${inv.accessoriStr ? 'Acc: ' + inv.accessoriStr + '<br>' : ''}
+                    ${inv.matricola ? 'SN: ' + inv.matricola : ''}
+                </small><br>${badgeVal}
+            </td>
             <td>${inv.kmPercorsi ? inv.kmPercorsi + ' km' : '-'}</td>
             <td>${fileHtml} ${adminActions}</td>
         `;
@@ -418,6 +444,8 @@ function renderTable(dataArray) {
 }
 
 function renderNonEseguitiTable(dataArray) {
+    if (badgeNonEseguitiHeader) badgeNonEseguitiHeader.textContent = dataArray.length;
+
     if (dataArray.length === 0) {
         nonEseguitiTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: #666;">🎉 Nessun intervento pendente da controllare.</td></tr>`;
         return;
@@ -444,7 +472,14 @@ function renderNonEseguitiTable(dataArray) {
             <td style="font-weight: 600;">${inv.paziente}</td>
             <td>${inv.localita || inv.destinazione || "N/D"}</td>
             <td>${inv.indirizzo || ""} <br><small style="color:gray;">${inv.telefono || ""}</small></td>
-            <td><span class="badge badge-warning">${window.decodeCodeToLabel(inv.tipo, 'interventi')}</span><br><small style="color:gray;">${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi')} ${inv.matricola ? `(SN: ${inv.matricola})` : ''}</small><br>${badgeVal}</td>
+            <td>
+                <span class="badge badge-warning">${window.decodeCodeToLabel(inv.tipo, 'interventi')}</span><br>
+                <small style="color:gray;">
+                    ${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi')}<br>
+                    ${inv.accessoriStr ? 'Acc: ' + inv.accessoriStr + '<br>' : ''}
+                    ${inv.matricola ? 'SN: ' + inv.matricola : ''}
+                </small><br>${badgeVal}
+            </td>
             <td style="color:#b45309; font-weight:600; font-style: italic;">"${inv.motivazione || 'Nessuna'}"</td>
             <td>
                 <button class="btn btn-primary btn-sm btn-chiudi" data-fbid="${inv.fbId}" style="background-color: var(--blue-dark); color: white; width: 100%; margin-bottom: 5px;">Archivia (Chiudi)</button>
@@ -575,7 +610,7 @@ function renderAdminCharts(eseguiti, programmati) {
     if (ctxTecnici) {
         const counts = {};
         eseguiti.forEach(inv => {
-            const t = inv.tecnico || 'Sconosciuto';
+            const t = inv.tecnico || inv.operatore || inv.user || inv.inseritoDa || 'Pietro Cammarota';
             counts[t] = (counts[t] || 0) + 1;
         });
         const labels = Object.keys(counts).sort((a,b) => counts[b] - counts[a]);
@@ -696,7 +731,7 @@ function esporterCSV() {
         return alert("Nessun dato da esportare con questi filtri.");
     }
 
-    let header = ["Data", "Orario Inizio", "Orario Fine", "Paziente / Ente", "Localita", "Indirizzo", "Telefono", "Tipo Intervento", "Dispositivi", "Matricola", "Km Extra", "Note", "Link Allegato"];
+    let header = ["Data", "Orario Inizio", "Orario Fine", "Paziente / Ente", "Localita", "Indirizzo", "Telefono", "Tipo Intervento", "Dispositivi", "Accessori", "Matricola", "Km Extra", "Note", "Link Allegato"];
     let csvContent = header.join(";") + "\n";
 
     currentData.forEach(inv => {
@@ -706,7 +741,7 @@ function esporterCSV() {
         let rs = [
             `"${formatDateDMY(new Date(inv.startTime))}"`, `"${formatTime(inv.startTime)}"`, `"${formatTime(inv.endTime)}"`,
             `"${inv.paziente.replace(/"/g, '""')}"`, `"${loc.replace(/"/g, '""')}"`, `"${ind.replace(/"/g, '""')}"`, `"${inv.telefono || ""}"`,
-            `"${window.decodeCodeToLabel(inv.tipo, 'interventi')}"`, `"${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi').replace(/"/g, '""')}"`, `"${inv.matricola ? inv.matricola.replace(/"/g, '""') : ''}"`, `"${inv.kmPercorsi}"`,
+            `"${window.decodeCodeToLabel(inv.tipo, 'interventi')}"`, `"${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi').replace(/"/g, '""')}"`, `"${inv.accessoriStr ? inv.accessoriStr.replace(/"/g, '""') : ''}"`, `"${inv.matricola ? inv.matricola.replace(/"/g, '""') : ''}"`, `"${inv.kmPercorsi}"`,
             `"${inv.note ? inv.note.replace(/"/g, '""') : ''}"`, `"${inv.fileUrl || ''}"`
         ];
         csvContent += rs.join(";") + "\n";
@@ -1012,3 +1047,253 @@ if(btnMassDeleteNonEseguiti) {
         }
     });
 }
+
+
+/* ==========================================
+ * VALORIZZAZIONE ATTIVITÀ
+ * ========================================== */
+const btnOpenValuation = document.getElementById('btnOpenValuation');
+const valorizzazioneModal = document.getElementById('valorizzazioneModal');
+const btnCloseValuation = document.getElementById('btnCloseValuation');
+const valPeriod = document.getElementById('valPeriod');
+const valCustomDates = document.getElementById('valCustomDates');
+const valDateFrom = document.getElementById('valDateFrom');
+const valDateTo = document.getElementById('valDateTo');
+const valRole = document.getElementById('valRole');
+const valOperator = document.getElementById('valOperator');
+const btnCalculateValuation = document.getElementById('btnCalculateValuation');
+const valDetailsTableBody = document.getElementById('valDetailsTableBody');
+const valTotalCount = document.getElementById('valTotalCount');
+const valTotalAmount = document.getElementById('valTotalAmount');
+const valExportBtn = document.getElementById('valExportBtn');
+
+if(valPeriod) {
+    valPeriod.addEventListener('change', (e) => {
+        if(e.target.value === 'custom') valCustomDates.classList.remove('hidden');
+        else valCustomDates.classList.add('hidden');
+    });
+}
+
+function initValuationDropdowns() {
+    const currentUser = localStorage.getItem('antimo_user_name') || "";
+    const userEmail = (localStorage.getItem('antimo_user_email') || "").toLowerCase();
+    
+    // Bypass di sicurezza per amministratori originali
+    let isDirezione = false;
+    if (userEmail.includes('eubios') || userEmail.includes('giuseppe') || currentUser.toLowerCase().includes('antimo')) isDirezione = true;
+
+    if(window.anagrafiche) {
+        const u = window.anagrafiche.find(a => (a.ragioneSociale || (a.nome + " " + (a.cognome||""))).trim() === currentUser);
+        if(u && u.ruolo && u.ruolo.toUpperCase().includes('DIREZ')) isDirezione = true;
+    }
+
+    if(valRole && window.antimoDropdownLists && window.antimoDropdownLists.ruoli) {
+        valRole.innerHTML = '<option value="">Tutti i Ruoli</option>';
+        if (!isDirezione) {
+            valRole.disabled = true;
+        } else {
+            window.antimoDropdownLists.ruoli.forEach(r => {
+                valRole.innerHTML += `<option value="${r.desc}">${r.desc}</option>`;
+            });
+            valRole.disabled = false;
+        }
+    }
+    if(valOperator && window.anagrafiche) {
+        if (!isDirezione) {
+            valOperator.innerHTML = `<option value="${currentUser}">${currentUser}</option>`;
+            valOperator.disabled = true;
+        } else {
+            valOperator.innerHTML = '<option value="">Tutti gli Operatori</option>';
+            const dipendenti = window.anagrafiche.filter(d => !!d.qualifica).map(d => (d.ragioneSociale || (d.nome + " " + (d.cognome || ""))).trim()).sort();
+            /* Rimuovo i duplicati */
+            const dedupe = [...new Set(dipendenti)];
+            dedupe.forEach(nome => {
+                if(nome) valOperator.innerHTML += `<option value="${nome}">${nome}</option>`;
+            });
+            valOperator.disabled = false;
+        }
+    }
+}
+
+if(btnOpenValuation) {
+    btnOpenValuation.addEventListener('click', () => {
+        initValuationDropdowns();
+        valorizzazioneModal.classList.remove('hidden');
+        valDetailsTableBody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #94a3b8;">Imposta i filtri e clicca su Calcola per visualizzare la valorizzazione economica.</td></tr>';
+        valTotalCount.textContent = "0";
+        valTotalAmount.textContent = "€ 0.00";
+        valExportBtn.style.display = 'none';
+        valExportBtn.onclick = null;
+    });
+}
+if(btnCloseValuation) {
+    btnCloseValuation.addEventListener('click', () => {
+        valorizzazioneModal.classList.add('hidden');
+    });
+}
+
+if(btnCalculateValuation) {
+    btnCalculateValuation.addEventListener('click', async () => {
+        try {
+            if(!isFirebaseConfigured) return alert("Firebase non configurato o offline.");
+            
+            btnCalculateValuation.innerHTML = '<span class="btn-icon">⏳</span> CARICAMENTO...';
+            btnCalculateValuation.disabled = true;
+
+            const now = new Date();
+            let startTs = 0; let endTs = 0;
+            const p = valPeriod.value;
+
+            if(p === 'oggi') {
+                startTs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                endTs = startTs + 86399999;
+            } else if(p === 'ieri') {
+                startTs = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime();
+                endTs = startTs + 86399999;
+            } else if(p === 'mese_corrente') {
+                startTs = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+                endTs = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime();
+            } else if(p === 'mese_scorso') {
+                startTs = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+                endTs = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).getTime();
+            } else if(p === 'trimestre') {
+                const q = Math.floor(now.getMonth() / 3);
+                startTs = new Date(now.getFullYear(), q * 3, 1).getTime();
+                endTs = new Date(now.getFullYear(), q * 3 + 3, 0, 23, 59, 59).getTime();
+            } else if(p === 'anno') {
+                startTs = new Date(now.getFullYear(), 0, 1).getTime();
+                endTs = new Date(now.getFullYear(), 11, 31, 23, 59, 59).getTime();
+            } else if(p === 'custom') {
+                if(!valDateFrom.value || !valDateTo.value) { alert("Inserisci le date di inizio e fine."); btnCalculateValuation.disabled = false; btnCalculateValuation.innerHTML = '<span class="btn-icon">🧮</span> CALCOLA'; return; }
+                startTs = new Date(valDateFrom.value).getTime();
+                endTs = new Date(valDateTo.value);
+                endTs.setHours(23, 59, 59, 999);
+                endTs = endTs.getTime();
+            }
+
+
+            const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            
+            // Esposizione per funzione Elimina Test
+            window.deleteValuationIntervention = async function(id) {
+                if(!confirm("⚠️ Vuoi eliminare DEFINITIVAMENTE questo intervento su Cloud? Non potrà essere recuperato.")) return;
+                try {
+                    await deleteDoc(doc(db, "interventi", id));
+                    // Ricalcoliamo ricaricando i dati prima
+                    await loadData();
+                    btnCalculateValuation.click(); 
+                } catch(e) {
+                    alert("Errore durante l'eliminazione: " + e.message);
+                }
+            };
+
+            // Filtra localmente su tuttiGliInterventi scaricati al caricamento pagina
+            const snaps = tuttiGliInterventi.filter(item => item.startTime >= startTs && item.startTime <= endTs);
+
+            // Mappa ruoli 
+            let cacheRuoliApp = {};
+            if(window.anagrafiche) {
+                window.anagrafiche.forEach(a => {
+                    const nm = (a.ragioneSociale || (a.nome + " " + (a.cognome||""))).trim();
+                    if(nm) cacheRuoliApp[nm] = a.ruolo || "Sconosciuto";
+                });
+            }
+
+            const rFilter = valRole.value;
+            let oFilter = valOperator.value;
+            
+            // SECURITY: Forza filtro se non è direzione
+            const currentUser = localStorage.getItem('antimo_user_name') || "";
+            const userEmail = (localStorage.getItem('antimo_user_email') || "").toLowerCase();
+            let isDirCalc = false;
+            
+            // Bypass sicurezza per amministratori base (risolve problema "Non funziona nulla")
+            if (userEmail.includes('eubios') || userEmail.includes('giuseppe') || currentUser.toLowerCase().includes('antimo')) isDirCalc = true;
+
+            const currentUserRole = cacheRuoliApp[currentUser] || "Sconosciuto";
+            if (currentUserRole.toUpperCase().includes('DIREZ')) isDirCalc = true;
+
+            if (!isDirCalc) {
+                oFilter = currentUser;
+            }
+
+            let validCount = 0;
+            let sumVal = 0;
+            let rowsHtml = '';
+            let resultsCSV = [];
+
+            // Costruisci dizionario val
+            let valInterventi = {};
+            if(window.antimoDropdownLists && window.antimoDropdownLists.interventi) {
+                window.antimoDropdownLists.interventi.forEach(i => valInterventi[i.id] = parseFloat(i.val || 0));
+            }
+
+            snaps.forEach(data => {
+                // User requirement: if operator is completely unknown, it defaults to the inserter or "Pietro Cammarota"
+                let opStr = data.operatore || data.user || data.inseritoDa || "Pietro Cammarota";
+                let rStr = cacheRuoliApp[opStr] || "Ruolo Non Definito";
+
+                if (oFilter && opStr !== oFilter) return;
+                if (rFilter && rStr !== rFilter) return;
+
+                let tipis = data.tipo ? data.tipo.split(',').map(x => x.trim()) : [];
+                let msgTipo = window.decodeCodeToLabel(data.tipo, 'interventi');
+                let curVal = 0;
+                tipis.forEach(tCode => {
+                    if (valInterventi[tCode]) curVal += valInterventi[tCode];
+                });
+
+                validCount++;
+                sumVal += curVal;
+                
+                const dDate = new Date(data.startTime);
+                const dStr = `${String(dDate.getDate()).padStart(2,'0')}/${String(dDate.getMonth()+1).padStart(2,'0')}/${dDate.getFullYear()}`;
+
+                rowsHtml += `<tr style="border-bottom: 1px solid #e2e8f0; background: ${validCount % 2 === 0 ? '#f8fafc' : 'white'};">
+                    <td style="padding: 10px;">${dStr}</td>
+                    <td style="padding: 10px; font-weight: bold; color: var(--blue-dark);">${opStr}</td>
+                    <td style="padding: 10px; color: #475569;">${rStr} / <strong>${data.paziente}</strong></td>
+                    <td style="padding: 10px; color: #475569;">${msgTipo}</td>
+                    <td style="padding: 10px; text-align: right; color: #64748b;">€ ${curVal.toFixed(2)}</td>
+                    <td style="padding: 10px; text-align: right; font-weight: bold; color: #15803d;">€ ${curVal.toFixed(2)}</td>
+                    <td style="padding: 10px; text-align: center;">
+                        <button onclick="deleteValuationIntervention('${data.fbId}')" style="background:none; border:none; cursor:pointer; font-size:1.1rem;" title="Elimina definitivamente">🗑️</button>
+                    </td>
+                </tr>`;
+
+                resultsCSV.push({ date: dStr, op: opStr, role: rStr, patient: data.paziente, type: msgTipo, value: curVal });
+            });
+
+            valTotalCount.textContent = validCount.toString();
+            valTotalAmount.textContent = "€ " + sumVal.toFixed(2);
+            
+            if(validCount === 0) {
+                valDetailsTableBody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #94a3b8;">Nessun intervento e nessun valore economico generato nei filtri.</td></tr>';
+                valExportBtn.style.display = 'none';
+            } else {
+                valDetailsTableBody.innerHTML = rowsHtml;
+                valExportBtn.style.display = 'inline-block';
+                valExportBtn.onclick = () => {
+                   let csvContent = "Data;Operatore;Ruolo;Paziente;Tipo Intervento;Valore\n";
+                   resultsCSV.forEach(r => {
+                       csvContent += `"${r.date}";"${r.op}";"${r.role}";"${r.patient.replace(/"/g, '""')}";"${r.type}";"${r.value.toFixed(2).replace('.', ',')}"\n`;
+                   });
+                   const blob = new Blob(["\uFEFF"+csvContent], { type: 'text/csv;charset=utf-8;' });
+                   const url = URL.createObjectURL(blob);
+                   const a = document.createElement("a");
+                   a.href = url;
+                   a.download = `Valorizzazione_${p}.csv`;
+                   document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                };
+            }
+
+        } catch(e) {
+            console.error(e);
+            alert("Errore Reale: " + e.message);
+        } finally {
+            btnCalculateValuation.innerHTML = '<span class="btn-icon">🧮</span> CALCOLA';
+            btnCalculateValuation.disabled = false;
+        }
+    });
+}
+

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Peppe-System | Progetto Paolo</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- HEADER AREA -->
+    <header class="top-nav">
+        <div class="user-info">
+            <div id="currentUserDisplay">Profilo: Caricamento...</div>
+            <div class="wallet-mini" id="btnOpenWallet" style="display:none;">
+                💰 <span id="walletBalanceDisplay">€ 0.00</span>
+            </div>
+        </div>
+        <div class="nav-tabs" id="mainTabs">
+            <button class="tab-btn active" data-target="view-dashboard" id="tab-dashboard">Dashboard</button>
+            <button class="tab-btn" data-target="view-manager" id="tab-manager" style="display:none;">Manager</button>
+            <button class="tab-btn" data-target="view-admin" id="tab-admin" style="display:none;">Amministrazione</button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="container">
+
+        <!-- VIEW: DASHBOARD (Worker) -->
+        <section id="view-dashboard" class="view-section active">
+            <h2>Le Mie Attività</h2>
+            <div id="tasksList" class="feed-list">
+                <div style="text-align: center; color: #666; padding: 20px;">Caricamento attività...</div>
+            </div>
+            <button id="btnQuickExpense" class="btn-fab btn-primary-gradient hidden">+ Spesa Rapida</button>
+        </section>
+
+        <!-- VIEW: MANAGER (Requests) -->
+        <section id="view-manager" class="view-section">
+            <h2>Richieste da Gestire</h2>
+            <div id="requestsList" class="feed-list">
+                 <div style="text-align: center; color: #666; padding: 20px;">Nessuna richiesta pendente.</div>
+            </div>
+            <button id="btnNewRequest" class="btn btn-primary" style="width:100%; margin-top:15px;">➕ Nuova Richiesta</button>
+        </section>
+
+        <!-- VIEW: ADMIN (Allocations) -->
+        <section id="view-admin" class="view-section">
+            <h2>Allocazione Costi</h2>
+            <div id="unallocatedExpensesList" class="feed-list">
+                <div style="text-align: center; color: #666; padding: 20px;">Nessuna spesa da splittare.</div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODALS -->
+    <!-- Login -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <h2 style="text-align:center; color: var(--primary); margin-bottom: 20px;">Accesso Peppe-System</h2>
+            <p style="font-size:0.9rem; text-align:center; margin-bottom: 15px;">Seleziona il tuo profilo utente per il test.</p>
+            <select id="loginUserSelect" style="margin-bottom: 20px;">
+                <option value="">Nessuno/Logout</option>
+            </select>
+            <button id="btnLogin" class="btn btn-primary" style="width:100%">Entra</button>
+        </div>
+    </div>
+
+    <!-- Wallet -->
+    <div id="walletModal" class="modal hidden">
+        <div class="modal-content bg-dark">
+            <button class="btn-close" id="btnCloseWallet">&times;</button>
+            <h3 style="margin-bottom: 20px;">Fondo Cassa</h3>
+            <div style="text-align:center; margin-bottom: 25px;">
+                <div style="font-size: 0.9rem; color:#94a3b8;">Disponibilità Fisica Attesa</div>
+                <div id="modalWalletAmount" style="font-size: 2.8rem; font-weight: bold; color: #34d399; margin: 10px 0;">€ 0.00</div>
+            </div>
+            <button id="btnRequestRecharge" class="btn btn-secondary" style="width:100%; margin-bottom:20px; color:#333;">Richiedi Refill Fondo</button>
+            <div>
+                <h4 style="margin-bottom: 10px; color:#cbd5e1; border-bottom: 1px solid #334155; padding-bottom:5px;">Ultimi Movimenti</h4>
+                <ul id="walletHistoryList" style="list-style:none; padding:0;">
+                   <li style="text-align:center; color:#64748b; font-size:0.85rem; padding:10px;">Nessun movimento.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Request Modal -->
+    <div id="newRequestModal" class="modal hidden">
+        <div class="modal-content">
+            <button class="btn-close" id="btnCloseRequestModal">&times;</button>
+            <h3 style="margin-bottom: 15px;">Crea Nuova Richiesta</h3>
+            <form id="newRequestForm" style="display:flex; flex-direction:column; gap:12px;">
+                <input type="text" id="reqTitle" placeholder="Titolo (es. Riparazione cancello)" required style="padding:12px; border-radius:8px; border:1px solid var(--border);">
+                <textarea id="reqDesc" placeholder="Descrizione problema..." rows="3" required style="padding:12px; border-radius:8px; border:1px solid var(--border); font-family:inherit;"></textarea>
+                <select id="reqTargets" multiple size="3" required style="padding:8px; border-radius:8px; border:1px solid var(--border);">
+                    <option value="disabled" disabled>Seleziona i proprietari (Ctrl/Cmd click):</option>
+                </select>
+                <button type="submit" class="btn btn-primary" style="margin-top:10px;">Invia Richiesta</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Quick Expense Modal -->
+    <div id="quickExpenseModal" class="modal hidden">
+        <div class="modal-content">
+            <button class="btn-close" id="btnCloseExpenseModal">&times;</button>
+            <h3 style="margin-bottom: 15px;">Registra Spesa</h3>
+            <form id="quickExpenseForm" style="display:flex; flex-direction:column; gap:12px;">
+                <select id="expTaskRef" required style="padding:12px; border-radius:8px; border:1px solid var(--border);">
+                    <option value="">-- Seleziona Task Riferimento --</option>
+                </select>
+                <input type="number" id="expAmount" placeholder="Importo (€)" step="0.01" required style="padding:12px; border-radius:8px; border:1px solid var(--border);">
+                <input type="text" id="expVendor" placeholder="Fornitore (es. Leroy Merlin)" style="padding:12px; border-radius:8px; border:1px solid var(--border);">
+                <button type="submit" class="btn btn-success" style="margin-top:10px;">Salva Spesa</button>
+            </form>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>

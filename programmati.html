@@ -73,11 +73,6 @@
 
     <main class="container" style="max-width: 900px;">
         
-        <!-- IMPORT ASSISTITI BUTTON & DATALIST -->
-        <div style="text-align: right; margin-bottom: 15px;">
-            <input type="file" id="uploadAssistitiExcel" accept=".csv, .xls, .xlsx" style="display:none;" />
-            <button id="btnImportAssistiti" class="btn btn-secondary" style="background:#10b981; border:none; color:white; font-weight:bold;"><span class="btn-icon">👥</span> Importa Rubrica Assistiti (Excel)</button>
-        </div>
         <datalist id="assistitiDatalist"></datalist>
 
         <!-- INSERIMENTO PROGRAMMATO -->
@@ -123,6 +118,29 @@
                             <input type="time" id="oraProgrammata" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
                         </div>
                     </div>
+
+                    <!-- NOTE PROGRAMMAZIONE CON SUPPORTO ALLEGATI E INCOLLA -->
+                    <div class="form-group" style="margin-top: 15px; margin-bottom: 0; position: relative;" id="progNoteContainer">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <label for="progNoteInput" style="margin-bottom: 0;">Note Essenziali (es. Problema) *</label>
+                            <button type="button" id="btnExpandNote" class="btn btn-sm" style="padding: 2px 8px; font-size: 0.75rem; background: #e2e8f0; color: #333; border: 1px solid #cbd5e1; border-radius: 4px;">Espandi ↕</button>
+                        </div>
+                        
+                        <div style="position: relative; border: 1px solid #ccc; border-radius: 6px; background: white; padding-bottom: 30px;">
+                            <textarea id="progNoteInput" rows="3" placeholder="Scrivi note o incolla un'immagine (Ctrl+V)..." style="width: 100%; border: none; outline: none; padding: 10px; font-family: inherit; font-size: 0.9rem; resize: none; background: transparent; transition: height 0.3s;"></textarea>
+                            
+                            <!-- Pulsantiera incollata sul fondo della textarea -->
+                            <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 30px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 10px; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;">
+                                <label for="progNoteFileInput" style="cursor: pointer; display: flex; align-items: center; gap: 5px; color: var(--blue-primary); font-size: 0.8rem; font-weight: bold;">
+                                    📎 Allega File (PDF, Immagini, Video, Audio)
+                                </label>
+                                <input type="file" id="progNoteFileInput" accept="image/*,video/*,audio/*,application/pdf" multiple style="display: none;">
+                            </div>
+                        </div>
+
+                        <!-- Anteprime file note -->
+                        <div id="progNotePreviewContainer" class="hidden" style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; background: rgba(255,255,255,0.5); padding: 8px; border-radius: 8px; border: 1px dashed #ccc;"></div>
+                    </div>
                 </div>
 
                 <!-- Dynamic Interventions Array Block -->
@@ -133,22 +151,39 @@
                     ➕ Aggiungi Dispositivo / Intervento
                 </button>
 
-                <div style="display: flex; gap: 10px; margin-top: 10px;">
-                    <button type="submit" class="btn btn-primary btn-orange" style="flex: 1;" id="btnPlanIntervention">
-                        <span class="btn-icon">📅</span> SALVA PROGRAMMAZIONE
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="progAllegatoFile">Allegato/i (Foto, PDF, o Video) - Obbligatorio per Chiudere</label>
+                    <input type="file" id="progAllegatoFile" accept="image/*,video/*,application/pdf" multiple>
+                    <div id="progFilePreviewContainer" class="hidden" style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: start; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px;">
+                        <!-- Le anteprime verranno inserite qui dinamicamente -->
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 10px; flex-direction: column;">
+                    <button type="button" class="btn btn-primary btn-orange btn-large" style="width: 100%; border: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(234, 88, 12, 0.4); display: flex; align-items: center; justify-content: center; gap: 8px; color: white;" id="btnProgStartIntervention">
+                        <span class="btn-icon">⚡</span> TERMINA ATTIVITA'
                     </button>
-                    <button type="button" class="btn btn-secondary" style="flex: 1;" id="btnSaveWaiting">
-                        <span class="btn-icon">⏳</span> SALVA IN ATTESA
-                    </button>
+                    
+                    <div style="display: flex; gap: 10px; margin-top: 5px;">
+                        <button type="submit" class="btn btn-primary" style="flex: 1; background-color: var(--blue-primary); border: none; color: white; padding: 12px; font-weight: bold;" id="btnPlanIntervention">
+                            <span class="btn-icon">📅</span> SALVA PROGRAM.
+                        </button>
+                        <button type="button" class="btn btn-secondary" style="flex: 1; padding: 12px; font-weight: bold;" id="btnSaveWaiting">
+                            <span class="btn-icon">⏳</span> SALVA IN ATTESA
+                        </button>
+                    </div>
                 </div>
             </form>
         </section>
 
         <!-- ELENCO DA PROGRAMMARE (IN ATTESA) -->
         <section class="card glass-card" style="padding: 1rem 0; overflow-x: auto; margin-bottom: 20px;">
-            <div style="padding: 0 1rem; display: flex; justify-content: space-between; align-items: center;">
+            <div style="padding: 0 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <h2 style="margin: 0;"><span class="btn-icon">⏳</span> Da Programmare (In Attesa)</h2>
-                <button id="btnToggleWaiting" class="btn btn-secondary" style="width: auto; padding: 5px 10px; font-size: 0.8rem; margin: 0;">Mostra / Nascondi</button>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" id="btnStampaListone" onclick="if(window.stampaListoneMagazzinoPDF) window.stampaListoneMagazzinoPDF()" class="btn btn-sm" style="background: #ea580c; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; width: auto; margin: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">🖨️ Stampa Riepilogo Magazzino</button>
+                    <button id="btnToggleWaiting" class="btn btn-secondary" style="width: auto; padding: 6px 12px; font-size: 0.8rem; margin: 0;">Mostra / Nascondi</button>
+                </div>
             </div>
             <div id="waitingContainer" class="hidden" style="margin: 10px 1rem 0 1rem;">
                 <table id="waitingTable" style="width: 100%; border-collapse: collapse; font-size: 0.9rem; background: white; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow);">
@@ -161,7 +196,7 @@
                         </tr>
                     </thead>
                     <tbody id="waitingTableBody">
-                        <tr><td colspan="3" style="text-align: center; padding: 20px;">Caricamento...</td></tr>
+                        <tr><td colspan="4" style="text-align: center; padding: 20px;">Caricamento...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -175,7 +210,10 @@
 
         <!-- ELENCO TABELLA -->
         <section class="card glass-card" style="padding: 1rem 0; overflow-x: auto;">
-            <h2 style="padding: 0 1rem;"><span class="btn-icon">📋</span> Elenco Programmati</h2>
+            <div style="padding: 0 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+                <h2 style="margin: 0;"><span class="btn-icon">📋</span> Elenco Programmati</h2>
+                <button type="button" onclick="if(window.stampaListoneMagazzinoPDF) window.stampaListoneMagazzinoPDF()" class="btn btn-sm" style="background: #ea580c; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; width: auto; margin: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">🖨️ Stampa Riepilogo Magazzino</button>
+            </div>
             <div style="margin: 0 1rem;">
                 <table id="programmatiTable">
                     <thead>
@@ -228,84 +266,7 @@
         </div>
     </div>
     
-    <!-- MODAL MODIFICA ATTIVITA PROGRAMMATA -->
-    <div id="editProgrammatoModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
-        <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-            <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
-                <span><span class="btn-icon">✏️</span> Modifica Programmazione</span>
-                <button id="btnCancelEditProg" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
-            </h3>
-            <form id="editProgForm">
-                <input type="hidden" id="editProgFbId">
-                <div class="form-group">
-                    <label>Paziente / Ente</label>
-                    <input type="text" id="editProgPaziente" list="assistitiDatalist" required>
-                </div>
-                <div class="form-group">
-                    <label>Tecnico Assegnato</label>
-                    <select id="editProgTecnicoAssegnato" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.9rem; font-family: inherit;">
-                        <option value="">Seleziona Tecnico...</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Località</label>
-                    <input type="text" id="editProgLocalita">
-                </div>
-                <div class="form-group">
-                    <label>Indirizzo</label>
-                    <input type="text" id="editProgIndirizzo">
-                </div>
-                <div class="form-group">
-                    <label>Telefono</label>
-                    <input type="tel" id="editProgTelefono">
-                </div>
-                <div class="form-group">
-                    <label>Tipo Intervento</label>
-                    <textarea id="editProgTipo" rows="2"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Dispositivi / Note</label>
-                    <textarea id="editProgDispositivi" rows="2"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Matricole</label>
-                    <textarea id="editProgMatricola" rows="2"></textarea>
-                </div>
-                <!-- CAMPI VALUTAZIONE DPAD / D3 -->
-                <div style="border-top: 1px dashed #ccc; padding-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
-                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                        <label style="color: #0284c7; font-weight: bold; font-size: 0.8rem;">Operatore Sanitario (Opzionale)</label>
-                        <select id="editProgOperatoreValutazione" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #bae6fd; background: #f0f9ff;"></select>
-                    </div>
-                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                        <label style="color: #0284c7; font-weight: bold; font-size: 0.8rem;">Esito / Punteggio</label>
-                        <input type="text" id="editProgEsito" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #bae6fd; background: #f0f9ff;">
-                    </div>
-                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                        <label style="color: #0284c7; font-weight: bold; font-size: 0.8rem;">Stato Valutazione</label>
-                        <select id="editProgStatoValutazione" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #bae6fd; background: #f0f9ff;">
-                            <option value="">Nessuno</option>
-                            <option value="Svolta - A buon fine">✅ A buon fine</option>
-                            <option value="Svolta - Da ripetere">🔄 Da ripetere</option>
-                        </select>
-                    </div>
-                </div>
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <div style="flex: 1;">
-                        <label>Data Prevista</label>
-                        <input type="date" id="editProgData" style="width: 100%;">
-                    </div>
-                    <div style="flex: 1;">
-                        <label>Ora Prevista</label>
-                        <input type="time" id="editProgOra" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
-                    </div>
-                </div>
-                <button type="button" id="btnSaveEditProg" class="btn btn-primary btn-large" style="width: 100%; margin-top: 10px;">SALVA MODIFICHE</button>
-            </form>
-        </div>
-    </div>
-
-    <script type="module" src="programmati.js?v=45"></script>
-    <script type="module" src="global_notifications.js?v=45"></script>
+    <script type="module" src="programmati.js?v=61"></script>
+    <script type="module" src="global_notifications.js?v=61"></script>
 </body>
 </html>

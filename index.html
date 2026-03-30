@@ -9,6 +9,7 @@
     <title>Gestione Attività Esterne</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </head>
 <body>
     <header class="top-nav" style="display: flex; flex-direction: column; gap: 10px; padding: calc(12px + env(safe-area-inset-top, 20px)) 12px 12px 12px; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
@@ -19,6 +20,9 @@
                 <button id="btnSettings" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: white; padding: 0;" title="Impostazioni">⚙️</button>
                 <button id="btnTogglePC" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; font-weight: bold; font-size: 0.75rem; cursor: pointer;">PC</button>
                 <a href="anagrafiche.html" id="btnTopAnag" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: flex; align-items: center; gap: 4px;">📇 ANAG</a>
+                <button id="btnIncarichiFilter" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; font-weight: bold; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                    👤 INCARICHI
+                </button>
             </div>
             <select id="filterTecnicoOggi" style="padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.5); background: rgba(0,0,0,0.2); color: white; font-weight: bold; font-size: 0.75rem; outline: none; cursor: pointer; max-width: 140px;">
                 <option value="" style="color: black;">Filtro...</option>
@@ -34,7 +38,7 @@
             <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
                 <a href="admin.html" id="btnOpenDashboard" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 6px 8px; color: white; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: inline-flex; align-items: center; width: fit-content; gap: 4px;">💻 Dashboard</a>
                 <div id="loggedInUserDisplay" style="font-size: 0.75rem; color: #fcd34d; font-weight: bold; line-height: 1.1; margin-top: 2px;"></div>
-                <div id="appVersionStamp" style="font-size: 0.65rem; color: rgba(255,255,255,0.7); cursor: pointer; line-height: 1.1;" onclick="nukeCache()">v26.0 - AutoSync v58</div>
+                <div id="appVersionStamp" style="font-size: 0.65rem; color: rgba(255,255,255,0.7); cursor: pointer; line-height: 1.1;" onclick="nukeCache()">v63.0 - AutoSync v63</div>
                 
                 <button id="btnTopNotification" class="hidden" style="margin-top: 2px; background: #e11d48; color: white; border-radius: 6px; padding: 4px 8px; border: 1px solid rgba(255,255,255,0.5); cursor: pointer; font-weight: 600; font-size: 0.7srem; align-items: center; max-width: 120px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
                     🔔 <span id="topNotificationText"></span>
@@ -55,7 +59,12 @@
                     <div style="font-size: 0.6rem; text-transform: uppercase;">Domani</div>
                     <div style="font-size: 1rem; font-weight: 700;"><strong id="domaniCount">0</strong></div>
                 </div>
-                <a href="programmati.html" id="btnCalendarLink" class="header-stat-box" style="cursor: pointer; padding: 4px; font-size: 1.2rem; text-decoration: none; min-width: unset; color: inherit; display:flex; justify-content:center; align-items:center;">📅</a>
+                <!-- Pulsante Magazzino (MAG) -->
+                <div id="btnMostraMagazzino" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset; background-color: #ffffff; border: 2px solid #16a34a; box-shadow: 0 4px 6px rgba(0,0,0,0.2); position: relative;">
+                    <div id="badgeMagazzino" class="hidden" style="position: absolute; top: -8px; right: -8px; background: #ef4444; color: white; border-radius: 50%; width: 22px; height: 22px; font-size: 0.75rem; font-weight: bold; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">0</div>
+                    <div style="font-size: 0.7rem; text-transform: uppercase; color: #16a34a; font-weight: 900;">MAG</div>
+                    <div style="font-size: 1rem; font-weight: 700; color: #15803d;">📦</div>
+                </div>
                 
                 <div id="btnMostraNP" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
                     <div style="font-size: 0.6rem; text-transform: uppercase;">NP</div>
@@ -69,7 +78,11 @@
                     <div style="font-size: 0.6rem; text-transform: uppercase;">Eseg</div>
                     <div style="font-size: 1rem; font-weight: 700;"><strong id="interventiCount">0</strong></div>
                 </div>
-                <!-- 8th spot is deliberately left empty perfectly aligning the grid layout -->
+                <!-- Pulsante AI AUDIO (Generatore Bozze) -->
+                <div id="btnOpenAiGenerator" onclick="document.getElementById('aiGeneratorModal').classList.remove('hidden')" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset; background-color: #6366f1; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+                    <div style="font-size: 0.65rem; text-transform: uppercase; color: #ffffff; font-weight: 900;">AUDIO</div>
+                    <div style="font-size: 1rem; font-weight: 700; color: #ffffff;">🎙️</div>
+                </div>
             </div>
         </div>
 
@@ -79,6 +92,9 @@
                 <input type="text" id="magicSearchApp" placeholder="🔍 Ricerca Magica globale (Paziente, Città)..." style="width: 100%; padding: 8px 15px 8px 35px; border-radius: 20px; border: none; font-size: 0.9rem; outline: none; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); background: rgba(255,255,255,0.95); color: #333;">
                 <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 1rem;">🔍</span>
             </div>
+            <button id="btnOpenChangelog" style="width: 100%; margin-top: 8px; padding: 6px 12px; background: rgba(255,255,255,0.2); color: white; border: 1px solid white; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                🆕 Modifiche Software
+            </button>
         </div>
     </header>
 
@@ -89,6 +105,28 @@
         <div id="globalToggleCardContainer" class="hidden" style="display: none; text-align: right; width: 100%;">
             <button id="btnToggleAllCollapse" class="btn btn-secondary btn-sm" style="width: 100%; font-size: 0.95rem; padding: 12px; margin-bottom: 0px;">
                 <span class="btn-icon">⏬</span> APRI TUTTE LE SCHEDE
+            </button>
+        </div>
+
+        <!-- SEZIONE UNIFICATA: ATTIVITÀ ESEGUITE (Posizionata in alto) -->
+        <div id="activitiesListContainer" class="hidden" style="margin-bottom: 20px; text-align: left; background: white; border-radius: 12px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-left: 4px solid #166534;">
+            <h3 style="margin-top: 0; margin-bottom: 15px; color: #166534; border-bottom: 2px solid #bbf7d0; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                <span>✅ Eseguiti (Oggi)</span>
+                <button id="btnCloseActivitiesList" style="background:rgba(0,0,0,0.05); border:none; width: 28px; height: 28px; border-radius: 50%; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #666; cursor: pointer;">&times;</button>
+            </h3>
+            <div id="activitiesList" style="max-height: 60vh; overflow-y: auto; padding: 5px; display: flex; flex-direction: column; gap: 8px;">
+                <!-- I task vengono inseriti qui da app.js (Rossi/Verdi) -->
+            </div>
+            
+            <button class="btn btn-primary btn-blue hidden" id="btnShareCSV" style="width: 100%; margin-top: 15px; padding: 12px;">
+                 <span class="btn-icon">📤</span> ESTRAI & CONDIVIDI CSV
+            </button>
+        </div>
+
+        <!-- BOZZE AI - DA APPROVARE -->
+        <div id="aiDraftsContainer" style="margin-bottom: 20px;">
+            <button id="btnOpenAiDrafts" onclick="document.getElementById('aiDraftsModal').classList.remove('hidden')" class="btn btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; background: linear-gradient(135deg, #a855f7, #6366f1); border: none; font-size: 1rem; padding: 12px; font-weight: 800; box-shadow: 0 4px 10px rgba(99,102,241,0.3); border-radius: 12px;">
+                <span style="font-size: 1.2rem;">✨</span> ARCHIVIO PROPOSTE AI (<strong id="aiDraftsCount" style="color:#ffeb3b;">0</strong>)
             </button>
         </div>
 
@@ -115,6 +153,7 @@
                     <div style="display: flex; gap: 8px; justify-content: flex-start; width: 100%; flex-wrap: wrap; padding-bottom: 5px; align-items: center;">
                         <button id="btnMsgTabAll" class="btn btn-sm btn-primary btn-blue" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Tutti</button>
                         <button id="btnMsgTabUnread" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Non Letti</button>
+                        <button id="btnMsgTabRead" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">👁️ Letti</button>
                         <button id="btnMsgTabReceived" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Ricevuti</button>
                         <button id="btnMsgTabSent" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Inviati</button>
                         <button id="btnMsgTabInCharge" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">👷 Presi in Carico</button>
@@ -191,17 +230,15 @@
 
         <!-- PULSANTE ANAGRAFICHE SPOSTATO NEL HEADER -->
         <!-- NUOVO INTERVENTO & VALORIZZAZIONE -->
-        <div style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
-            <button id="btnToggleNuovoIntervento" class="btn btn-primary btn-blue btn-large" style="width: 100%; border: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(30,58,138,0.2); display: flex; align-items: center; justify-content: center; gap: 8px; color: white; margin: 0; cursor: pointer;">
-                <span style="font-size: 1.4rem;">📝</span> NUOVO INTERVENTO
-            </button>
-            <button id="btnOpenValuation" class="btn btn-primary btn-large" style="width: 100%; border: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(34,197,94,0.2); background: #22c55e; display: flex; align-items: center; justify-content: center; gap: 8px; color: white; margin: 0; cursor: pointer;">
-                <span style="font-size: 1.4rem;">💰</span> VALORIZZAZIONE ATTIVITÀ
-            </button>
+        <div id="nuovoInterventoBtnContainer" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
+            <a href="programmati.html" id="btnToggleNuovoIntervento" class="btn btn-primary btn-blue btn-large" style="width: 100%; border: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(30,58,138,0.2); display: flex; align-items: center; justify-content: center; gap: 8px; color: white; margin: 0; cursor: pointer; text-decoration: none;">
+                <span style="font-size: 1.4rem;">📅</span> CALENDARIO PROGRAMMAZIONE
+            </a>
+            
         </div>
 
-        <!-- SEZIONE INSERIMENTO INTERVENTO -->
-        <section class="card glass-card hidden" id="interventionSection">
+        <!-- SEZIONE INSERIMENTO INTERVENTO (NASCOSTA: Funzioni spostate nel calendario) -->
+        <section class="card glass-card hidden" id="interventionSection" style="display: none !important;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <h2 style="margin: 0; padding: 0;">Nuovo Intervento</h2>
                 <button id="btnCloseInterventionSection" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #666;">&times;</button>
@@ -298,25 +335,7 @@
         </section>
 
         <!-- SEZIONE INTERVENTO IN CORSO RIMOSSA IN FAVORE DELLA COMPILAZIONE DIRETTA A FASE SINGOLA -->
-        <!-- SEZIONE RIEPILOGO & EXPORT -->
-        <section class="card glass-card" id="exportSection">
-            <h2>Gestione Dati</h2>
-            <div class="button-group">
-                <button class="btn btn-primary" id="btnViewActivities">
-                     <span class="btn-icon">📅</span> INTERVENTI DELLA GIORNATA
-                </button>
-                <button class="btn btn-primary btn-blue hidden" id="btnShareCSV" style="width: 100%; margin-top: 10px;">
-                     <span class="btn-icon">📤</span> ESTRAI & CONDIVIDI
-                </button>
-            </div>
-            
-            <div id="activitiesListContainer" class="hidden" style="margin-top: 20px; text-align: left;">
-                <h3 style="margin-bottom: 10px; color: var(--blue-primary); border-bottom: 1px solid var(--blue-light); padding-bottom: 5px;">Riepilogo Odierno</h3>
-                <div id="activitiesList" style="max-height: 400px; overflow-y: auto; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px;">
-                    <!-- I task vengono inseriti qui da app.js (Rossi/Verdi) -->
-                </div>
-            </div>
-        </section>
+        <!-- SEZIONE RIEPILOGO & EXPORT SPOSTATA IN ALTO CON ESEGUITI -->
 
         <!-- MODAL MOTIVAZIONE NON ESEGUITO -->
         <div id="justifyModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; align-items: center; justify-content: center;">
@@ -386,10 +405,11 @@
                     <button id="btnCloseListsSetup" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
                 </h3>
                 
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <button id="btnTabInterventi" class="btn btn-primary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal; background: var(--blue-primary);">Interventi</button>
-                    <button id="btnTabDispositivi" class="btn btn-secondary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal;">Dispositivi</button>
-                    <button id="btnTabRuoli" class="btn btn-secondary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal;">Ruoli</button>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <button id="btnTabInterventi" class="btn btn-primary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal; background: var(--blue-primary); min-width: 80px;">Interventi</button>
+                    <button id="btnTabDispositivi" class="btn btn-secondary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal; min-width: 80px;">Dispositivi</button>
+                    <button id="btnTabRuoli" class="btn btn-secondary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal; min-width: 80px;">Ruoli</button>
+                    <button id="btnTabSeqex" class="btn btn-secondary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal; min-width: 100px;">Prog. SEQEX</button>
                 </div>
 
                 <div id="listsContentContainer" style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1;">
@@ -424,7 +444,7 @@
                     </p>
                     <!-- Versione App -->
                     <div style="font-size: 0.85rem; color: #1e3a8a; font-weight: bold; margin-bottom: 5px;">
-                        v26.0 - Mass Delete & SyncFix
+                        v61.0 - Mass Delete & SyncFix
                     </div>
                     <p style="font-size: 0.85rem; color: #1e3a8a; margin-bottom: 0;">
                         <strong>In caso di disastro grave</strong>: Entra sul sito Firebase &gt; vai in <strong>Storage</strong> &gt; apri la cartellina <code>backups_giornalieri</code>, scarica sul PC il file .json del giorno sano precedente ed importalo qui sotto.
@@ -443,68 +463,6 @@
                     <input type="file" id="importDataFile" accept=".json" style="width: 100%; padding: 8px; font-size: 0.85rem; border: 1px solid #ccc; border-radius: 4px; background: white; margin-bottom: 10px;">
                     <button id="btnImportDataJson" class="btn btn-danger" style="margin: 0; width: 100%;"><span class="btn-icon">⬆️</span> Ripristina da File .json</button>
                 </div>
-            </div>
-        </div>
-
-        <!-- MODAL MODIFICA ATTIVITA PROGRAMMATA -->
-        <div id="editInterventionModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
-            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
-                    <span><span class="btn-icon">✏️</span> Modifica Attività</span>
-                    <button id="btnCancelEdit" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
-                </h3>
-                <form id="editInterventionForm">
-                    <input type="hidden" id="editItemIndex">
-                    <div class="form-group">
-                        <label>Paziente / Ente</label>
-                        <input type="text" id="editPaziente" list="assistitiDatalist" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Tecnico Assegnato</label>
-                        <select id="editTecnicoAssegnato" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.9rem; font-family: inherit;">
-                            <option value="">Seleziona Tecnico...</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Località</label>
-                        <input type="text" id="editLocalita" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Indirizzo</label>
-                        <input type="text" id="editIndirizzo" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Telefono</label>
-                        <input type="tel" id="editTelefono">
-                    </div>
-                    <div class="form-group">
-                        <label>Tipo Intervento</label>
-                        <textarea id="editTipo" rows="2"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>Dispositivi</label>
-                        <textarea id="editDispositivi" rows="2"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>Matricole</label>
-                        <textarea id="editMatricola" rows="2"></textarea>
-                    </div>
-                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                        <div style="flex: 1;">
-                            <label>Data Prevista</label>
-                            <input type="date" id="editDataPrevista" style="width: 100%;">
-                        </div>
-                        <div style="flex: 1;">
-                            <label>Ora Prevista</label>
-                            <input type="time" id="editOraPrevista" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Note</label>
-                        <textarea id="editNote" rows="2"></textarea>
-                    </div>
-                    <button type="button" id="btnSaveEdit" class="btn btn-primary btn-large" style="width: 100%; margin-top: 10px;">SALVA MODIFICHE</button>
-                </form>
             </div>
         </div>
 
@@ -561,34 +519,34 @@
                         <tbody id="backupTableBody">
                             <tr style="border-bottom: 1px solid #eee; background-color: #f0fdf4;">
                                 <td style="padding: 10px; font-size: 0.9rem;" id="backupManualeDate">Oggi (Manuale) - --:--</td>
-                                <td style="padding: 10px; font-weight: bold; color: #15803d; font-size: 0.9rem;" id="backupManualeVersionTxt">v24.3 (Custom)</td>
+                                <td style="padding: 10px; font-weight: bold; color: #15803d; font-size: 0.9rem;" id="backupManualeVersionTxt">v61.3 (Custom)</td>
                                 <td style="padding: 10px;">
-                                    <button class="btn btn-sm btn-desc-version" data-version="v24.3-manual" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
-                                    <button class="btn btn-sm btn-reinstall-version" data-version="v24.3-manual" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
+                                    <button class="btn btn-sm btn-desc-version" data-version="v61.3-manual" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
+                                    <button class="btn btn-sm btn-reinstall-version" data-version="v61.3-manual" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
                                 </td>
                             </tr>
                             <tr style="border-bottom: 1px solid #eee;">
                                 <td style="padding: 10px; font-size: 0.9rem;" id="backupOggiDate">Oggi (Automatica)</td>
-                                <td style="padding: 10px; font-weight: bold; color: #166534; font-size: 0.9rem;" id="backupOggiVersionTxt">v24.3 (Attuale)</td>
+                                <td style="padding: 10px; font-weight: bold; color: #166534; font-size: 0.9rem;" id="backupOggiVersionTxt">v61.3 (Attuale)</td>
                                 <td style="padding: 10px;">
-                                    <button class="btn btn-sm btn-desc-version" data-version="v24.3" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
-                                    <button class="btn btn-sm btn-reinstall-version" data-version="v24.3" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
+                                    <button class="btn btn-sm btn-desc-version" data-version="v61.3" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
+                                    <button class="btn btn-sm btn-reinstall-version" data-version="v61.3" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
                                 </td>
                             </tr>
                             <tr style="border-bottom: 1px solid #eee;">
                                 <td style="padding: 10px; font-size: 0.9rem;" id="backup2giorniDate">2 Giorni Fa</td>
-                                <td style="padding: 10px; font-size: 0.9rem;">v24.2</td>
+                                <td style="padding: 10px; font-size: 0.9rem;">v61.2</td>
                                 <td style="padding: 10px;">
-                                    <button class="btn btn-sm btn-desc-version" data-version="v24.2" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
-                                    <button class="btn btn-sm btn-reinstall-version" data-version="v24.2" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
+                                    <button class="btn btn-sm btn-desc-version" data-version="v61.2" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
+                                    <button class="btn btn-sm btn-reinstall-version" data-version="v61.2" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
                                 </td>
                             </tr>
                             <tr style="border-bottom: 1px solid #eee;">
                                 <td style="padding: 10px; font-size: 0.9rem;" id="backup7giorniDate">1 Settimana Fa</td>
-                                <td style="padding: 10px; font-size: 0.9rem;">v24.0</td>
+                                <td style="padding: 10px; font-size: 0.9rem;">v61.0</td>
                                 <td style="padding: 10px;">
-                                    <button class="btn btn-sm btn-desc-version" data-version="v24.0" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
-                                    <button class="btn btn-sm btn-reinstall-version" data-version="v24.0" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
+                                    <button class="btn btn-sm btn-desc-version" data-version="v61.0" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
+                                    <button class="btn btn-sm btn-reinstall-version" data-version="v61.0" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
                                 </td>
                             </tr>
                         </tbody>
@@ -778,98 +736,258 @@
             </div>
         </div>
 
+        <!-- MODAL GESTIONE PREPARAZIONE MAGAZZINO (FILTRO) -->
+        <div id="magFilterModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 4100; overflow-y: auto; display: flex; align-items: center; justify-content: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="color: #15803d; margin-top: 0; margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
+                    <span><span class="btn-icon">📦</span> Ricerca Magazzino</span>
+                    <button id="btnCloseMagFilter" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color: #666;">&times;</button>
+                </h3>
+                <p style="font-size: 0.9rem; color: #555; margin-bottom: 20px;">Scegli come filtrare le attività programmate già assegnate al magazzino.</p>
+                
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <!-- Pulsante Prossimi -->
+                    <button id="btnMagProssimi" class="btn btn-primary btn-large" style="background: #16a34a; border: none; margin: 0; box-shadow: 0 4px 6px rgba(22, 163, 74, 0.3);">
+                        <span class="btn-icon">📅</span> TUTTI I PROSSIMI
+                    </button>
+                    
+                    <div style="text-align: center; font-weight: bold; color: #94a3b8; font-size: 0.9rem;">— OPPURE —</div>
+                    
+                    <!-- Selezione per Date -->
+                    <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1;">
+                        <h4 style="margin-top: 0; margin-bottom: 10px; color: var(--blue-dark); text-align: center;">📅 Cerca Per Data</h4>
+                        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.8rem; font-weight: bold; color: #333;">Da:</label>
+                                <input type="date" id="magFilterDataDa" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                            </div>
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.8rem; font-weight: bold; color: #333;">A:</label>
+                                <input type="date" id="magFilterDataA" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                            </div>
+                        </div>
+                        <button id="btnMagCercaDate" class="btn btn-primary btn-blue" style="width: 100%; margin: 0;">CERCA DATE</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL LISTA PROGRAMMATI MAGAZZINO -->
+        <div id="magListModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f1f5f9; z-index: 4200; overflow-y: auto; display: flex; flex-direction: column;">
+            
+            <!-- Header Fissato -->
+            <div style="background: white; padding: 15px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10;">
+                <h2 style="margin: 0; color: var(--blue-dark); display: flex; align-items: center; gap: 10px;">
+                    <span class="btn-icon">📋</span> Elenco Programmati (MAG)
+                </h2>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button id="btnMagStampaRiepilogo" class="btn btn-primary btn-orange" style="margin: 0; padding: 10px 20px; font-weight: bold; box-shadow: 0 4px 6px rgba(249, 115, 22, 0.3);">
+                        🖨️ STAMPA RIEPILOGO MAGAZZINO
+                    </button>
+                    <button id="btnCloseMagList" class="btn btn-secondary" style="margin: 0; border: none; font-size: 1.5rem; background: none; color: #64748b; padding: 0 10px;">&times;</button>
+                </div>
+            </div>
+
+            <!-- Tabella/Griglia Contenuto -->
+            <div style="padding: 20px; flex: 1; overflow-y: auto;">
+                <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left; min-width: 1000px;">
+                            <thead>
+                                <tr style="background: var(--blue-dark); color: white;">
+                                    <th style="padding: 15px; font-weight: 600;">Data</th>
+                                    <th style="padding: 15px; font-weight: 600;">Paziente</th>
+                                    <th style="padding: 15px; font-weight: 600;">Località</th>
+                                    <th style="padding: 15px; font-weight: 600;">Indirizzo (Tel)</th>
+                                    <th style="padding: 15px; font-weight: 600;">Tipo</th>
+                                    <th style="padding: 15px; font-weight: 600;">Dispositivi / Note</th>
+                                    <th style="padding: 15px; font-weight: 600; text-align: center;">Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody id="magListTableBody">
+                                <!-- Righe iniettate da JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            </div>
+        </div>
+
+        <!-- MODAL AI GENERATOR -->
+        <div id="aiGeneratorModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 5000; overflow-y: auto; padding: 15px; display: flex; align-items: flex-start; justify-content: center; backdrop-filter: blur(5px);">
+            <div style="background: white; padding: 25px; border-radius: 16px; width: 100%; max-width: 500px; box-shadow: 0 15px 35px rgba(0,0,0,0.3); margin-top: 30px; position: relative;">
+                <button id="btnCloseAiGenerator" onclick="document.getElementById('aiGeneratorModal').classList.add('hidden')" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 1.8rem; color: #64748b; cursor: pointer;">&times;</button>
+                <h2 style="color: #4f46e5; margin-top: 0; margin-bottom: 5px; display: flex; align-items: center; gap: 10px;">
+                    <span>🎙️</span> Generatore AI 
+                </h2>
+                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 20px;">Registra un memo vocale o allega documenti. L'AI estrarrà i dati creando una bozza pronta per essere salvata in Programmati.</p>
+
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <!-- Sezione Registrazione Audio -->
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; text-align: center;">
+                        <div id="aiAudioStatusLabel" style="font-size: 0.9rem; font-weight: 600; color: #334155; margin-bottom: 10px;">Pronto per registrare</div>
+                        
+                        <button id="btnAiRecordAudio" style="background: #3b82f6; color: white; padding: 15px 30px; border: none; border-radius: 30px; font-size: 1.1rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0 auto; transition: all 0.2s;">
+                            <span>🎤</span> <span>PREMI PER PARLARE</span>
+                        </button>
+                        
+                        <div id="aiRecordingIndicator" class="hidden" style="margin-top: 15px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #ef4444; font-weight: bold; animation: pulse 1s infinite;">
+                            <span style="width: 10px; height: 10px; background: #ef4444; border-radius: 50%; display: inline-block;"></span>
+                            Registrazione in corso... (<span id="aiRecordingTime">00:00</span>)
+                        </div>
+
+                        <!-- Player Anteprima Audio Registrato -->
+                        <div id="aiAudioPreviewContainer" class="hidden" style="margin-top: 15px;">
+                            <audio id="aiAudioPlayer" controls style="width: 100%; height: 40px; border-radius: 20px;"></audio>
+                            <button id="btnAiDeleteAudio" style="background: none; border: none; color: #ef4444; font-size: 0.8rem; font-weight: bold; text-decoration: underline; cursor: pointer; margin-top: 5px;">Rimuovi Audio</button>
+                        </div>
+                    </div>
+
+                    <!-- Sezione Allegati Multipli -->
+                    <div style="background: #fff; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 15px; text-align: center;">
+                        <input type="file" id="aiGeneratorFileInput" accept="image/*,application/pdf,audio/*" multiple style="display:none;">
+                        <button id="btnAiBrowseFiles" style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #475569; padding: 8px 15px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.9rem;">
+                            📎 Sfoglia Immagini / PDF / Audio
+                        </button>
+                        <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 5px;">Oppure INCOLLA dal blocco note (CTRL+V) in questa finestra</div>
+                        
+                        <!-- Griglia Anteprima File -->
+                        <div id="aiFilesPreviewGrid" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; justify-content: center;"></div>
+                    </div>
+
+                    <!-- Tasto Azione Finale -->
+                    <button id="btnAiGenerateFinal" class="btn btn-primary btn-large" style="background: linear-gradient(135deg, #a855f7, #6366f1); border: none; box-shadow: 0 4px 15px rgba(99,102,241,0.4); margin: 0;">
+                        <span class="btn-icon">🧠</span> ELABORA PROPOSTA
+                    </button>
+                </div>
+                
+                <!-- Loader Overlay -->
+                <div id="aiGeneratorLoaderOverlay" class="hidden" style="position: absolute; inset: 0; background: rgba(255,255,255,0.9); border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10;">
+                    <div class="dot-pulse" style="margin-bottom: 20px;"><i></i><i></i><i></i></div>
+                    <strong style="color: #4f46e5; text-align: center; padding: 0 20px;">L'Intelligenza Artificiale sta analizzando i documenti...</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL ARCHIVIO BOZZE AI -->
+        <div id="aiDraftsModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f8fafc; z-index: 5500; overflow-y: auto; display: flex; flex-direction: column;">
+            <div style="background: white; padding: 15px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10;">
+                <h2 style="margin: 0; color: #4f46e5; display: flex; align-items: center; gap: 10px; font-size:1.3rem;">
+                    <span class="btn-icon">✨</span> Archivio Bozze AI
+                </h2>
+                <button id="btnCloseAiDrafts" onclick="document.getElementById('aiDraftsModal').classList.add('hidden')" class="btn btn-secondary" style="margin: 0; border: none; font-size: 1.5rem; background: none; color: #64748b; padding: 0 10px;">&times;</button>
+            </div>
+            
+            <div style="padding: 20px; flex: 1; overflow-y: auto; max-width: 800px; margin: 0 auto; width: 100%;">
+                <p style="color: #64748b; font-size: 0.95rem; margin-top: 0; text-align:center;">Queste proposte sono state estratte dall'Intelligenza Artificiale ma <strong>non sono ancora ufficiali</strong>. Verificale e clicca "Approva" per trasferirle nel database reale di Antimo.</p>
+                <div id="aiDraftsCardsContainer" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
+                    <!-- Card delle bozze Popolate via JS -->
+                    <div style="text-align: center; color: #94a3b8; padding: 30px;">Caricamento in corso...</div>
+                </div>
+            </div>
+        </div>
+
     </main>
 
-    <!-- MODAL VALORIZZAZIONE ATTIVITÀ -->
-    <div id="valorizzazioneModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2300; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
-        <div style="background: white; padding: 20px; border-radius: 12px; width: 95%; max-width: 900px; margin: 20px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2); display: flex; flex-direction: column;">
-            <h3 style="color: #15803d; margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center; border-bottom: 2px solid #bbf7d0; padding-bottom: 10px;">
-                <span><span class="btn-icon">💰</span> Valorizzazione Attività</span>
-                <button id="btnCloseValuation" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
-            </h3>
-            
-            <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; background: #f0fdf4; padding: 15px; border-radius: 8px; border: 1px solid #bbf7d0;">
-                <div style="flex: 1; min-width: 150px;">
-                    <label style="font-size: 0.8rem; font-weight: bold; color: #166534;">Periodo / Modus</label>
-                    <select id="valPeriod" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px;">
-                        <option value="oggi">Oggi</option>
-                        <option value="ieri">Ieri</option>
-                        <option value="mese_corrente" selected>Questo Mese</option>
-                        <option value="mese_scorso">Mese Scorso</option>
-                        <option value="trimestre">Questo Trimestre</option>
-                        <option value="anno">Quest'Anno</option>
-                        <option value="custom">Date Personalizzate...</option>
-                    </select>
-                </div>
-                <div id="valCustomDates" class="hidden" style="flex: 2; display: flex; gap: 10px; min-width: 250px;">
-                    <div style="flex: 1;">
-                        <label style="font-size: 0.8rem; font-weight: bold; color: #166534;">Dal</label>
-                        <input type="date" id="valDateFrom" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px;">
-                    </div>
-                    <div style="flex: 1;">
-                        <label style="font-size: 0.8rem; font-weight: bold; color: #166534;">Al</label>
-                        <input type="date" id="valDateTo" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px;">
-                    </div>
-                </div>
-                <div style="flex: 1; min-width: 150px;">
-                    <label style="font-size: 0.8rem; font-weight: bold; color: #166534;">Ruolo</label>
-                    <select id="valRole" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px;">
-                        <option value="">Tutti i Ruoli</option>
-                        <!-- Popolato dinamicamente -->
-                    </select>
-                </div>
-                <div style="flex: 1; min-width: 150px;">
-                    <label style="font-size: 0.8rem; font-weight: bold; color: #166534;">Operatore/Tecnico</label>
-                    <select id="valOperator" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px;">
-                        <option value="">Tutti gli Operatori</option>
-                        <!-- Popolato dinamicamente -->
-                    </select>
-                </div>
+    
+    <!-- CHANGELOG NOTIFICATION (Floating Badge) -->
+    <div id="changelogNotification" class="hidden" style="position: fixed; bottom: 20px; right: 20px; background-color: var(--orange); color: white; padding: 15px 20px; border-radius: 8px; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 9999; display: flex; align-items: center; gap: 10px; cursor: pointer; border: 2px solid white;">
+        <div style="font-size: 1.5rem; animation: pulse 2s infinite;">🆕</div>
+        <div id="changelogNotificationText" style="font-size: 0.85rem; font-weight: bold;">Ci sono nuove modifiche software da leggere!</div>
+    </div>
 
-                <div style="display: flex; align-items: flex-end;">
-                    <button id="btnCalculateValuation" class="btn btn-primary" style="margin: 0; padding: 8px 15px; background: #22c55e; border-color: #16a34a;"><span class="btn-icon">🧮</span> CALCOLA</button>
-                </div>
-            </div>
-
-            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-                <div style="flex: 1; background: #f8fafc; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #e2e8f0;">
-                    <div style="font-size: 0.85rem; color: #64748b; font-weight: bold; text-transform: uppercase;">Totale Interventi Validi</div>
-                    <div id="valTotalCount" style="font-size: 1.8rem; font-weight: bold; color: #0f172a;">0</div>
-                </div>
-                <div style="flex: 1; background: #ecfdf5; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #6ee7b7;">
-                    <div style="font-size: 0.85rem; color: #047857; font-weight: bold; text-transform: uppercase;">Valore Economico Totale</div>
-                    <div id="valTotalAmount" style="font-size: 1.8rem; font-weight: bold; color: #059669;">€ 0.00</div>
-                </div>
-            </div>
-
-            <h4 style="color: #334155; margin-bottom: 10px; font-size: 1rem;">Dettaglio Attività Valutate</h4>
-            <div style="overflow-x: auto; max-height: 400px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                <table id="valDetailsTable" style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
-                    <thead style="background: #f1f5f9; position: sticky; top: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                        <tr>
-                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155;">Data</th>
-                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155;">Operatore</th>
-                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155;">Ruolo / Paziente</th>
-                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155;">Tipo Intervento</th>
-                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155; text-align: right;">Valore Unit.</th>
-                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155; text-align: right;">Valore Tot.</th>
-                            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #334155; text-align: center; width: 40px;"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="valDetailsTableBody">
-                        <tr><td colspan="7" style="padding: 20px; text-align: center; color: #94a3b8;">Imposta i filtri e clicca su Calcola per visualizzare la valorizzazione economica.</td></tr>
-                    </tbody>
-                </table>
+    <!-- CHANGELOG MODAL -->
+    <div id="changelogModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10000; padding: 15px; display: flex; align-items: center; justify-content: center;">
+        <div class="card glass-card" style="width: 100%; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; background: #fff; border-top: 4px solid var(--blue-dark);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; color: var(--blue-dark); display:flex; align-items:center; gap:8px;">🆕 Modifiche Software</h3>
+                <button id="btnCloseChangelog" style="background:none; border:none; font-size: 1.8rem; color: #666; cursor: pointer;">&times;</button>
             </div>
             
-            <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
-                <button id="valExportBtn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 6px 12px; display: none;">📥 ESPORTA CSV</button>
+            <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #cbd5e1;">
+                <div style="font-size:0.8rem; font-weight:bold; color:var(--blue-dark); margin-bottom:6px;">Aggiungi una modifica o nota di rilascio:</div>
+                <textarea id="clTesto" rows="3" placeholder="Scrivi i dettagli dell'aggiornamento..." style="width:100%; border-radius:6px; padding:10px; border:1px solid #ccc; font-size:0.9rem; resize:vertical; outline: none;"></textarea>
+                <div style="display:flex; justify-content:flex-end; margin-top: 8px;">
+                    <button id="btnSaveChangelog" class="btn btn-primary btn-sm" style="margin:0; padding:6px 15px;"><span class="btn-icon">✅</span> Pubblica</button>
+                </div>
+            </div>
+
+            <div id="changelogList" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right:5px;">
+                <div style="text-align: center; color: #666; font-size:0.9rem;">Caricamento in corso...</div>
             </div>
         </div>
     </div>
-    <script type="module" src="app.js?v=58"></script>
-    <script type="module" src="ai_chat.js?v=12"></script>
-    <script type="module" src="global_notifications.js?v=58"></script>
+
+    <!-- MODAL MULTI-SELECT INCARICHI -->
+    <div id="incarichiModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2500; display: flex; align-items: center; justify-content: center; padding: 15px;">
+        <div style="background: white; padding: 20px; border-radius: 12px; width: 100%; max-width: 380px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); display: flex; flex-direction: column; max-height: 85vh;">
+            <h3 style="color: var(--blue-dark); margin-top: 0; margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+                <span>👥 Filtro Incarichi</span>
+                <button id="btnCloseIncarichi" style="background:none; border:none; font-size:1.8rem; cursor:pointer; color: #64748b;">&times;</button>
+            </h3>
+            
+            <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: bold; color: var(--blue-primary);">
+                    <input type="checkbox" id="cbxIncarichiTutti" value="TUTTI" style="width: 20px; height: 20px; cursor: pointer;" checked>
+                    🌍 Tutti gli Incaricati
+                </label>
+            </div>
+
+            <div id="incarichiListContainer" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; padding-right: 5px;">
+                <div style="text-align: center; color: #666; font-size:0.9rem;">Caricamento in corso...</div>
+            </div>
+
+            <button id="btnApplyIncarichi" class="btn btn-primary btn-blue" style="width: 100%; padding: 14px; font-size: 1.05rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <span class="btn-icon">✔️</span> APPLICA FILTRO
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL GESTIONE ACCESSORI DEDICATI -->
+    <div id="manageAccessoriModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2300; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
+        <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+            <h3 style="color: var(--blue-dark); margin-bottom: 10px; display:flex; justify-content: space-between; align-items:center;">
+                <span id="manageAccessoriTitle"><span class="btn-icon">⚙️</span> Accessori Dedicati</span>
+                <button id="btnCloseManageAccessori" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+            </h3>
+            <p style="font-size: 0.85rem; color: #555; margin-bottom: 15px;">Aggiungi qui gli accessori o componenti *esclusivi* per questo dispositivo.</p>
+            
+            <div style="display:flex; gap: 10px; margin-bottom: 20px; align-items: center;">
+                <input type="text" id="newAccessorioDesc" placeholder="Es. Filtro Batterico..." style="flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem;">
+                <button id="btnAddAccessorio" class="btn btn-primary btn-orange" style="margin: 0; padding: 10px 15px; font-size: 0.95rem;"><span class="btn-icon">➕</span> Aggiungi</button>
+            </div>
+
+            <div style="max-height: 250px; overflow-y: auto;">
+                <table id="accessoriSetupTable" style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                    <!-- Popolato dinamicamente da app.js -->
+                </table>
+            </div>
+            
+            <button id="btnSaveAccessoriFirebase" class="btn btn-primary btn-blue" style="width: 100%; margin: 20px 0 0 0; padding: 12px; font-size: 1rem;">
+                <span class="btn-icon">💾</span> SALVA ACCESSORI E CHIUDI
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL BARCODE SCANNER -->
+    <div id="barcodeScannerModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+        <div style="width: 100%; max-width: 600px; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+            <div style="padding: 15px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; color: #1e293b; font-size: 1.1rem;"><span class="btn-icon">📷</span> Scansione Codice a Barre</h3>
+                <button id="btnCloseBarcodeScanner" style="background: none; border: none; font-size: 1.5rem; color: #64748b; cursor: pointer;">&times;</button>
+            </div>
+            <div id="qr-reader" style="width: 100%; min-height: 300px;"></div>
+            <div style="padding: 15px; text-align: center; color: #64748b; font-size: 0.9rem;">
+                Inquadra il codice a barre o QR Code. Verrà letto automaticamente.
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="app.js?v=63"></script>
+    <script type="module" src="ai_chat.js?v=63"></script>
+    <script type="module" src="global_notifications.js?v=63"></script>
     <script>
       // Gestione layout PC
       document.addEventListener('DOMContentLoaded', () => {
