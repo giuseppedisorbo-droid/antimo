@@ -19,7 +19,7 @@
             <div style="display: flex; gap: 8px; align-items: center;">
                 <button id="btnSettings" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: white; padding: 0;" title="Impostazioni">⚙️</button>
                 <button id="btnTogglePC" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; font-weight: bold; font-size: 0.75rem; cursor: pointer;">PC</button>
-                <a href="anagrafiche.html" id="btnTopAnag" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: flex; align-items: center; gap: 4px;">📇 ANAG</a>
+                <a href='/anagrafiche' id='btnTopAnag' style='background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: flex; align-items: center; gap: 4px;'>📇 ANAG</a>
                 <button id="btnIncarichiFilter" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; font-weight: bold; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">
                     👤 INCARICHI
                 </button>
@@ -36,9 +36,9 @@
             
             <!-- Lato Sinistro (Dashboard, Utente, Versione) -->
             <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
-                <a href="admin.html" id="btnOpenDashboard" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 6px 8px; color: white; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: inline-flex; align-items: center; width: fit-content; gap: 4px;">💻 Dashboard</a>
+                <a href='/admin' id='btnOpenDashboard' style='background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 6px 8px; color: white; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: inline-flex; align-items: center; width: fit-content; gap: 4px;'>💻 Dashboard</a>
                 <div id="loggedInUserDisplay" style="font-size: 0.75rem; color: #fcd34d; font-weight: bold; line-height: 1.1; margin-top: 2px;"></div>
-                <div id="appVersionStamp" style="font-size: 0.65rem; color: rgba(255,255,255,0.7); cursor: pointer; line-height: 1.1;" onclick="nukeCache()">v63.0 - AutoSync v63</div>
+                <div id="appVersionStamp" style="font-size: 0.65rem; color: rgba(255,255,255,0.7); cursor: pointer; line-height: 1.1;" onclick="nukeCache()">v62.0 - AutoSync v62</div>
                 
                 <button id="btnTopNotification" class="hidden" style="margin-top: 2px; background: #e11d48; color: white; border-radius: 6px; padding: 4px 8px; border: 1px solid rgba(255,255,255,0.5); cursor: pointer; font-weight: 600; font-size: 0.7srem; align-items: center; max-width: 120px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
                     🔔 <span id="topNotificationText"></span>
@@ -210,7 +210,7 @@
         <section class="card glass-card hidden" id="plannedInterventionsSection" style="margin-bottom: 20px; border-left: 4px solid var(--orange);">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <h2 style="color: var(--orange); margin:0;"><span class="btn-icon">📅</span> Tutti i Programmati</h2>
-                <a href="programmati.html" style="font-size: 0.8rem; text-decoration: underline; color: var(--blue-primary); font-weight: 600;">Gestisci &rarr;</a>
+                <a href='/programmati' style='font-size: 0.8rem; text-decoration: underline; color: var(--blue-primary); font-weight: 600;'>Gestisci &rarr;</a>
             </div>
             <div id="plannedList" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
                 <!-- Gli interventi programmati verranno creati qui da app.js -->
@@ -221,7 +221,7 @@
         <section class="card glass-card hidden" id="npInterventionsSection" style="margin-bottom: 20px; border-left: 4px solid #ef4444;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <h2 style="color: #ef4444; margin:0;"><span class="btn-icon">⏳</span> Non Programmati (NP)</h2>
-                <a href="programmati.html" style="font-size: 0.8rem; text-decoration: underline; color: var(--blue-primary); font-weight: 600;">Gestisci &rarr;</a>
+                <a href='/programmati' style='font-size: 0.8rem; text-decoration: underline; color: var(--blue-primary); font-weight: 600;'>Gestisci &rarr;</a>
             </div>
             <div id="npList" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
                 <!-- Gli interventi in attesa verranno creati qui da app.js -->
@@ -231,7 +231,7 @@
         <!-- PULSANTE ANAGRAFICHE SPOSTATO NEL HEADER -->
         <!-- NUOVO INTERVENTO & VALORIZZAZIONE -->
         <div id="nuovoInterventoBtnContainer" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
-            <a href="programmati.html" id="btnToggleNuovoIntervento" class="btn btn-primary btn-blue btn-large" style="width: 100%; border: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(30,58,138,0.2); display: flex; align-items: center; justify-content: center; gap: 8px; color: white; margin: 0; cursor: pointer; text-decoration: none;">
+            <a class='btn btn-primary btn-blue btn-large' href='/programmati' id='btnToggleNuovoIntervento' style='width: 100%; border: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(30,58,138,0.2); display: flex; align-items: center; justify-content: center; gap: 8px; color: white; margin: 0; cursor: pointer; text-decoration: none;'>
                 <span style="font-size: 1.4rem;">📅</span> CALENDARIO PROGRAMMAZIONE
             </a>
             
@@ -985,9 +985,9 @@
         </div>
     </div>
 
-    <script type="module" src="app.js?v=63"></script>
-    <script type="module" src="ai_chat.js?v=63"></script>
-    <script type="module" src="global_notifications.js?v=63"></script>
+    <script type="module" src="app.js?v=62"></script>
+    <script type="module" src="ai_chat.js?v=62"></script>
+    <script type="module" src="global_notifications.js?v=62"></script>
     <script>
       // Gestione layout PC
       document.addEventListener('DOMContentLoaded', () => {

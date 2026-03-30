@@ -1,0 +1,19 @@
+node:internal/modules/esm/load:46
+    throw new ERR_UNSUPPORTED_ESM_URL_SCHEME(url, supportedSchemes);
+          ^
+
+Error [ERR_UNSUPPORTED_ESM_URL_SCHEME]: Only URLs with a scheme in: file and data are supported by the default ESM loader. Received protocol 'https:'
+    at getSourceSync (node:internal/modules/esm/load:46:11)
+    at defaultLoadSync (node:internal/modules/esm/load:153:34)
+    at #loadAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:796:12)
+    at #loadSync (node:internal/modules/esm/loader:816:49)
+    at ModuleLoader.load (node:internal/modules/esm/loader:781:26)
+    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:526:31)
+    at #getOrCreateModuleJobAfterResolve (node:internal/modules/esm/loader:577:36)
+    at afterResolve (node:internal/modules/esm/loader:625:52)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:631:12)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:160:33) {
+  code: 'ERR_UNSUPPORTED_ESM_URL_SCHEME'
+}
+
+Node.js v24.14.0

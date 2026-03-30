@@ -46,7 +46,7 @@ try {
     
     // Estrai la modale
     const modalStartHTML = "<!-- MODAL VALORIZZAZIONE ATTIVITÀ -->";
-    const modalEndHTML = '<script type="module" src="app.js?v=58"></script>';
+    const modalEndHTML = '<script type="module" src="app.js?v=61"></script>';
     let modStartIdx = indexHtmlContent.indexOf(modalStartHTML);
     let modEndIdx = indexHtmlContent.lastIndexOf('</div>', indexHtmlContent.indexOf(modalEndHTML));
     
