@@ -3,1032 +3,441 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon.svg">
     <link rel="manifest" href="manifest.json">
-    <title>Gestione Attività Esterne</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            alert("Error: " + msg + "\nLine: " + line);
+            return false;
+        };
+        window.addEventListener('unhandledrejection', function(event) {
+            alert("Promise Error: " + (event.reason ? event.reason.message : "Scrittura DB fallita. Controlla connessione."));
+        });
+    </script>
+    <title>Progetto Paolo V3</title>
+    <link rel="stylesheet" href="style.css?v=6.4">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <header class="top-nav" style="display: flex; flex-direction: column; gap: 10px; padding: calc(12px + env(safe-area-inset-top, 20px)) 12px 12px 12px; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
-        
-        <!-- Riga 1: Controlli e Filtro -->
-        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-            <div style="display: flex; gap: 8px; align-items: center;">
-                <button id="btnSettings" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: white; padding: 0;" title="Impostazioni">⚙️</button>
-                <button id="btnTogglePC" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; font-weight: bold; font-size: 0.75rem; cursor: pointer;">PC</button>
-                <a href="anagrafiche.html" id="btnTopAnag" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: flex; align-items: center; gap: 4px;">📇 ANAG</a>
-                <button id="btnIncarichiFilter" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 4px 8px; color: white; font-weight: bold; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                    👤 INCARICHI
-                </button>
+    
+    <!-- Login Overlay (Cannot be closed until logged in) -->
+    <div id="loginOverlay" class="modal-fs open" style="z-index: 9999;">
+        <div class="modal-body" style="display:flex; flex-direction:column; justify-content:center; align-items:center; height:100%; background:white;">
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color:var(--primary); font-size:2rem; margin-bottom:10px; line-height:1.2;">Gestione Attività<br>Manutenzione</h1>
+                <p style="color:var(--text-muted); line-height:1.4;"><strong>v6.4</strong></p>
             </div>
-            <select id="filterTecnicoOggi" style="padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.5); background: rgba(0,0,0,0.2); color: white; font-weight: bold; font-size: 0.75rem; outline: none; cursor: pointer; max-width: 140px;">
-                <option value="" style="color: black;">Filtro...</option>
-                <option value="MIO" style="color: black;" selected>👨‍🔧 Miei</option>
-                <option value="TUTTI" style="color: black;">🌍 Tutti</option>
+            <select id="loginSelect" style="max-width: 300px;">
+                <option value="">Caricamento utenti...</option>
             </select>
+            <button id="btnLogin" class="btn btn-primary" style="max-width:300px; margin-top:15px;">Accedi</button>
         </div>
+    </div>
 
-        <!-- Riga 2 e 3 combinate (Flex Row per bilanciare i lati) -->
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
-            
-            <!-- Lato Sinistro (Dashboard, Utente, Versione) -->
-            <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
-                <a href="admin.html" id="btnOpenDashboard" style="background: rgba(255,255,255,0.2); border: 1px solid white; border-radius: 6px; padding: 6px 8px; color: white; font-weight: bold; font-size: 0.8rem; text-decoration: none; display: inline-flex; align-items: center; width: fit-content; gap: 4px;">💻 Dashboard</a>
-                <div id="loggedInUserDisplay" style="font-size: 0.75rem; color: #fcd34d; font-weight: bold; line-height: 1.1; margin-top: 2px;"></div>
-                <div id="appVersionStamp" style="font-size: 0.65rem; color: rgba(255,255,255,0.7); cursor: pointer; line-height: 1.1;" onclick="nukeCache()">v62.0 - AutoSync v62</div>
-                
-                <button id="btnTopNotification" class="hidden" style="margin-top: 2px; background: #e11d48; color: white; border-radius: 6px; padding: 4px 8px; border: 1px solid rgba(255,255,255,0.5); cursor: pointer; font-weight: 600; font-size: 0.7srem; align-items: center; max-width: 120px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
-                    🔔 <span id="topNotificationText"></span>
-                </button>
-            </div>
-
-            <!-- Lato Destro (Griglia 8 slot in max 2 righe x 4 colonne) -->
-            <div class="header-stats-grid" style="flex: 2; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-left: 10px;">
-                <div id="btnMostraP" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
-                    <div style="font-size: 0.6rem; text-transform: uppercase;">PT</div>
-                    <div style="font-size: 1rem; font-weight: 700;"><strong id="programmatiCount">0</strong></div>
-                </div>
-                <div id="btnMostraOggi" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
-                    <div style="font-size: 0.6rem; text-transform: uppercase;">Oggi</div>
-                    <div style="font-size: 1rem; font-weight: 700;"><strong id="oggiCount">0</strong></div>
-                </div>
-                <div id="btnMostraDomani" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
-                    <div style="font-size: 0.6rem; text-transform: uppercase;">Domani</div>
-                    <div style="font-size: 1rem; font-weight: 700;"><strong id="domaniCount">0</strong></div>
-                </div>
-                <!-- Pulsante Magazzino (MAG) -->
-                <div id="btnMostraMagazzino" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset; background-color: #ffffff; border: 2px solid #16a34a; box-shadow: 0 4px 6px rgba(0,0,0,0.2); position: relative;">
-                    <div id="badgeMagazzino" class="hidden" style="position: absolute; top: -8px; right: -8px; background: #ef4444; color: white; border-radius: 50%; width: 22px; height: 22px; font-size: 0.75rem; font-weight: bold; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">0</div>
-                    <div style="font-size: 0.7rem; text-transform: uppercase; color: #16a34a; font-weight: 900;">MAG</div>
-                    <div style="font-size: 1rem; font-weight: 700; color: #15803d;">📦</div>
-                </div>
-                
-                <div id="btnMostraNP" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
-                    <div style="font-size: 0.6rem; text-transform: uppercase;">NP</div>
-                    <div style="font-size: 1rem; font-weight: 700;"><strong id="npCount">0</strong></div>
-                </div>
-                <div id="btnMostraNeseguiti" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
-                    <div style="font-size: 0.6rem; text-transform: uppercase; color: #e11d48;">N.Eseg</div>
-                    <div style="font-size: 1rem; font-weight: 700; color: #e11d48;"><strong id="nesegCount">0</strong></div>
-                </div>
-                <div id="btnMostraEseguiti" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset;">
-                    <div style="font-size: 0.6rem; text-transform: uppercase;">Eseg</div>
-                    <div style="font-size: 1rem; font-weight: 700;"><strong id="interventiCount">0</strong></div>
-                </div>
-                <!-- Pulsante AI AUDIO (Generatore Bozze) -->
-                <div id="btnOpenAiGenerator" onclick="document.getElementById('aiGeneratorModal').classList.remove('hidden')" class="header-stat-box" style="cursor: pointer; padding: 4px; min-width: unset; background-color: #6366f1; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
-                    <div style="font-size: 0.65rem; text-transform: uppercase; color: #ffffff; font-weight: 900;">AUDIO</div>
-                    <div style="font-size: 1rem; font-weight: 700; color: #ffffff;">🎙️</div>
-                </div>
-            </div>
+    <!-- Top Header -->
+    <header class="top-header">
+        <div style="display:flex; flex-direction:column;">
+            <h1 id="headerTitle" style="margin:0; line-height:1;">Home</h1>
+            <div id="headerUserInfo" style="font-size:0.7rem; font-weight:600; color:var(--text-muted); margin-top:2px;">v6.4</div>
         </div>
-
-        <!-- NUOVA RIGA: Magic Search Bar -->
-        <div style="width: 100%; margin-top: 5px;">
-            <div style="position: relative; width: 100%;">
-                <input type="text" id="magicSearchApp" placeholder="🔍 Ricerca Magica globale (Paziente, Città)..." style="width: 100%; padding: 8px 15px 8px 35px; border-radius: 20px; border: none; font-size: 0.9rem; outline: none; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); background: rgba(255,255,255,0.95); color: #333;">
-                <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 1rem;">🔍</span>
-            </div>
-            <button id="btnOpenChangelog" style="width: 100%; margin-top: 8px; padding: 6px 12px; background: rgba(255,255,255,0.2); color: white; border: 1px solid white; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
-                🆕 Modifiche Software
-            </button>
+        <div style="display:flex; gap:15px; align-items:center;">
+            <div id="headerWallet" class="wallet-badge hidden">€ 0.00</div>
+            <button id="btnNotifs" style="background:none; border:none; font-size:1.5rem; position:relative; cursor:pointer;">🔔<span id="notifBadge" class="hidden" style="position:absolute; top:-5px; right:-5px; background:var(--danger); color:white; border-radius:50%; width:18px; height:18px; font-size:0.7rem; font-weight:bold; display:flex; align-items:center; justify-content:center;">0</span></button>
+            <button id="btnTogglePC" onclick="window.togglePcMode()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;" title="Modalità PC">🖥️</button>
+            <button id="btnSettings" onclick="document.getElementById('guideModal').classList.add('open')" style="background:none; border:none; font-size:1.5rem; cursor:pointer;" title="Impostazioni e Guida">⚙️</button>
         </div>
     </header>
+    
+    <!-- Notification Panel -->
+    <div id="notifPanel" class="modal-fs">
+        <div class="modal-header"><h2 id="notifTitle">Notifiche</h2><button class="btn-close-modal" id="btnCloseNotif">&times;</button></div>
+        <div class="modal-body" id="notifList"></div>
+    </div>
 
-    <main class="container">
-        <!-- Datalist Autocomplete -->
-        <datalist id="assistitiDatalist"></datalist>
-        <!-- GLOBAL TOGGLE FOR LISTS -->
-        <div id="globalToggleCardContainer" class="hidden" style="display: none; text-align: right; width: 100%;">
-            <button id="btnToggleAllCollapse" class="btn btn-secondary btn-sm" style="width: 100%; font-size: 0.95rem; padding: 12px; margin-bottom: 0px;">
-                <span class="btn-icon">⏬</span> APRI TUTTE LE SCHEDE
-            </button>
+    <!-- VIEWS -->
+    
+    <!-- View 1: Tasks / Home (Worker & Admin) -->
+    <main id="view-home" class="view-section active">
+        <div id="homeAdminStats" class="hidden" style="margin-bottom:15px;">
+            <!-- For Admin: brief summary of requests / tasks -->
         </div>
-
-        <!-- SEZIONE UNIFICATA: ATTIVITÀ ESEGUITE (Posizionata in alto) -->
-        <div id="activitiesListContainer" class="hidden" style="margin-bottom: 20px; text-align: left; background: white; border-radius: 12px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-left: 4px solid #166534;">
-            <h3 style="margin-top: 0; margin-bottom: 15px; color: #166534; border-bottom: 2px solid #bbf7d0; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                <span>✅ Eseguiti (Oggi)</span>
-                <button id="btnCloseActivitiesList" style="background:rgba(0,0,0,0.05); border:none; width: 28px; height: 28px; border-radius: 50%; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #666; cursor: pointer;">&times;</button>
-            </h3>
-            <div id="activitiesList" style="max-height: 60vh; overflow-y: auto; padding: 5px; display: flex; flex-direction: column; gap: 8px;">
-                <!-- I task vengono inseriti qui da app.js (Rossi/Verdi) -->
-            </div>
-            
-            <button class="btn btn-primary btn-blue hidden" id="btnShareCSV" style="width: 100%; margin-top: 15px; padding: 12px;">
-                 <span class="btn-icon">📤</span> ESTRAI & CONDIVIDI CSV
-            </button>
+        <div id="feedList">
+            <div class="text-center" style="color:var(--text-muted); margin-top:40px;">Caricamento...</div>
         </div>
-
-        <!-- BOZZE AI - DA APPROVARE -->
-        <div id="aiDraftsContainer" style="margin-bottom: 20px;">
-            <button id="btnOpenAiDrafts" onclick="document.getElementById('aiDraftsModal').classList.remove('hidden')" class="btn btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; background: linear-gradient(135deg, #a855f7, #6366f1); border: none; font-size: 1rem; padding: 12px; font-weight: 800; box-shadow: 0 4px 10px rgba(99,102,241,0.3); border-radius: 12px;">
-                <span style="font-size: 1.2rem;">✨</span> ARCHIVIO PROPOSTE AI (<strong id="aiDraftsCount" style="color:#ffeb3b;">0</strong>)
-            </button>
-        </div>
-
-        <!-- BACHECA MESSAGGI / NOTIFICHE -->
-        <section class="card glass-card" id="messagesSection" style="margin-bottom: 20px; border-left: 4px solid var(--orange);">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h2 style="color: var(--blue-primary); margin:0;"><span class="btn-icon">💬</span> Bacheca & Notifiche</h2>
-                <div style="display: flex; gap: 5px;">
-                    <button id="btnOpenRubrica" class="btn btn-secondary" style="width: auto; padding: 5px 10px; font-size: 0.8rem; margin: 0; background: var(--orange); color: white; border: none;">📱 Rubrica SMS</button>
-                    <button id="btnToggleMessages" class="btn btn-secondary" style="width: auto; padding: 5px 10px; font-size: 0.8rem; margin: 0;">Mostra</button>
-                </div>
-            </div>
-            
-            <div id="messagesContainer" class="hidden" style="margin-top: 15px;">
-                <!-- Filtri e Ricerca Bacheca -->
-                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; align-items: center;">
-                    <div style="display: flex; gap: 5px; flex: 1; min-width: 250px;">
-                        <input type="text" id="msgSearchText" placeholder="Cerca testo..." style="flex: 1; font-size: 0.85rem; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px;">
-                        <select id="msgSearchUser" style="flex: 1; font-size: 0.85rem; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px;">
-                            <option value="">Utente (Tutti)</option>
-                        </select>
-                        <input type="date" id="msgSearchDate" style="font-size: 0.85rem; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; max-width: 40px;">
-                    </div>
-                    <div style="display: flex; gap: 8px; justify-content: flex-start; width: 100%; flex-wrap: wrap; padding-bottom: 5px; align-items: center;">
-                        <button id="btnMsgTabAll" class="btn btn-sm btn-primary btn-blue" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Tutti</button>
-                        <button id="btnMsgTabUnread" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Non Letti</button>
-                        <button id="btnMsgTabRead" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">👁️ Letti</button>
-                        <button id="btnMsgTabReceived" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Ricevuti</button>
-                        <button id="btnMsgTabSent" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Inviati</button>
-                        <button id="btnMsgTabInCharge" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">👷 Presi in Carico</button>
-                        <button id="btnMsgTabReplied" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">↩️ Risposti</button>
-                        <button id="btnMsgTabResolved" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">✅ Risolti</button>
-                        <button id="btnMsgTabDeleted" class="btn btn-sm btn-secondary" style="padding: 6px 14px; margin: 0; font-size: 0.75rem; white-space: nowrap; border-radius: 20px;">Cestino</button>
-                        <button id="btnEmptyTrash" class="btn btn-sm btn-danger hidden" style="padding: 6px 14px; margin: 0; margin-left: auto; font-size: 0.75rem; white-space: nowrap; background-color: #ef4444; color: white; border: none; font-weight: bold; border-radius: 20px;">🔥 Svuota</button>
-                    </div>
-                </div>
-
-                <div id="messagesList" style="max-height: 50vh; min-height: 350px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px; margin-bottom: 10px;">
-                    <div style="text-align: center; font-size: 0.9rem; color: #666;">Caricamento messaggi...</div>
-                </div>
-                <hr style="border: 0; border-top: 1px dotted #ccc; margin: 10px 0;">
-                <form id="newMessageForm" style="display: flex; flex-direction: column; gap: 8px;">
-                    <textarea id="msgText" rows="2" placeholder="Scrivi un nuovo messaggio o comunicazione..." style="width: 100%; border-radius: 8px; border: 1px solid #ccc; padding: 10px; font-family: inherit; font-size: 0.9rem;" required></textarea>
-                    
-                    <div class="form-group" style="background: rgba(59,130,246,0.05); padding: 10px; border-radius: 8px; border: 1px dashed var(--blue-primary); margin-bottom: 0;">
-                        <label for="msgAttachments" style="font-size: 0.85rem; font-weight: bold; color: var(--blue-dark);">📎 Allega File (Foto, PDF, Video)</label>
-                        <input type="file" id="msgAttachments" multiple accept="image/*,video/*,application/pdf" style="font-size: 0.85rem; margin-top: 5px; width: 100%;">
-                        <div id="msgPreviewContainer" class="hidden" style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: start; background: rgba(255,255,255,0.5); padding: 5px; border-radius: 8px;">
-                        </div>
-                    </div>
-
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <label style="display: flex; align-items: center; gap: 5px; font-size: 0.85rem; color: var(--blue-dark); cursor: pointer; font-weight: 600;">
-                            <input type="checkbox" id="msgIsNotification" checked style="width: 18px; height: 18px; accent-color: var(--orange);"> 
-                            📌 Fissa come Notifica
-                        </label>
-                        <button type="submit" class="btn btn-primary btn-orange btn-sm" style="width: auto; margin: 0; padding: 8px 15px;" id="btnSendMsg">Invia</button>
-                    </div>
-                </form>
-            </div>
-        </section>
-        <!-- SEZIONE INTERVENTI OGGI -->
-        <section class="card glass-card hidden" id="oggiInterventionsSection" style="margin-bottom: 20px; border-left: 4px solid #3b82f6;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h2 style="color: #3b82f6; margin:0;"><span class="btn-icon">📅</span> Interventi Oggi</h2>
-            </div>
-            <div id="oggiList" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
-            </div>
-        </section>
-
-        <!-- SEZIONE INTERVENTI DOMANI -->
-        <section class="card glass-card hidden" id="domaniInterventionsSection" style="margin-bottom: 20px; border-left: 4px solid #a855f7;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h2 style="color: #a855f7; margin:0;"><span class="btn-icon">📅</span> Interventi Domani</h2>
-            </div>
-            <div id="domaniList" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
-            </div>
-        </section>
-
-        <!-- SEZIONE INTERVENTI PROGRAMMATI (TUTTI) -->
-        <section class="card glass-card hidden" id="plannedInterventionsSection" style="margin-bottom: 20px; border-left: 4px solid var(--orange);">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h2 style="color: var(--orange); margin:0;"><span class="btn-icon">📅</span> Tutti i Programmati</h2>
-                <a href="programmati.html" style="font-size: 0.8rem; text-decoration: underline; color: var(--blue-primary); font-weight: 600;">Gestisci &rarr;</a>
-            </div>
-            <div id="plannedList" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
-                <!-- Gli interventi programmati verranno creati qui da app.js -->
-            </div>
-        </section>
-
-        <!-- SEZIONE INTERVENTI NP - NON PROGRAMMATI (Nascondibile a Piacere) -->
-        <section class="card glass-card hidden" id="npInterventionsSection" style="margin-bottom: 20px; border-left: 4px solid #ef4444;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h2 style="color: #ef4444; margin:0;"><span class="btn-icon">⏳</span> Non Programmati (NP)</h2>
-                <a href="programmati.html" style="font-size: 0.8rem; text-decoration: underline; color: var(--blue-primary); font-weight: 600;">Gestisci &rarr;</a>
-            </div>
-            <div id="npList" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
-                <!-- Gli interventi in attesa verranno creati qui da app.js -->
-            </div>
-        </section>
-
-        <!-- PULSANTE ANAGRAFICHE SPOSTATO NEL HEADER -->
-        <!-- NUOVO INTERVENTO & VALORIZZAZIONE -->
-        <div id="nuovoInterventoBtnContainer" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
-            <a href="programmati.html" id="btnToggleNuovoIntervento" class="btn btn-primary btn-blue btn-large" style="width: 100%; border: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(30,58,138,0.2); display: flex; align-items: center; justify-content: center; gap: 8px; color: white; margin: 0; cursor: pointer; text-decoration: none;">
-                <span style="font-size: 1.4rem;">📅</span> CALENDARIO PROGRAMMAZIONE
-            </a>
-            
-        </div>
-
-        <!-- SEZIONE INSERIMENTO INTERVENTO (NASCOSTA: Funzioni spostate nel calendario) -->
-        <section class="card glass-card hidden" id="interventionSection" style="display: none !important;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h2 style="margin: 0; padding: 0;">Nuovo Intervento</h2>
-                <button id="btnCloseInterventionSection" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #666;">&times;</button>
-            </div>
-            <form id="newInterventionForm">
-                <div class="form-group">
-                    <label for="paziente">Paziente / Ente *</label>
-                    <input type="text" id="paziente" placeholder="Nominativo" list="assistitiDatalist" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="tecnicoAssegnato">Tecnico Assegnato *</label>
-                    <select id="tecnicoAssegnato" required style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.9rem; font-family: inherit;">
-                        <option value="">Seleziona Tecnico...</option>
-                    </select>
-                </div>
-
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <div class="form-group" style="flex: 1; min-width: 140px;">
-                        <label for="localita">Località (Città) *</label>
-                        <input type="text" id="localita" placeholder="Es. Napoli" required>
-                    </div>
-                    <div class="form-group" style="flex: 1; min-width: 140px;">
-                        <label for="indirizzo">Indirizzo *</label>
-                        <input type="text" id="indirizzo" placeholder="Es. Via Roma 1" required>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="telefono">Recapito Telefonico (Opzionale ma Consigliato)</label>
-                    <input type="tel" id="telefono" placeholder="Es. 3331234567">
-                </div>
-                
-                <div class="form-group">
-                    <label for="allegatoFile">Allegato/i (Foto, PDF, o Video) - Operatore Campo</label>
-                    <input type="file" id="allegatoFile" accept="image/*,video/*,application/pdf" multiple>
-                    <div id="filePreviewContainer" class="hidden" style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: start; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px;">
-                        <!-- Le anteprime verranno inserite qui dinamicamente -->
-                    </div>
-                </div>
-
-                <!-- Dynamic Interventions Array Block -->
-                <div id="dynamicInterventionsContainer">
-                    <!-- Dynamic Blocks injected by app.js -->
-                </div>
-                <button type="button" id="btnAddInterventionBlock" class="btn btn-secondary" style="margin-bottom: 15px; width: 100%; background: #e0f2fe; color: var(--blue-dark); border: 1px dashed var(--blue-primary); padding: 10px; border-radius: 8px; font-weight: bold;">
-                    ➕ Aggiungi Dispositivo / Intervento
-                </button>
-
-
-                <div class="form-group">
-                    <label for="note">Eventuali Note</label>
-                    <textarea id="note" rows="2" placeholder="Note sull'intervento..."></textarea>
-                </div>
-                
-                <div class="form-group" style="background: rgba(234, 88, 12, 0.05); padding: 10px; border-radius: 8px; border: 1px dashed var(--orange-accent);">
-                    <label for="allegatoProgrammazione">Allegati Extra (Programmazione / Sede)</label>
-                    <input type="file" id="allegatoProgrammazione" accept="image/*,video/*,application/pdf" multiple>
-                    <div id="progPreviewContainer" class="hidden" style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: start; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px;">
-                        <!-- Le anteprime extra verranno inserite qui dinamicamente -->
-                    </div>
-                </div>
-
-                <div id="kmContainer" class="form-group mt-15 hidden">
-                    <label for="kmPercorsi">Km A/R Percorsi per questo intervento (Obbligatorio se in Impostazioni)</label>
-                    <input type="number" id="kmPercorsi" placeholder="Es. 35">
-                </div>
-
-                <div style="display: flex; gap: 10px; flex-direction: column;">
-                    <button type="submit" class="btn btn-primary btn-orange btn-large" id="btnStartIntervention">
-                        <span class="btn-icon">⚡</span> TERMINA ATTIVITA'
-                    </button>
-                    <button type="button" class="btn btn-success btn-large" id="btnWhatsappNuovoIntervento" style="background-color: #25D366; color: white; border: none; padding: 15px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.2); display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
-                        <span class="btn-icon" style="font-size: 1.4rem;">💬</span> WHATSAPP "NUOVO INTERVENTO"
-                    </button>
-                    
-                    <div style="border-top: 1px dashed #ccc; margin-top: 10px; padding-top: 10px;">
-                        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                            <div style="flex: 1;">
-                                <label for="dataProgrammata"><strong>Data Prevista</strong></label>
-                                <input type="date" id="dataProgrammata" style="width: 100%;">
-                            </div>
-                            <div style="flex: 1;">
-                                <label for="oraProgrammata"><strong>Ora Prevista</strong></label>
-                                <input type="time" id="oraProgrammata" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
-                            </div>
-                        </div>
-                        <button type="button" class="btn" id="btnPlanIntervention" style="background-color: #e2e8f0; color: var(--blue-dark); font-weight: 600; padding: 12px; border: 1px solid #cbd5e1; width: 100%;">
-                             <span class="btn-icon">📅</span> SALVA IN PROGRAMMATI
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </section>
-
-        <!-- SEZIONE INTERVENTO IN CORSO RIMOSSA IN FAVORE DELLA COMPILAZIONE DIRETTA A FASE SINGOLA -->
-        <!-- SEZIONE RIEPILOGO & EXPORT SPOSTATA IN ALTO CON ESEGUITI -->
-
-        <!-- MODAL MOTIVAZIONE NON ESEGUITO -->
-        <div id="justifyModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; align-items: center; justify-content: center;">
-            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px;">
-                <h3 style="color: var(--blue-dark); margin-bottom: 10px;">Intervento Non Eseguito</h3>
-                <p style="font-size: 0.9rem; margin-bottom: 15px;">Inserisci una motivazione obbligatoria per segnalare questo intervento come NON eseguito.</p>
-                <textarea id="justifyReason" rows="3" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-family: inherit;" placeholder="Es. Paziente non in casa, strumento rotto..."></textarea>
-                <div style="display: flex; gap: 10px; margin-top: 15px;">
-                    <button id="btnCancelJustify" class="btn" style="background: #e2e8f0; color: #333; padding: 10px; flex: 1;">Annulla</button>
-                    <button id="btnConfirmJustify" class="btn btn-danger" style="padding: 10px; flex: 1;">Conferma</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL IMPOSTAZIONI -->
-        <div id="settingsModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; display: flex; align-items: center; justify-content: center;">
-            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
-                    <span><span class="btn-icon">⚙️</span> Impostazioni App</span>
-                    <button id="btnCloseSettings" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
-                </h3>
-                
-                <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee;">
-                    <div>
-                        <strong style="display: block; color: var(--blue-dark);">Richiedi Km Fine Intervento</strong>
-                        <span style="font-size: 0.8rem; color: #666;">Se disattivato, il campo km viene nascosto.</span>
-                    </div>
-                    <label style="position: relative; display: inline-block; width: 50px; height: 28px;">
-                        <input type="checkbox" id="toggleRequireKm" style="opacity: 0; width: 0; height: 0;">
-                        <span class="slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px;"></span>
-                        <style>
-                            .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-                            input:checked + .slider { background-color: #22c55e; }
-                            input:checked + .slider:before { transform: translateX(22px); }
-                        </style>
-                    </label>
-                </div>
-                
-                <div style="margin-top: 20px;">
-                    <button class="btn btn-primary btn-blue" id="btnOpenUsersList" style="width: 100%; padding: 12px; margin-bottom: 10px; font-weight: bold;">
-                        <span class="btn-icon">👥</span> GESTIONE DIPENDENTI
-                    </button>
-                    <button class="btn btn-primary btn-blue" id="btnOpenListsSetup" style="width: 100%; padding: 12px; margin-bottom: 10px; font-weight: bold; background: #6366f1; border-color: #4f46e5;">
-                        <span class="btn-icon">📋</span> GESTIONE VOCI (DISP/INT)
-                    </button>
-                    <button class="btn btn-primary btn-orange" id="btnManualSyncMobile" style="width: 100%; padding: 12px;">
-                        <span class="btn-icon">🔄</span> SINCRONIZZA CON CLOUD
-                    </button>
-                    <button class="btn btn-primary" id="btnLaunchAiChatDirectly" style="width: 100%; padding: 12px; margin-top: 10px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; font-weight: bold; box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);">
-                        <span class="btn-icon">💬</span> ASSISTENTE IA (GEMINI)
-                    </button>
-                    <button class="btn btn-primary btn-blue" id="btnOpenBackup" style="width: 100%; padding: 12px; margin-top: 10px;">
-                        <span class="btn-icon">💾</span> BACKUP VERSIONI
-                    </button>
-                    <button class="btn btn-primary btn-orange" id="btnOpenDataBackup" style="width: 100%; padding: 12px; margin-top: 10px;">
-                        <span class="btn-icon">🗄️</span> BACKUP DATI & RIPRISTINO
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL GESTIONE VOCI (DISP/INT) -->
-        <div id="listsSetupModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2200; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
-            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 600px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
-                    <span><span class="btn-icon">📋</span> Gestione Voci</span>
-                    <button id="btnCloseListsSetup" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
-                </h3>
-                
-                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-                    <button id="btnTabInterventi" class="btn btn-primary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal; background: var(--blue-primary); min-width: 80px;">Interventi</button>
-                    <button id="btnTabDispositivi" class="btn btn-secondary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal; min-width: 80px;">Dispositivi</button>
-                    <button id="btnTabRuoli" class="btn btn-secondary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal; min-width: 80px;">Ruoli</button>
-                    <button id="btnTabSeqex" class="btn btn-secondary" style="flex: 1; padding: 8px; margin: 0; font-weight: normal; min-width: 100px;">Prog. SEQEX</button>
-                </div>
-
-                <div id="listsContentContainer" style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1;">
-                    <div style="display:flex; gap: 10px; margin-bottom: 15px; align-items: center;">
-                        <input type="text" id="newListItemDesc" placeholder="Es. Visita..." style="flex: 2; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
-                        <input type="number" id="newListItemVal" placeholder="Valore €" step="0.01" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; min-width: 80px;" title="Valore in Euro (lasciare vuoto se non applicabile)">
-                        <button id="btnAddListItem" class="btn btn-primary btn-orange" style="margin: 0; padding: 8px 15px;"><span class="btn-icon">➕</span> Agg.</button>
-                    </div>
-
-                    <div style="max-height: 300px; overflow-y: auto;">
-                        <table id="listsSetupTable" style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
-                            <!-- Le voci verranno popolate da JS -->
-                        </table>
-                    </div>
-                    <button id="btnSaveFirebaseLists" class="btn btn-primary" style="width: 100%; margin: 15px 0 0 0;"><span class="btn-icon">💾</span> SALVA MODIFICHE E CHIUDI</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL DATA BACKUP -->
-        <div id="dataBackupModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2100; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
-            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 600px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
-                    <span><span class="btn-icon">💾</span> Gestione Dati (Server)</span>
-                    <button id="btnCloseDataBackup" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
-                </h3>
-
-                <div style="background: #eff6ff; padding: 15px; border-radius: 8px; border: 1px solid #bfdbfe; margin-bottom: 20px;">
-                    <h4 style="margin:0 0 10px; color: #1e40af;">🤖 Backup Automatico Firebase</h4>
-                    <p style="font-size: 0.85rem; color: #1e3a8a; margin-bottom: 5px;">
-                        L'app esegue un <strong>salvataggio giornaliero invisibile</strong> di tutti i dati ogni volta che un Amministratore apre la pagina <em>Dashboard</em> nel browser.
-                    </p>
-                    <!-- Versione App -->
-                    <div style="font-size: 0.85rem; color: #1e3a8a; font-weight: bold; margin-bottom: 5px;">
-                        v61.0 - Mass Delete & SyncFix
-                    </div>
-                    <p style="font-size: 0.85rem; color: #1e3a8a; margin-bottom: 0;">
-                        <strong>In caso di disastro grave</strong>: Entra sul sito Firebase &gt; vai in <strong>Storage</strong> &gt; apri la cartellina <code>backups_giornalieri</code>, scarica sul PC il file .json del giorno sano precedente ed importalo qui sotto.
-                    </p>
-                </div>
-                
-                <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 20px;">
-                    <h4 style="margin:0 0 10px; color: #b45309;">Esporta Database</h4>
-                    <p style="font-size: 0.85rem; color: #555; margin-bottom: 10px;">Crea una copia locale di tutti gli Interventi, Programmati, Messaggi e Anagrafiche estraendoli dal Cloud in un formidabile file JSON.</p>
-                    <button id="btnExportDataJson" class="btn btn-primary btn-orange" style="margin: 0; width: 100%;"><span class="btn-icon">⬇️</span> Scarica Database (.json)</button>
-                </div>
-
-                <div style="background: #fef2f2; padding: 15px; border-radius: 8px; border: 1px solid #fecaca;">
-                    <h4 style="margin:0 0 10px; color: #dc2626;">Ripristina Database</h4>
-                    <p style="font-size: 0.85rem; color: #7f1d1d; margin-bottom: 10px;">Questa operazione caricherà un file JSON esportato e andrà a re-inserire o aggiornare i record sul Server. Consigliato solo in caso di emergenza o migrazione.</p>
-                    <input type="file" id="importDataFile" accept=".json" style="width: 100%; padding: 8px; font-size: 0.85rem; border: 1px solid #ccc; border-radius: 4px; background: white; margin-bottom: 10px;">
-                    <button id="btnImportDataJson" class="btn btn-danger" style="margin: 0; width: 100%;"><span class="btn-icon">⬆️</span> Ripristina da File .json</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL DATA BACKUP -->
-        <div id="dataBackupModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2100; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
-            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 600px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
-                    <span><span class="btn-icon">💾</span> Gestione Dati (Server)</span>
-                    <button id="btnCloseDataBackup" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
-                </h3>
-                
-                <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 20px;">
-                    <h4 style="margin:0 0 10px; color: #b45309;">Esporta Database</h4>
-                    <p style="font-size: 0.85rem; color: #555; margin-bottom: 10px;">Crea una copia in cassaforte di tutti gli Interventi, Programmati, Messaggi e Anagrafiche estraendoli dal Cloud in un file JSON.</p>
-                    <button id="btnExportDataJson" class="btn btn-primary btn-orange" style="margin: 0; width: 100%;"><span class="btn-icon">⬇️</span> Scarica Database (.json)</button>
-                </div>
-
-                <div style="background: #fef2f2; padding: 15px; border-radius: 8px; border: 1px solid #fecaca;">
-                    <h4 style="margin:0 0 10px; color: #dc2626;">Ripristina Database</h4>
-                    <p style="font-size: 0.85rem; color: #7f1d1d; margin-bottom: 10px;">Questa operazione caricherà un file JSON esportato e andrà a re-inserire o aggiornare i record sul Server. Consigliato solo in caso di emergenza o migrazione.</p>
-                    <input type="file" id="importDataFile" accept=".json" style="width: 100%; padding: 8px; font-size: 0.85rem; border: 1px solid #ccc; border-radius: 4px; background: white; margin-bottom: 10px;">
-                    <button id="btnImportDataJson" class="btn btn-danger" style="margin: 0; width: 100%;"><span class="btn-icon">⬆️</span> Ripristina da File .json</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL BACKUP VERSIONI -->
-        <div id="backupModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
-            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 600px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
-                    <span><span class="btn-icon">💾</span> Riepilogo Versioni</span>
-                    <button id="btnCloseBackup" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
-                </h3>
-                
-                <div style="margin-bottom: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px;">
-                        <label style="font-weight: 600; font-size: 0.9rem; color: var(--blue-dark);">Assistente IA Antimo</label>
-                        <button id="btnSaveManualBackup" class="btn btn-primary" style="background: #15803d; border: none; padding: 8px 12px; font-size: 0.85rem; margin: 0;"><span class="btn-icon">💾</span> Salva Vers. Manuale</button>
-                    </div>
-                    <button id="btnOpenTrueAiChat" class="btn btn-primary" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; width: 100%; padding: 12px; font-size: 1rem; font-weight: bold; margin: 0; border-radius: 8px; box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);">
-                        💬 Apri Assistente Antimo (Gemini)
-                    </button>
-                </div>
-
-                <div style="overflow-x: auto;">
-                    <table style="width: 100%; border-collapse: collapse; text-align: left;">
-                        <thead>
-                            <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
-                                <th style="padding: 10px; font-size: 0.85rem;">Data / Periodo</th>
-                                <th style="padding: 10px; font-size: 0.85rem;">Versione</th>
-                                <th style="padding: 10px; font-size: 0.85rem;">Azioni</th>
-                            </tr>
-                        </thead>
-                        <tbody id="backupTableBody">
-                            <tr style="border-bottom: 1px solid #eee; background-color: #f0fdf4;">
-                                <td style="padding: 10px; font-size: 0.9rem;" id="backupManualeDate">Oggi (Manuale) - --:--</td>
-                                <td style="padding: 10px; font-weight: bold; color: #15803d; font-size: 0.9rem;" id="backupManualeVersionTxt">v61.3 (Custom)</td>
-                                <td style="padding: 10px;">
-                                    <button class="btn btn-sm btn-desc-version" data-version="v61.3-manual" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
-                                    <button class="btn btn-sm btn-reinstall-version" data-version="v61.3-manual" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
-                                </td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid #eee;">
-                                <td style="padding: 10px; font-size: 0.9rem;" id="backupOggiDate">Oggi (Automatica)</td>
-                                <td style="padding: 10px; font-weight: bold; color: #166534; font-size: 0.9rem;" id="backupOggiVersionTxt">v61.3 (Attuale)</td>
-                                <td style="padding: 10px;">
-                                    <button class="btn btn-sm btn-desc-version" data-version="v61.3" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
-                                    <button class="btn btn-sm btn-reinstall-version" data-version="v61.3" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
-                                </td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid #eee;">
-                                <td style="padding: 10px; font-size: 0.9rem;" id="backup2giorniDate">2 Giorni Fa</td>
-                                <td style="padding: 10px; font-size: 0.9rem;">v61.2</td>
-                                <td style="padding: 10px;">
-                                    <button class="btn btn-sm btn-desc-version" data-version="v61.2" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
-                                    <button class="btn btn-sm btn-reinstall-version" data-version="v61.2" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
-                                </td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid #eee;">
-                                <td style="padding: 10px; font-size: 0.9rem;" id="backup7giorniDate">1 Settimana Fa</td>
-                                <td style="padding: 10px; font-size: 0.9rem;">v61.0</td>
-                                <td style="padding: 10px;">
-                                    <button class="btn btn-sm btn-desc-version" data-version="v61.0" style="background: #3b82f6; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Dettagli</button>
-                                    <button class="btn btn-sm btn-reinstall-version" data-version="v61.0" style="background: #ef4444; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-left: 5px;">🔄 Reinstalla</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div style="margin-top: 15px; text-align: center;">
-                    <button id="btnAllVersions" class="btn btn-primary btn-blue" style="width: 100%; padding: 12px; font-weight: bold;">
-                        <span class="btn-icon">📋</span> TUTTE LE VERSIONI
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL DESCRIZIONE VERSIONE -->
-        <div id="versionDescModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2500; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
-            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 600px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center; border-bottom: 2px solid #eee; padding-bottom: 10px;">
-                    <span><span class="btn-icon">📄</span> Versione <span id="verTitleDesc" style="color: #ea580c;"></span></span>
-                    <button id="btnCloseVersionDesc" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
-                </h3>
-                
-                <div id="versionDescContent" style="font-size: 0.9rem; line-height: 1.5; color: #333;">
-                    <!-- Content generated by JS -->
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL RUBRICA IPHONE/SMS -->
-        <div id="rubricaModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2500; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
-            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
-                    <span><span class="btn-icon">📱</span> Rubrica SMS</span>
-                    <button id="btnCloseRubrica" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
-                </h3>
-                
-                <form id="newRubricaForm" style="display: flex; gap: 10px; border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 15px;">
-                    <input type="text" id="rubricaNome" placeholder="Nome..." required style="flex: 1;" autocomplete="off">
-                    <input type="tel" id="rubricaTelefono" placeholder="Numero..." required style="flex: 1;" autocomplete="off">
-                    <button type="submit" class="btn btn-primary" style="margin: 0; padding: 10px;">➕</button>
-                </form>
-
-                <div id="rubricaList" style="display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto;">
-                    <div style="text-align: center; color: #666; font-size: 0.9rem;">Caricamento rubrica...</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL SELEZIONE DESTINATARI WHATSAPP -->
-        <div id="waSelectModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
-            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                <h3 style="color: var(--blue-dark); margin-bottom: 10px; display:flex; justify-content: space-between; align-items:center;">
-                    <span><span class="btn-icon">💬</span> Invia anche via WhatsApp</span>
-                    <button id="btnCloseWaSelect" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#666;">&times;</button>
-                </h3>                <p style="font-size: 0.9rem; color: #555; margin-bottom: 15px;">Seleziona i dipendenti da notificare via WhatsApp.</p>
-                
-                <div style="margin-bottom: 15px;">
-                    <label style="display: flex; align-items: center; gap: 8px; font-weight: bold; cursor: pointer;">
-                        <input type="checkbox" id="waSelectAll"> Seleziona Tutti
-                    </label>
-                </div>
-                
-                <div id="waContactsList" style="display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; margin-bottom: 15px; border-top: 1px solid #eee; padding-top: 10px;">
-                    <!-- Checkbox iniettati da JS -->
-                </div>
-                
-                <div style="display: flex; gap: 10px;">
-                    <button id="btnWaSkip" class="btn btn-secondary" style="flex: 1; padding: 10px;">Solo Bacheca</button>
-                    <button id="btnWaSend" class="btn btn-primary" style="flex: 2; padding: 10px; background: #25D366; border: none;">Procedi su WA</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL INVIO SEQUENZIALE WHATSAPP -->
-        <div id="waQueueModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3100; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
-            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; margin: 40px auto; text-align: center;">
-                <h3 style="color: #25D366; margin-bottom: 15px;">Messaggio Salvato!</h3>
-                <p style="font-size: 0.9rem; color: #555; margin-bottom: 20px;">Clicca sui pulsanti per inviare il messaggio WhatsApp ai destinatari selezionati.</p>
-                
-                <div id="waQueueList" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
-                    <!-- Bottoni iniettati da JS -->
-                </div>
-                
-                <button id="btnCloseWaQueue" class="btn btn-secondary" style="width: 100%; padding: 10px;">Chiudi Terminata l'Operazione</button>
-            </div>
-        </div>
-
-        <!-- MODAL LOGIN (OBBLIGATORIO) -->
-        <div id="loginModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
-            <div style="background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.15); border: 2px solid var(--blue-light);">
-                <div style="font-size: 3rem; margin-bottom: 10px;">🔐</div>
-                <h2 style="color: var(--blue-primary); margin-bottom: 15px;">Accesso Riservato</h2>
-                <p style="font-size: 0.9rem; color: #555; margin-bottom: 25px;">Inserisci le tue credenziali aziendali per accedere. L'accesso è consentito solo con email <strong>@eubios.it</strong>.</p>
-                <form id="loginForm" style="display: flex; flex-direction: column; gap: 15px;">
-                    <div style="text-align: left;">
-                        <label for="loginEmail" style="font-weight: bold; font-size: 0.85rem; color: var(--blue-dark);">Email Aziendale *</label>
-                        <input type="email" id="loginEmail" placeholder="nome.cognome@eubios.it" required style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; margin-top: 5px; font-size: 1rem;">
-                    </div>
-                    <div style="text-align: left;">
-                        <label for="loginPhone" style="font-weight: bold; font-size: 0.85rem; color: var(--blue-dark);">Cellulare (per Anagrafica) *</label>
-                        <input type="tel" id="loginPhone" placeholder="Es. 3331234567" required style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; margin-top: 5px; font-size: 1rem;">
-                    </div>
-                    <div id="loginError" style="color: #dc2626; font-size: 0.85rem; font-weight: bold; display: none; background: #fee2e2; padding: 10px; border-radius: 6px;">Errore: formato email non valido.</div>
-                    <button type="submit" class="btn btn-primary btn-blue" style="width: 100%; padding: 15px; font-size: 1.1rem; font-weight: bold; margin-top: 10px; margin-bottom: 0;" id="btnLoginSubmit">
-                        AUTENTICATI
-                    </button>
-                </form>
-            </div>
-        </div>
-        
-        <!-- MODAL UTENTI APP -->
-        <div id="appUsersModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2500; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
-            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
-                    <span><span class="btn-icon">👥</span> Dipendenti Registrati</span>
-                    <button id="btnCloseUsersList" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
-                </h3>
-                <div id="appUsersList" style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto;">
-                    <div style="text-align: center; color: #666; font-size: 0.9rem;">Caricamento dipendenti...</div>
-                </div>
-            </div>
-        </div>
-        <!-- MODAL VERA CHAT AI -->
-        <div id="aiChatModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; display: flex; align-items: flex-start; justify-content: center; overflow-y: hidden;">
-            <div style="background: #f8fafc; border-radius: 12px; width: 95%; max-width: 600px; height: 90vh; margin: 20px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.3); display: flex; flex-direction: column; overflow: hidden;">
-                <!-- Header Chat -->
-                <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 12px 20px; display: flex; flex-direction: column; gap: 8px; color: white;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <div style="font-size: 1.5rem;">🤖</div>
-                            <div>
-                                <h3 style="margin: 0; font-size: 1.1rem; color: white;">Antimo Assistant</h3>
-                                <p style="margin: 0; font-size: 0.75rem; color: #e0e7ff;">Powered by Google Gemini</p>
-                            </div>
-                        </div>
-                        <button id="btnCloseAiChat" style="background: none; border: none; color: white; font-size: 1.8rem; cursor: pointer; line-height: 1;">&times;</button>
-                    </div>
-                    <!-- Stile Risposta -->
-                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: #e0e7ff;">
-                        <span>Densità Risposta:</span>
-                        <select id="aiResponseStyle" style="padding: 2px 4px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.4); background: rgba(0,0,0,0.1); color: white; cursor: pointer; font-size: 0.8rem; outline: none;">
-                            <option value="standard" style="color: black;" selected>Normale</option>
-                            <option value="breve" style="color: black;">Breve (Riassuntiva)</option>
-                            <option value="lunga" style="color: black;">Dettagliata (Analitica)</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <!-- Area Messaggi -->
-                <div id="aiChatMessages" style="flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px;">
-                    <!-- Messaggio Iniziale -->
-                    <div style="display: flex; gap: 10px; align-items: flex-start;">
-                        <div style="background: white; border: 1px solid #e2e8f0; padding: 12px 15px; border-radius: 12px; border-bottom-left-radius: 2px; max-width: 85%; font-size: 0.9rem; color: #334155; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                            Ciao! Sono l'assistente IA di Antimo. Conosco perfettamente le regole di questa applicazione. Chiedimi come gestire le Valutazioni D3, i programmati, le statistiche o qualsiasi altra funzionalità dell'app!
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Previews -->
-                <div id="aiChatPreviewContainer" class="hidden" style="background: white; padding: 10px 15px 0; display: flex; gap: 10px; overflow-x: auto; min-height: 80px; align-items: center;"></div>
-                
-                <!-- Input Box -->
-                <div style="background: white; padding: 15px; border-top: 1px solid #e2e8f0; display: flex; gap: 10px; align-items: flex-end;">
-                    <div style="position: relative;">
-                        <input type="file" id="aiChatFile" accept="image/*" style="display: none;">
-                        <button type="button" id="btnBrowseAiFile" style="background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); color: #6366f1; border-radius: 50%; font-size: 1.2rem; cursor: pointer; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" title="Allega immagine">📎</button>
-                    </div>
-                    <textarea id="aiChatInput" placeholder="Scrivi il tuo messaggio o carica un'immagine..." style="flex: 1; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-family: inherit; font-size: 0.9rem; resize: none; min-height: 44px; max-height: 120px;" rows="1"></textarea>
-                    <button id="btnSendAiChat" style="background: #6366f1; color: white; border: none; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL MAGICA RICERCA GLOBALE -->
-        <div id="magicSearchModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 4000; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center; backdrop-filter: blur(4px);">
-            <div style="background: white; padding: 20px; border-radius: 12px; width: 95%; max-width: 600px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.3); min-height: 50vh;">
-                <h3 style="color: var(--blue-dark); margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center; border-bottom: 2px solid #eee; padding-bottom: 10px;">
-                    <span><span class="btn-icon">🔍</span> Ricerca Globale</span>
-                    <button id="btnCloseMagicSearch" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
-                </h3>
-                <div style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Ricerca in tutto il cloud Storage per: <strong id="magicSearchTermDisplay" style="color: var(--blue-primary); font-size: 1rem;"></strong></div>
-                <div id="magicSearchResultsContainer" style="display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow-y: auto; padding-right: 5px;">
-                    <!-- Risultati iniettati da JS -->
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL GESTIONE PREPARAZIONE MAGAZZINO (FILTRO) -->
-        <div id="magFilterModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 4100; overflow-y: auto; display: flex; align-items: center; justify-content: center;">
-            <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                <h3 style="color: #15803d; margin-top: 0; margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center;">
-                    <span><span class="btn-icon">📦</span> Ricerca Magazzino</span>
-                    <button id="btnCloseMagFilter" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color: #666;">&times;</button>
-                </h3>
-                <p style="font-size: 0.9rem; color: #555; margin-bottom: 20px;">Scegli come filtrare le attività programmate già assegnate al magazzino.</p>
-                
-                <div style="display: flex; flex-direction: column; gap: 15px;">
-                    <!-- Pulsante Prossimi -->
-                    <button id="btnMagProssimi" class="btn btn-primary btn-large" style="background: #16a34a; border: none; margin: 0; box-shadow: 0 4px 6px rgba(22, 163, 74, 0.3);">
-                        <span class="btn-icon">📅</span> TUTTI I PROSSIMI
-                    </button>
-                    
-                    <div style="text-align: center; font-weight: bold; color: #94a3b8; font-size: 0.9rem;">— OPPURE —</div>
-                    
-                    <!-- Selezione per Date -->
-                    <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1;">
-                        <h4 style="margin-top: 0; margin-bottom: 10px; color: var(--blue-dark); text-align: center;">📅 Cerca Per Data</h4>
-                        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                            <div style="flex: 1;">
-                                <label style="font-size: 0.8rem; font-weight: bold; color: #333;">Da:</label>
-                                <input type="date" id="magFilterDataDa" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
-                            </div>
-                            <div style="flex: 1;">
-                                <label style="font-size: 0.8rem; font-weight: bold; color: #333;">A:</label>
-                                <input type="date" id="magFilterDataA" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
-                            </div>
-                        </div>
-                        <button id="btnMagCercaDate" class="btn btn-primary btn-blue" style="width: 100%; margin: 0;">CERCA DATE</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL LISTA PROGRAMMATI MAGAZZINO -->
-        <div id="magListModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f1f5f9; z-index: 4200; overflow-y: auto; display: flex; flex-direction: column;">
-            
-            <!-- Header Fissato -->
-            <div style="background: white; padding: 15px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10;">
-                <h2 style="margin: 0; color: var(--blue-dark); display: flex; align-items: center; gap: 10px;">
-                    <span class="btn-icon">📋</span> Elenco Programmati (MAG)
-                </h2>
-                
-                <div style="display: flex; gap: 10px;">
-                    <button id="btnMagStampaRiepilogo" class="btn btn-primary btn-orange" style="margin: 0; padding: 10px 20px; font-weight: bold; box-shadow: 0 4px 6px rgba(249, 115, 22, 0.3);">
-                        🖨️ STAMPA RIEPILOGO MAGAZZINO
-                    </button>
-                    <button id="btnCloseMagList" class="btn btn-secondary" style="margin: 0; border: none; font-size: 1.5rem; background: none; color: #64748b; padding: 0 10px;">&times;</button>
-                </div>
-            </div>
-
-            <!-- Tabella/Griglia Contenuto -->
-            <div style="padding: 20px; flex: 1; overflow-y: auto;">
-                <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
-                    <div style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: collapse; text-align: left; min-width: 1000px;">
-                            <thead>
-                                <tr style="background: var(--blue-dark); color: white;">
-                                    <th style="padding: 15px; font-weight: 600;">Data</th>
-                                    <th style="padding: 15px; font-weight: 600;">Paziente</th>
-                                    <th style="padding: 15px; font-weight: 600;">Località</th>
-                                    <th style="padding: 15px; font-weight: 600;">Indirizzo (Tel)</th>
-                                    <th style="padding: 15px; font-weight: 600;">Tipo</th>
-                                    <th style="padding: 15px; font-weight: 600;">Dispositivi / Note</th>
-                                    <th style="padding: 15px; font-weight: 600; text-align: center;">Azioni</th>
-                                </tr>
-                            </thead>
-                            <tbody id="magListTableBody">
-                                <!-- Righe iniettate da JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            </div>
-        </div>
-
-        <!-- MODAL AI GENERATOR -->
-        <div id="aiGeneratorModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 5000; overflow-y: auto; padding: 15px; display: flex; align-items: flex-start; justify-content: center; backdrop-filter: blur(5px);">
-            <div style="background: white; padding: 25px; border-radius: 16px; width: 100%; max-width: 500px; box-shadow: 0 15px 35px rgba(0,0,0,0.3); margin-top: 30px; position: relative;">
-                <button id="btnCloseAiGenerator" onclick="document.getElementById('aiGeneratorModal').classList.add('hidden')" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 1.8rem; color: #64748b; cursor: pointer;">&times;</button>
-                <h2 style="color: #4f46e5; margin-top: 0; margin-bottom: 5px; display: flex; align-items: center; gap: 10px;">
-                    <span>🎙️</span> Generatore AI 
-                </h2>
-                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 20px;">Registra un memo vocale o allega documenti. L'AI estrarrà i dati creando una bozza pronta per essere salvata in Programmati.</p>
-
-                <div style="display: flex; flex-direction: column; gap: 20px;">
-                    <!-- Sezione Registrazione Audio -->
-                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; text-align: center;">
-                        <div id="aiAudioStatusLabel" style="font-size: 0.9rem; font-weight: 600; color: #334155; margin-bottom: 10px;">Pronto per registrare</div>
-                        
-                        <button id="btnAiRecordAudio" style="background: #3b82f6; color: white; padding: 15px 30px; border: none; border-radius: 30px; font-size: 1.1rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0 auto; transition: all 0.2s;">
-                            <span>🎤</span> <span>PREMI PER PARLARE</span>
-                        </button>
-                        
-                        <div id="aiRecordingIndicator" class="hidden" style="margin-top: 15px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #ef4444; font-weight: bold; animation: pulse 1s infinite;">
-                            <span style="width: 10px; height: 10px; background: #ef4444; border-radius: 50%; display: inline-block;"></span>
-                            Registrazione in corso... (<span id="aiRecordingTime">00:00</span>)
-                        </div>
-
-                        <!-- Player Anteprima Audio Registrato -->
-                        <div id="aiAudioPreviewContainer" class="hidden" style="margin-top: 15px;">
-                            <audio id="aiAudioPlayer" controls style="width: 100%; height: 40px; border-radius: 20px;"></audio>
-                            <button id="btnAiDeleteAudio" style="background: none; border: none; color: #ef4444; font-size: 0.8rem; font-weight: bold; text-decoration: underline; cursor: pointer; margin-top: 5px;">Rimuovi Audio</button>
-                        </div>
-                    </div>
-
-                    <!-- Sezione Allegati Multipli -->
-                    <div style="background: #fff; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 15px; text-align: center;">
-                        <input type="file" id="aiGeneratorFileInput" accept="image/*,application/pdf,audio/*" multiple style="display:none;">
-                        <button id="btnAiBrowseFiles" style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #475569; padding: 8px 15px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.9rem;">
-                            📎 Sfoglia Immagini / PDF / Audio
-                        </button>
-                        <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 5px;">Oppure INCOLLA dal blocco note (CTRL+V) in questa finestra</div>
-                        
-                        <!-- Griglia Anteprima File -->
-                        <div id="aiFilesPreviewGrid" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; justify-content: center;"></div>
-                    </div>
-
-                    <!-- Tasto Azione Finale -->
-                    <button id="btnAiGenerateFinal" class="btn btn-primary btn-large" style="background: linear-gradient(135deg, #a855f7, #6366f1); border: none; box-shadow: 0 4px 15px rgba(99,102,241,0.4); margin: 0;">
-                        <span class="btn-icon">🧠</span> ELABORA PROPOSTA
-                    </button>
-                </div>
-                
-                <!-- Loader Overlay -->
-                <div id="aiGeneratorLoaderOverlay" class="hidden" style="position: absolute; inset: 0; background: rgba(255,255,255,0.9); border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10;">
-                    <div class="dot-pulse" style="margin-bottom: 20px;"><i></i><i></i><i></i></div>
-                    <strong style="color: #4f46e5; text-align: center; padding: 0 20px;">L'Intelligenza Artificiale sta analizzando i documenti...</strong>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL ARCHIVIO BOZZE AI -->
-        <div id="aiDraftsModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f8fafc; z-index: 5500; overflow-y: auto; display: flex; flex-direction: column;">
-            <div style="background: white; padding: 15px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10;">
-                <h2 style="margin: 0; color: #4f46e5; display: flex; align-items: center; gap: 10px; font-size:1.3rem;">
-                    <span class="btn-icon">✨</span> Archivio Bozze AI
-                </h2>
-                <button id="btnCloseAiDrafts" onclick="document.getElementById('aiDraftsModal').classList.add('hidden')" class="btn btn-secondary" style="margin: 0; border: none; font-size: 1.5rem; background: none; color: #64748b; padding: 0 10px;">&times;</button>
-            </div>
-            
-            <div style="padding: 20px; flex: 1; overflow-y: auto; max-width: 800px; margin: 0 auto; width: 100%;">
-                <p style="color: #64748b; font-size: 0.95rem; margin-top: 0; text-align:center;">Queste proposte sono state estratte dall'Intelligenza Artificiale ma <strong>non sono ancora ufficiali</strong>. Verificale e clicca "Approva" per trasferirle nel database reale di Antimo.</p>
-                <div id="aiDraftsCardsContainer" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
-                    <!-- Card delle bozze Popolate via JS -->
-                    <div style="text-align: center; color: #94a3b8; padding: 30px;">Caricamento in corso...</div>
-                </div>
-            </div>
-        </div>
-
     </main>
 
-    
-    <!-- CHANGELOG NOTIFICATION (Floating Badge) -->
-    <div id="changelogNotification" class="hidden" style="position: fixed; bottom: 20px; right: 20px; background-color: var(--orange); color: white; padding: 15px 20px; border-radius: 8px; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 9999; display: flex; align-items: center; gap: 10px; cursor: pointer; border: 2px solid white;">
-        <div style="font-size: 1.5rem; animation: pulse 2s infinite;">🆕</div>
-        <div id="changelogNotificationText" style="font-size: 0.85rem; font-weight: bold;">Ci sono nuove modifiche software da leggere!</div>
+    <!-- View 2: Messa in Opera / Calendario -->
+    <main id="view-agenda" class="view-section flex-view" style="padding:10px; height: calc(100vh - 140px); overflow-y:auto;">
+        <div class="flex-between mb-2" style="flex-shrink:0;">
+            <h2>Calendario</h2>
+            <button id="btnWorkerSessionCal" class="btn btn-secondary" style="width:auto; padding:8px 15px; font-size:0.85rem; display:none;" onclick="window.openWorkerSessionWizard()">👨‍🔧 Giornata Manovale</button>
+        </div>
+        <div id="calendarContainer" style="flex-shrink:0; background:white; border-radius:12px; overflow:hidden; padding:10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); min-height:450px; margin-bottom:20px;"></div>
+        
+        <div class="flex-between mb-2" style="flex-shrink:0;">
+            <h3 id="agendaListTitle">Prossimi Interventi</h3>
+            <button id="btnShowAllCards" class="btn btn-outline" style="font-size:0.75rem; padding:4px 8px; display:none;" onclick="window.filterAgendaList(null)">Mostra Tutti</button>
+        </div>
+        <div id="agendaList" style="flex:1; padding-bottom:30px;"></div>
+    </main>
+
+    <!-- View 3: Allocazioni / Cassa -->
+    <main id="view-finance" class="view-section">
+        <h2 class="mb-4">Ripartizione e Cassa</h2>
+        <div id="financeList"></div>
+    </main>
+
+    <!-- View 4: Rubrica / Directory -->
+    <main id="view-directory" class="view-section">
+        <h2 class="mb-4">Direttorio Proprietà</h2>
+        <div id="directoryList"></div>
+    </main>
+
+    <!-- View 5: Report (Admin only) -->
+    <main id="view-report" class="view-section">
+        <h2 class="mb-4">Report Operativo</h2>
+        <div id="reportContent"></div>
+    </main>
+
+    <!-- BOTTOM NAVIGATION -->
+    <nav class="bottom-nav" id="bottomNav">
+        <!-- Dynamic injection based on role -->
+    </nav>
+
+    <!-- FLOATING ACTION BUTTON (Context aware) -->
+    <button id="fabMain" class="fab">+</button>
+
+    <!-- FULLSCREEN MODALS -->
+
+    <!-- 1. Task Detail Modal -->
+    <div id="taskDetailModal" class="modal-fs">
+        <div class="modal-header">
+            <h2 id="taskModalTitle">Dettaglio</h2>
+            <button class="btn-close-modal" id="btnCloseTaskModal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="taskDetailContent"></div>
+            <div id="taskDetailActions" class="mt-4">
+                <!-- Worker buttons or Admin buttons injected here -->
+            </div>
+        </div>
     </div>
 
-    <!-- CHANGELOG MODAL -->
-    <div id="changelogModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10000; padding: 15px; display: flex; align-items: center; justify-content: center;">
-        <div class="card glass-card" style="width: 100%; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; background: #fff; border-top: 4px solid var(--blue-dark);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h3 style="margin: 0; color: var(--blue-dark); display:flex; align-items:center; gap:8px;">🆕 Modifiche Software</h3>
-                <button id="btnCloseChangelog" style="background:none; border:none; font-size: 1.8rem; color: #666; cursor: pointer;">&times;</button>
+    <!-- 2. Dynamic Bottom Sheet (Add Expense / Allocations / Close) -->
+    <div id="bsBackdrop" class="bs-backdrop"></div>
+    <div id="actionWizardModal" class="bottom-sheet">
+        <div class="modal-header" style="border-bottom:none; padding:0 0 15px 0;">
+            <h2 id="wizardTitle">Azione Rapida</h2>
+            <button class="btn-close-modal" id="btnCloseWizard">&times;</button>
+        </div>
+        <div id="wizardBody" style="max-height: 70vh; overflow-y: auto; padding-top:5px;">
+            <!-- Content Injected -->
+        </div>
+    </div>
+
+    <!-- 3. Rich Description Modal -->
+    <div id="richDescModal" class="modal-fs">
+        <div class="modal-header">
+            <h2>Dettagli e Materiale</h2>
+            <button class="btn-close-modal" onclick="document.getElementById('richDescModal').classList.remove('open')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <label>Descrizione Estesa</label>
+            <textarea id="richDescText" rows="6" placeholder="Incolla qui appunti o scrivi i dettagli completi..."></textarea>
+            
+            <label class="mt-4">Allega File (Foto, Audio, Video, PDF)</label>
+            <input type="file" id="richDescFiles" multiple accept="image/*,video/*,audio/*,.pdf" style="margin-bottom:15px; width:100%;">
+            
+            <button class="btn btn-primary mt-4" onclick="window.saveRichDescription()">✅ Salva e Torna Indietro</button>
+        </div>
+    </div>
+
+    <!-- AI Assist Modal -->
+    <div id="aiAssistModal" class="modal-fs">
+        <div class="modal-header" style="background:#8b5cf6; color:white;">
+            <h2 id="aiModalTitle" style="color:white; margin:0;">✨ Aiuto AI</h2>
+            <button class="btn-close-modal" id="btnCloseAiModal" style="color:white;">&times;</button>
+        </div>
+        <div class="modal-body" style="padding-top:10px;">
+            <div id="aiContextBanner" style="font-size:0.8rem; background:#ede9fe; color:#5b21b6; padding:8px 12px; border-radius:12px; margin-bottom:15px; font-weight:600;">Contesto: Home</div>
+            
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:15px;">
+                <button class="btn btn-outline" style="padding:5px 10px; font-size:0.8rem; border-color:#8b5cf6; color:#8b5cf6; width:auto;" onclick="document.getElementById('aiInput').value='Come faccio a ...'">Come faccio a...</button>
+                <button class="btn btn-outline" style="padding:5px 10px; font-size:0.8rem; border-color:#8b5cf6; color:#8b5cf6; width:auto;" onclick="document.getElementById('aiInput').value='Ho un problema con ...'">Segnala problema</button>
+                <button class="btn btn-outline" style="padding:5px 10px; font-size:0.8rem; border-color:#8b5cf6; color:#8b5cf6; width:auto;" onclick="document.getElementById('aiInput').value='Crea una richiesta per ...'">Trasforma in richiesta</button>
             </div>
             
-            <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #cbd5e1;">
-                <div style="font-size:0.8rem; font-weight:bold; color:var(--blue-dark); margin-bottom:6px;">Aggiungi una modifica o nota di rilascio:</div>
-                <textarea id="clTesto" rows="3" placeholder="Scrivi i dettagli dell'aggiornamento..." style="width:100%; border-radius:6px; padding:10px; border:1px solid #ccc; font-size:0.9rem; resize:vertical; outline: none;"></textarea>
-                <div style="display:flex; justify-content:flex-end; margin-top: 8px;">
-                    <button id="btnSaveChangelog" class="btn btn-primary btn-sm" style="margin:0; padding:6px 15px;"><span class="btn-icon">✅</span> Pubblica</button>
+            <textarea id="aiInput" style="width:100%; height:120px; border:2px solid #ddd; border-radius:12px; padding:12px; font-family:inherit; font-size:1rem; resize:none; margin-bottom:10px;" placeholder="Scrivi qui il tuo dubbio, problema o richiesta..."></textarea>
+            
+            <button id="btnSubmitAi" class="btn btn-primary" onclick="window.submitAiPrompt()" style="background:#8b5cf6; display:flex; align-items:center; justify-content:center; gap:8px;">✨ Chiedi all'AI</button>
+            <div id="aiLoadingIndicator" style="display:none; text-align:center; padding:10px; color:#8b5cf6; font-weight:bold;">L'AI sta pensando...</div>
+            
+            <div id="aiResponseContainer" class="mt-4" style="display:none;">
+                <div class="card" style="border-left:4px solid #8b5cf6; background:#f5f3ff;">
+                    <div id="aiResponseText" style="font-size:0.95rem; line-height:1.5; color:#333;"></div>
+                    <div id="aiSuggestedActions" class="mt-3"></div>
+                </div>
+            </div>
+            
+            <h4 class="mt-4" style="color:var(--text-muted); font-size:0.9rem; margin-bottom:10px;">Ultime Tue Interazioni</h4>
+            <div id="aiHistory" style="margin-top:5px; margin-bottom:40px;"></div>
+        </div>
+    </div>
+
+    <!-- AI FAB (Removed per user request) -->
+    <!-- <button id="fabAi" class="fab" style="bottom: 150px; right: 20px; z-index: 1000; background: #8b5cf6; box-shadow: 0 4px 10px rgba(139,92,246,0.4);" onclick="window.openAiModal()">✨</button> -->
+
+    <!-- Guide Modal (Settings / Tutorial) -->
+    <div id="guideModal" class="modal-fs">
+        <div class="modal-header">
+            <h2>⚙️ Impostazioni e Guida</h2>
+            <button class="btn-close-modal" onclick="document.getElementById('guideModal').classList.remove('open')">&times;</button>
+        </div>
+        <div class="modal-body" style="font-size:0.95rem; line-height:1.6;">
+
+            <div id="guideMenu">
+                <input type="text" id="guideSearchInput" placeholder="🔍 Cerca argomenti, termini o procedure..." style="width:100%; padding:14px; margin-bottom:20px; border-radius:12px; border:2px solid var(--primary); font-size:1rem; outline:none;" onkeyup="window.searchGuide()">
+                
+                <div id="guideSearchResults" style="display:none; margin-bottom:20px; padding:15px; background:var(--secondary); border-radius:12px; max-height:400px; overflow-y:auto; border:1px solid var(--border);"></div>
+
+                <div id="guideButtons">
+                    <button class="btn btn-outline mb-3" style="justify-content:flex-start; font-weight:700; font-size:1rem; padding:15px;" onclick="window.openChapter(1)">Capitolo 1 - Creazione e Gestione dei Task</button>
+                    <button class="btn btn-outline mb-3" style="justify-content:flex-start; font-weight:700; font-size:1rem; padding:15px;" onclick="window.openChapter(2)">Capitolo 2 - Agenda, Calendario e Interventi</button>
+                    <button class="btn btn-outline mb-3" style="justify-content:flex-start; font-weight:700; font-size:1rem; padding:15px;" onclick="window.openChapter(3)">Capitolo 3 - Ripartizione, Cassa e Finanza</button>
+                    <button class="btn btn-outline mb-3" style="justify-content:flex-start; font-weight:700; font-size:1rem; padding:15px;" onclick="window.openChapter(4)">Capitolo 4 - Direttorio, Organizzazioni e Famiglie</button>
+                    <button class="btn btn-outline mb-3" style="justify-content:flex-start; font-weight:700; font-size:1rem; padding:15px;" onclick="window.openChapter(5)">Capitolo 5 - Supporto Intelligente e Notifiche</button>
+                    <button class="btn btn-outline mb-3" style="justify-content:flex-start; font-weight:700; font-size:1rem; padding:15px;" onclick="window.openChapter(6)">Capitolo 6 - Glossario Tecnico (40 Termini)</button>
+                    <button class="btn btn-outline mb-3" style="justify-content:flex-start; font-weight:700; font-size:1rem; padding:15px;" onclick="window.openChapter(7)">Capitolo 7 - Aggiornamenti Precedenti (v6.4)</button>
+                    <button class="btn btn-primary mb-3" style="justify-content:flex-start; font-weight:700; font-size:1rem; padding:15px; background:var(--success); border:none;" onclick="window.openChapter(8)">🌟 NOVITÀ: Capitolo 8 - Costi e Report (v6.8)</button>                </div>
+            </div>
+
+            <div id="guideContent" style="display:none;">
+                <button class="btn btn-secondary mb-4" onclick="window.closeChapter()" style="background:#e2e8f0; color:#0f172a; border:none; width:auto; padding:10px 15px; font-weight:bold;">⬅️ Torna al Menu Principale</button>
+                
+                
+                <div id="chap1" class="guide-chap" style="display:none;">
+                    <h2 style="color:var(--primary); margin-bottom:20px; border-bottom:3px solid var(--border); padding-bottom:10px;">Capitolo 1 - Creazione e Gestione dei Task</h2>
+                    <ul style="margin-left:20px; line-height:1.8; list-style-type:circle;">
+                        <li style="margin-bottom:15px;"><strong>Creare un Task:</strong> Premi il pulsante <strong>"+"</strong> posizionato in basso a destra. Si aprirà il modulo dove descrivere il guasto o l'intervento. Ricorda che è obbligatorio assegnare una <em>Famiglia</em> o un <em>Centro di Costo</em>.</li>
+                        <li style="margin-bottom:15px;"><strong>Aggiungere Dettagli e Foto:</strong> Usa il pulsante <strong>"✏️ Aggiungi Dettagli/Allegati"</strong> per espandere le informazioni. Qui puoi caricare foto del problema, inserire file PDF o scrivere appunti più lunghi (<em>Rich Description</em>).</li>
+                        <li style="margin-bottom:15px;"><strong>Approvazione e Assegnazione:</strong> I nuovi task nascono in stato di <em>"Proposta (In Attesa)"</em>. Spetta a <strong>Giuseppe (Admin)</strong> o ai <strong>Supervisori</strong> approvare la richiesta e decidere a quale operatore (es. Paolo) assegnarla.</li>
+                        <li style="margin-bottom:15px;"><strong>Le Urgenze:</strong> Se il problema non può aspettare, usa il flag di <strong>Urgenza Massima</strong>. Sulla scheda apparirà un bollino rosso <em>"🚨 URGENTE"</em> e il task balzerà in cima alla lista di chi deve eseguire il lavoro.</li>
+                        <li style="margin-bottom:15px;"><strong>Chiudere un Lavoro:</strong> Una volta terminato l'intervento, premi il pulsante <strong>"✔️ Completato"</strong>. Il task sparirà dalla lista delle cose da fare e verrà archiviato nel sistema per i report futuri.</li>
+                    </ul>
+                </div>
+
+                <div id="chap2" class="guide-chap" style="display:none;">
+                    <h2 style="color:var(--primary); margin-bottom:20px; border-bottom:3px solid var(--border); padding-bottom:10px;">Capitolo 2 - Agenda, Calendario e Interventi</h2>
+                    <ul style="margin-left:20px; line-height:1.8; list-style-type:square;">
+                        <li style="margin-bottom:15px;"><strong>Il Calendario (FullCalendar):</strong> La schermata <em>"Agenda"</em> ti permette di visualizzare tutti i lavori programmati in una comoda griglia Mensile, Settimanale o Giornaliera. È perfetta per avere un'anteprima chiara degli impegni.</li>
+                        <li style="margin-bottom:15px;"><strong>Colori per Ogni Giorno:</strong> Ogni giorno ha un colore speciale: ad esempio, il <strong>Lunedì</strong> è sempre <em>rosso</em>, il <strong>Martedì</strong> è <em>arancione</em>. Questo aiuta a riconoscere al volo quando cade un appuntamento.</li>
+                        <li style="margin-bottom:15px;"><strong>Ordine Programmato (Mattina / Pomeriggio):</strong> I task della giornata si dividono automaticamente. Troviamo prima le emergenze in ritardo, poi i blocchi <strong>"☀️ Mattina"</strong> e a seguire quelli etichettati <strong>"🌙 Pomeriggio"</strong>.</li>
+                        <li style="margin-bottom:15px;"><strong>Filtrare un Singolo Giorno:</strong> Se clicchi sulla data numerica nel calendario, l'elenco in basso ti mostrerà <strong>solo</strong> i lavori previsti per quel giorno (<em>Focus View</em>). Ricliccando, tornerai a vedere il flusso generale.</li>
+                        <li style="margin-bottom:15px;"><strong>Giornata Manovale (Lavoratori Esterni):</strong> Se c'è un operatore esterno (come Dino o Antimo) che ti aiuta, usa il pulsante <strong>"👨‍🔧 Giornata Manovale"</strong> per registrare le sue ore di affiancamento a fine giornata.</li>
+                    </ul>
+                </div>
+
+                <div id="chap3" class="guide-chap" style="display:none;">
+                    <h2 style="color:var(--primary); margin-bottom:20px; border-bottom:3px solid var(--border); padding-bottom:10px;">Capitolo 3 - Ripartizione, Cassa e Finanza</h2>
+                    <ul style="margin-left:20px; line-height:1.8; list-style-type:disc;">
+                        <li style="margin-bottom:15px;"><strong>Il Wallet (Il tuo saldo in tempo reale):</strong> In cima allo schermo c'è sempre un indicatore verde. È il tuo saldo di "Cassa" (Wallet). Quando aggiungi una spesa, i soldi scendono. Solo l'<strong>Admin</strong> può ricaricare questo fondo.</li>
+                        <li style="margin-bottom:15px;"><strong>Aggiungere una Spesa:</strong> Clicca sul tasto <em>"Aggiungi Spesa"</em> all'interno del task o nella pagina Finanza. Scrivi l'importo pagato per materiali o fornitori e i soldi scaleranno subito dal tuo portafoglio virtuale.</li>
+                        <li style="margin-bottom:15px;"><strong>Obbligo dello Scontrino Fiscale:</strong> Non puoi registrare spese valide senza allegare la foto della ricevuta. Se non hai la foto pronta, la spesa resterà marcata come <em>"⚠️ MANCA SCONTRINO"</em> o "Pendente" finché non ne fai una.</li>
+                        <li style="margin-bottom:15px;"><strong>L'Allocation Wizard (Ripartizione dei Costi):</strong> A fine giornata, l'Admin o il Supervisore distribuiscono la spesa tra i vari centri di costo. Usano l'<em>Allocation Wizard</em> per decidere al centesimo se i soldi spettano all'<strong>Organizzazione A</strong> o alla <strong>Famiglia B</strong>.</li>
+                        <li style="margin-bottom:15px;"><strong>La Vista Finanza Centrale:</strong> Solo l'amministrazione vede questa pagina protetta. Qui i supervisori controllano tutti i movimenti in uscita, ricaricano il wallet degli operatori e generano estratti conto.</li>
+                    </ul>
+                </div>
+
+                <div id="chap4" class="guide-chap" style="display:none;">
+                    <h2 style="color:var(--primary); margin-bottom:20px; border-bottom:3px solid var(--border); padding-bottom:10px;">Capitolo 4 - Direttorio, Organizzazioni e Famiglie</h2>
+                    <ul style="margin-left:20px; line-height:1.8; list-style-type:circle;">
+                        <li style="margin-bottom:15px;"><strong>A Chi si Intesta il Lavoro:</strong> Ogni intervento o acquisto di materiali deve basarsi su chi richiederà la prestazione. Non puoi creare un task senza aver indicato un'<em>Organizzazione</em> o una <em>Famiglia</em> a cui fatturare.</li>
+                        <li style="margin-bottom:15px;"><strong>I Menù a Scomparsa:</strong> Nelle Impostazioni c'è il <strong>Direttorio</strong>. Visto che la lista è lunga, è divisa in bottoni a fisarmonica: cliccando su <em>"Famiglie"</em> o <em>"Organizzazioni"</em> si apre l'elenco vero e proprio.</li>
+                        <li style="margin-bottom:15px;"><strong>Aggiungere Nuove Voci:</strong> Se devi registrare un cliente fresco, basta premere <strong>"➕ Aggiungi"</strong>. Inserisci il nome nel pop-up e verrà immediatamente salvato in cloud (su Firebase), visibile subito anche a chi deve chiudere i conti.</li>
+                        <li style="margin-bottom:15px;"><strong>Luoghi e Indirizzi (Location Id):</strong> Sono i cantieri fisici o gli immobili. Quando aggiungi un task, scegli da questo elenco di <em>Luoghi</em> prememorizzati per far sapere subito agli operatori dove dirigere il veicolo o ritirare gli attrezzi.</li>
+                        <li style="margin-bottom:15px;"><strong>I Limiti di Visualizzazione:</strong> Un tecnico operativo vede l'essenziale per pensare a lavorare (lista semplificata). Tutte le liste sensibili coi nomi, le suddivisioni di fatturazione interne e i partner finanziari sono visibili <strong>esclusivamente all'Admin</strong>.</li>
+                    </ul>
+                </div>
+
+                <div id="chap5" class="guide-chap" style="display:none;">
+                    <h2 style="color:var(--primary); margin-bottom:20px; border-bottom:3px solid var(--border); padding-bottom:10px;">Capitolo 5 - Supporto Intelligente e Notifiche</h2>
+                    <ul style="margin-left:20px; line-height:1.8; list-style-type:square;">
+                        <li style="margin-bottom:15px;"><strong>L'Aiuto AI:</strong> Se ti blocchi, apri il modulo <strong>✨ Aiuto AI</strong>. Troverai un'intelligenza artificiale pronta a chattare con te per darti una mano a usare i comandi dell'applicazione o capire chi contattare in caso di blocco.</li>
+                        <li style="margin-bottom:15px;"><strong>Il Context Banner:</strong> Mentre scrivi all'AI, noterai in alto una fascetta colorata (es. <em>"Contesto: Finanza"</em>). Ricorda in quale schermata ti trovi, così l'AI potrà darti risposte specifiche per quella singola pagina.</li>
+                        <li style="margin-bottom:15px;"><strong>Prompt Veloci:</strong> Invece di scrivere tutta la domanda a mano, puoi pigiare i pulsanti pre-costruiti come <strong>"Come faccio a..."</strong> o <strong>"Segnala Problema..."</strong> per avviare subito la conversazione in maniera tecnica ed efficace.</li>
+                        <li style="margin-bottom:15px;"><strong>Notifiche Push Interne:</strong> Se ti viene inoltrato un task, se una priorità cambia o se ti arriva una ricarica nel wallet, un campanellino in alto e una riga in Home ti avviseranno immediatamente del nuovo evento.</li>
+                        <li style="margin-bottom:15px;"><strong>Pulizia Automatica Giornaliera:</strong> Per non ingolfare il telefono o l'app, a mezzanotte il sistema pialla automaticamente i task completati del giorno precedente e svuota le notifiche già lette, accogliendoti ogni mattina con il desk sgombro.</li>
+                    </ul>
+                </div>
+
+                <div id="chap6" class="guide-chap" style="display:none;">
+                    <h2 style="color:var(--primary); margin-bottom:20px; border-bottom:3px solid var(--border); padding-bottom:10px;">Capitolo 6 - Glossario Tecnico</h2>
+                    <ul style="list-style-type:none; padding:0; margin:0; line-height:1.7;" id="glossaryList">
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>1. Admin:</strong> Livello massimo (Giuseppe). Approva interventi, gestisce finanze, distribuisce fondi e organizza directory.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>2. Agenda:</strong> Schermata (Calendario) per visualizzare gli appuntamenti nel mese, settimana o giornata.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>3. Aiuto AI:</strong> Modulo di Intelligenza Artificiale per l'assistenza al software in-app.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>4. Allegato:</strong> File audio, video o foto aggiunto al "Task" per capirne visivamente o oralmente l'entità.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>5. Allocazione:</strong> Procedura con cui l'Admin calcola al centesimo quanto una <em>Famiglia</em> dovrà pagare tra le spese libere inserite.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>6. Approvatore:</strong> Supervisore che dà il via libera ad una "Proposta" trasformandola in lavoro con budget.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>7. Assegnazione:</strong> Istante in cui un manager decide e collega il compito all'operaio effettivo (Es: Paolo o Luca).</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>8. Badge Status:</strong> Micro etichetta colorata posta sulla card del task ("Assegnato", "Finito", ecc.).</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>9. Cassa:</strong> Denaro contante o circuito di portafogli su cui appoggiare acquisti impellenti.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>10. Completato:</strong> Tasto e stato finale da cliccare a guasto riparato per togliere la card dal proprio feed quotidiano.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>11. Consuntivo:</strong> Riepilogo dettagliato della riparazione appena terminata per uso contabile o come appunto storico.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>12. Context Banner:</strong> Scrittina evidenziata che dice all'AI dove ti trovi per farti aiutare meglio nelle deduzioni visive.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>13. Dettaglio Task:</strong> Finestra "Modal" profonda in cui si entra cliccando la card per leggere gli allegati sfuggiti nell'anteprima.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>14. Direttorio:</strong> L'elenco madre, diviso per "Organizzazioni, Famiglie e Luoghi" posto sotto Impostazioni.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>15. Famiglia:</strong> Entità fisica o società privata alla quale deviare la spesa vera e propria di manovalanza.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>16. Feed:</strong> Schermata principale "Home" col muro cascante dei task da adempiere dall'alto verso il basso per urgenza.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>17. Finanza:</strong> Pagina riservata in cui l'Admim vede tutto il ricaricato, lo speso e provvede ad esportare i report rendiconto.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>18. Focus View:</strong> Tappando in alto su un giorno nel Calendario, si filtrano all'istante spazzando via le altre occorrenze estranee della settimana.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>19. Fondo:</strong> Capitale e soldi ricaricabili in capo ad un Tecnico. L'admin compie "Ricarica Fondo" per alzarne il saldo.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>20. FullCalendar:</strong> Il plugin visivo dell'app che disegna la tabellina dell'agenda con colori inconfutabili.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>21. Giornata Manovale:</strong> Segnalazione apposita per le ore lavorate da dipendenti o aiuti esterni sul posto (Es: Antimo).</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>22. In-Progress:</strong> Fase in cui si trova un'attività dal primo mattino sino alla pressione sul verde e rasserenante "Completato".</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>23. Log Activity:</strong> Memoria di sistema blindata. Salva i click ed ogni cambio di data o messaggio avvenuto (utile contro modifiche accidentali).</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>24. Luogo (Location):</strong> Identificativo dell'edificio reale o del cantiere civico a cui indirizzare i dipendenti.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>25. Modal:</strong> Schermata gigante pop-up che si piazza sopra l'app per bloccarti su una singola azione voluta.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>26. Notifica Push:</strong> Segnalino per avvisi in tempo reale. Sbriga la comunicazione urgente o avvisa chi entra di un Task Fresco.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>27. Nuovo Task:</strong> Il compito non appena compilato ed incerto, spesso timido in "Attesa".</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>28. Operativo (Tecnico):</strong> Ruolo per colui che combatte materialmente i guasti dell'app ma che non penetra nei meandri direzionali delle finanze.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>29. Organizzazione:</strong> Sede, partner forte o società fattuarbile. Struttura preposta ad addossarsi i pagamenti ripartiti.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>30. Proposta Lavoro:</strong> Idea di intervento originata da operatori, non visibile ancora in agenda programmata ufficiale.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>31. PWA (WebApp):</strong> Il sistema vitale che consente all'app d'istallarsi su cellulare bypassando l'ingombro degli Stores digitali iOS/Android.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>32. Quick Actions:</strong> I bottoni scattanti sulle card ("+ Aggiungi Spesa" o "Scontrino") per non obbligarti all'apertura profonda in 5 click.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>33. Report:</strong> Sezione stringata utilissima ai commercialisti in cui scaricare elenchi nudi di fatturazione, compensi ed ore.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>34. Rich Description:</strong> Il box sterminato dentro il quale, incollare files audio vocali, e scrivere un log o lamenti estesi a corredo d'un titolo striminzito.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>35. Rimborso:</strong> Flusso in entrata o pareggio cassa azionato dall'amministrazione locale per ripagare un'eccessiva uscita di monete del dipendente ("Wallet").</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>36. Scontrino Fotografato:</strong> Assoluta precondizione obbligatoria. Un'emergenza senza sfilza fiscale jpg annessa rimarrà inevasa nel Wallet e "Pendente in Approvazione".</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>37. Sessione Lavorativa:</strong> Il riquadro che conteggia la parentesi oraria degli aiuti occasionali assoldati ad ore esterne.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>38. Supervisore:</strong> Secondo in scala, approva, accelera urgenze e muove calendari imponendo decisioni intermedie in supporto.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>39. Urgenza (Badge):</strong> Segnalino Letale "Rosso"; sopprime in tempo zero gli obblighi feriali scaraventando la card in testa al palinsesto generale per farsi sbrigare ad ogni costo.</li>
+                        <li style="margin-bottom:8px; border-bottom:1px dashed var(--border);"><strong>40. Wallet:</strong> Sull'interfaccia Home (in Cima Destra o Sinistra) il badge verde o rosso monetario dei TUOI esatti importi rimanenti d'ufficio prima di dover fare richieste SOS soldi (Ricariche).</li>
+                    </ul>
+                </div>
+
+                <div id="chap7" class="guide-chap" style="display:none;">
+                    <h2 style="color:var(--success); margin-bottom:20px; border-bottom:3px solid var(--border); padding-bottom:10px;">Capitolo 7 - Novità e Ultimi Aggiornamenti (v6.4)</h2>
+                    <ul style="margin-left:20px; line-height:1.8; list-style-type:circle;">
+                        <li style="margin-bottom:15px;"><strong>Assegnazione Dinamica dei Task:</strong> Quando si crea un <em>Nuovo Task</em>, non è più assegnato forzatamente a Paolo di default. Ora c'è un comodo <strong>menu a tendina</strong> per scegliere subito a quale tecnico destinare il lavoro, oppure lasciarlo "Da decidere".</li>
+                        <li style="margin-bottom:15px;"><strong>Gestione Avanzata Manovalanza:</strong> Hai inserito ore di lavoro per un operatore esterno (es. Antimo, Dino) ma l'importo totale era sbagliato? Niente panico! Entrando nel <strong>Dettaglio del Task</strong> troverai la lista dei turni di manovalanza con i nuovi pulsanti <strong>"✏️ Modifica"</strong> e <strong>"🗑️ Elimina"</strong> per correggere il costo in un tocco. I report in finanza scalano le somme in automatico.</li>
+                        <li style="margin-bottom:15px;"><strong>Calendario (Agenda) Globale:</strong> L'icona <strong>"Agenda"</strong> nella barra di navigazione in basso è stata attivata per <em>TUTTI</em> gli utenti della piattaforma. Ogni persona visualizzerà esattamente le mansioni che gli competono (gli Admin vedranno tutto, i tecnici i propri compiti, i proprietari i loro averi).</li>
+                        <li style="margin-bottom:15px;"><strong>Reattività Istantanea:</strong> La bacheca iniziale (<em>Home</em>) ora riconosce esattamente gli autori delle proposte (es. "Proposto da Stefano" anziché un laconico "Proposto da Paolo") e <em>si aggiorna istantaneamente</em> da sola non appena un task viene salvato. Mai più ricaricamenti (F5) obbligati!</li>
+                    </ul>
+                </div>
+
+                <div id="chap8" class="guide-chap" style="display:none;">
+                    <h2 style="color:var(--success); margin-bottom:20px; border-bottom:3px solid var(--border); padding-bottom:10px;">Capitolo 8 - Gestione Costi e Report Avanzati (v6.8 del 30/03/2026)</h2>
+                    <ul style="margin-left:20px; line-height:1.8; list-style-type:circle;">
+                        <li style="margin-bottom:15px;"><strong>Cruscotto Priorità e Bottone "TUTTI I TASK":</strong> Sulla cima della Home troverai dinamici bottoni intelligenti (TUTTI, Alta, Media, Bassa, Programmati, Senza Data). Contano il numero di task competenti e presentano badge rossi se ci sono dei task "Nuovi" (mai aperti).</li>
+                        <li style="margin-bottom:15px;"><strong>Tabelle Pivot Universali e Azioni in Riga:</strong> Cliccando uno dei bottoni precedenti, verrai proiettato in una Tabella Pivot a tutto schermo. Da qui potrai nascondere colonne o raggruppare i task. Per eccellenza, ogni riga offre direttamente i pulsanti "Apri", "Inizia", "Modifica", "Canc", slegando i flussi di lavoro dalla classica Home!</li>
+                        <li style="margin-bottom:15px;"><strong>Destinatari come Luoghi di Lavoro:</strong> Gli Enti fisici definiti (<em>Organizzazioni</em> e <em>Famiglie</em>) costituiscono ora a tutti gli effetti la "Sede" per il conteggio monetario. Le Tariffe Orarie, gestite nella pagina <em>Rubrica</em>, vengono configurate accoppiandole non a luoghi geografici, ma proprio a questi Proprietari!</li>
+                        <li style="margin-bottom:15px;"><strong>Consuntivo Task per Destinatario:</strong> Completando un task su "Fine", il modale estrarrà e proporrà la tariffa del Beneficiario selezionato nel task, calcolando perfettamente il Costo del Lavoro rispetto ai minuti esatti!</li>
+                        <li style="margin-bottom:15px;"><strong>"Senza Data" Preservato Opzionalmente:</strong> L'Approvazione dei Task, quando questi nascono Senza Data, rende il campo Date del calendario <em>Opzionale</em> in modo che possano essere definiti come attivi/assegnati senza forzarne illegalmente la messa in opera.</li>
+                    </ul>
                 </div>
             </div>
 
-            <div id="changelogList" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right:5px;">
-                <div style="text-align: center; color: #666; font-size:0.9rem;">Caricamento in corso...</div>
+            <script>
+                window.openChapter = function(n) {
+                    document.getElementById('guideButtons').style.display = 'none';
+                    document.getElementById('guideSearchInput').style.display = 'none';
+                    document.getElementById('guideSearchResults').style.display = 'none';
+                    document.getElementById('guideContent').style.display = 'block';
+                    for(let i=1; i<=8; i++) {
+                        let chp = document.getElementById('chap' + i);
+                        if(chp) chp.style.display = (i === n) ? 'block' : 'none';
+                    }
+                };
+
+                window.closeChapter = function() {
+                    document.getElementById('guideContent').style.display = 'none';
+                    document.getElementById('guideButtons').style.display = 'block';
+                    document.getElementById('guideSearchInput').style.display = 'block';
+                    document.getElementById('guideSearchInput').value = '';
+                    window.searchGuide();
+                };
+
+                window.searchGuide = function() {
+                    const q = document.getElementById('guideSearchInput').value.toLowerCase();
+                    const resultsBox = document.getElementById('guideSearchResults');
+                    const btnMenu = document.getElementById('guideButtons');
+                    
+                    if(q.trim() === '') {
+                        resultsBox.style.display = 'none';
+                        btnMenu.style.display = 'block';
+                        return;
+                    }
+
+                    resultsBox.style.display = 'block';
+                    btnMenu.style.display = 'none';
+
+                    // Collect all text
+                    let allResults = '';
+                    for(let i=1; i<=8; i++) {
+                        const chap = document.getElementById('chap' + i);
+                        if(!chap) continue;
+                        const h2 = chap.querySelector('h2');
+                        const chapTitle = h2 ? h2.innerText : 'Sezione ' + i;
+                        
+                        let paragraphs = chap.querySelectorAll('p, li');
+                        paragraphs.forEach(p => {
+                            const text = p.innerText;
+                            if(text.toLowerCase().includes(q)) {
+                                const highlighted = text.replace(new RegExp(q.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&"), 'gi'), match => '<strong style="background:var(--warning); color:white; padding:0 3px; border-radius:3px;">' + match + '</strong>');
+                                allResults += '<div style="margin-bottom:15px; padding:15px; border-left:4px solid var(--primary); background:white; font-size:0.95rem; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1); line-height:1.6;"><strong>' + chapTitle + '</strong><br><br>' + highlighted + '</div>';
+                            }
+                        });
+                    }
+
+                    if(allResults === '') {
+                        resultsBox.innerHTML = '<div class="text-muted" style="text-align:center; padding:20px; font-weight:bold;">Nessun risultato compatibile trovato in questa app. Riprova con altri termini.</div>';
+                    } else {
+                        resultsBox.innerHTML = allResults;
+                    }
+                };
+            </script>
+
+        </div>
+    </div>
+
+    <!-- Pivot Table Modal -->
+    <div class="modal-fs" id="pivotModal" style="z-index: 1500;">
+        <div class="modal-content" style="max-width:1200px; width:100%; height:100%; margin: 0 auto; display:flex; flex-direction:column; background: var(--bg);">
+            <div class="modal-header" style="border-bottom:2px solid #eee; padding-bottom:10px;">
+                <h2 id="pivotTitle" style="color:var(--primary); margin:0;">Pivot Report</h2>
+                <button class="btn btn-outline" style="width: auto; padding: 8px 15px;" onclick="document.getElementById('pivotModal').classList.remove('open')">Chiudi ❌</button>
+            </div>
+            <div id="pivotControls" class="mb-3 p-3" style="background:#f8fafc; border-radius:8px; display:flex; gap:15px; flex-wrap:wrap; align-items:center;">
+                <!-- Raggruppamento e Colonne verranno iniettati via JS -->
+            </div>
+            <div id="pivotContainer" style="flex:1; overflow-y:auto; background:white; border:1px solid #e2e8f0; border-radius:8px; padding:10px;">
+                <!-- Tabella Pivot -->
             </div>
         </div>
     </div>
 
-    <!-- MODAL MULTI-SELECT INCARICHI -->
-    <div id="incarichiModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2500; display: flex; align-items: center; justify-content: center; padding: 15px;">
-        <div style="background: white; padding: 20px; border-radius: 12px; width: 100%; max-width: 380px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); display: flex; flex-direction: column; max-height: 85vh;">
-            <h3 style="color: var(--blue-dark); margin-top: 0; margin-bottom: 15px; display:flex; justify-content: space-between; align-items:center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
-                <span>👥 Filtro Incarichi</span>
-                <button id="btnCloseIncarichi" style="background:none; border:none; font-size:1.8rem; cursor:pointer; color: #64748b;">&times;</button>
-            </h3>
-            
-            <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: bold; color: var(--blue-primary);">
-                    <input type="checkbox" id="cbxIncarichiTutti" value="TUTTI" style="width: 20px; height: 20px; cursor: pointer;" checked>
-                    🌍 Tutti gli Incaricati
-                </label>
-            </div>
+    <!-- Hidden Camera Input for PWA -->
+    <input type="file" id="nativeCameraInput" accept="image/*" capture="environment" style="display:none;">
 
-            <div id="incarichiListContainer" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; padding-right: 5px;">
-                <div style="text-align: center; color: #666; font-size:0.9rem;">Caricamento in corso...</div>
-            </div>
-
-            <button id="btnApplyIncarichi" class="btn btn-primary btn-blue" style="width: 100%; padding: 14px; font-size: 1.05rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                <span class="btn-icon">✔️</span> APPLICA FILTRO
-            </button>
-        </div>
-    </div>
-
-    <!-- MODAL GESTIONE ACCESSORI DEDICATI -->
-    <div id="manageAccessoriModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2300; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;">
-        <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; margin: 40px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-            <h3 style="color: var(--blue-dark); margin-bottom: 10px; display:flex; justify-content: space-between; align-items:center;">
-                <span id="manageAccessoriTitle"><span class="btn-icon">⚙️</span> Accessori Dedicati</span>
-                <button id="btnCloseManageAccessori" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
-            </h3>
-            <p style="font-size: 0.85rem; color: #555; margin-bottom: 15px;">Aggiungi qui gli accessori o componenti *esclusivi* per questo dispositivo.</p>
-            
-            <div style="display:flex; gap: 10px; margin-bottom: 20px; align-items: center;">
-                <input type="text" id="newAccessorioDesc" placeholder="Es. Filtro Batterico..." style="flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem;">
-                <button id="btnAddAccessorio" class="btn btn-primary btn-orange" style="margin: 0; padding: 10px 15px; font-size: 0.95rem;"><span class="btn-icon">➕</span> Aggiungi</button>
-            </div>
-
-            <div style="max-height: 250px; overflow-y: auto;">
-                <table id="accessoriSetupTable" style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
-                    <!-- Popolato dinamicamente da app.js -->
-                </table>
-            </div>
-            
-            <button id="btnSaveAccessoriFirebase" class="btn btn-primary btn-blue" style="width: 100%; margin: 20px 0 0 0; padding: 12px; font-size: 1rem;">
-                <span class="btn-icon">💾</span> SALVA ACCESSORI E CHIUDI
-            </button>
-        </div>
-    </div>
-
-    <!-- MODAL BARCODE SCANNER -->
-    <div id="barcodeScannerModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-        <div style="width: 100%; max-width: 600px; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-            <div style="padding: 15px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="margin: 0; color: #1e293b; font-size: 1.1rem;"><span class="btn-icon">📷</span> Scansione Codice a Barre</h3>
-                <button id="btnCloseBarcodeScanner" style="background: none; border: none; font-size: 1.5rem; color: #64748b; cursor: pointer;">&times;</button>
-            </div>
-            <div id="qr-reader" style="width: 100%; min-height: 300px;"></div>
-            <div style="padding: 15px; text-align: center; color: #64748b; font-size: 0.9rem;">
-                Inquadra il codice a barre o QR Code. Verrà letto automaticamente.
-            </div>
-        </div>
-    </div>
-
-    <script type="module" src="app.js?v=62"></script>
-    <script type="module" src="ai_chat.js?v=62"></script>
-    <script type="module" src="global_notifications.js?v=62"></script>
+    <!-- PWA Service Worker -->
     <script>
-      // Gestione layout PC
-      document.addEventListener('DOMContentLoaded', () => {
-          const btnTogglePC = document.getElementById('btnTogglePC');
-          const isPcMode = localStorage.getItem('antimo_pcmode') === 'true';
-          
-          if (isPcMode) {
-              document.body.classList.add('pc-layout-mode');
-              btnTogglePC.style.background = 'white';
-              btnTogglePC.style.color = '#15803d';
-          }
-          
-          if (btnTogglePC) {
-              btnTogglePC.addEventListener('click', () => {
-                  const currentlyPC = document.body.classList.contains('pc-layout-mode');
-                  if (currentlyPC) {
-                      document.body.classList.remove('pc-layout-mode');
-                      localStorage.setItem('antimo_pcmode', 'false');
-                      btnTogglePC.style.background = 'rgba(255,255,255,0.2)';
-                      btnTogglePC.style.color = 'white';
-                  } else {
-                      document.body.classList.add('pc-layout-mode');
-                      localStorage.setItem('antimo_pcmode', 'true');
-                      btnTogglePC.style.background = 'white';
-                      btnTogglePC.style.color = '#15803d';
-                  }
-              });
-          }
-      });
-
-
-
-      function nukeCache() {
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                for(let registration of registrations) { registration.unregister(); }
-                alert("Cache App azzerata! Riavvio in corso...");
-                window.location.href = window.location.href.split('?')[0] + '?v=' + Date.now();
-            });
-        }
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js').catch(err => console.log('SW failed', err));
+        });
       }
+    </script>
+    <!-- Logic -->
+    <script type="module" src="app.js?v=6.8"></script>
+
+    <!-- PWA Installation Logic -->
+    <script>
     </script>
 </body>
 </html>

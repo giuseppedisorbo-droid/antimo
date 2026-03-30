@@ -1,0 +1,682 @@
+{
+  "people": [
+    {
+      "id": "giuseppe",
+      "fullName": "Giuseppe Di Sorbo",
+      "shortName": "Peppe",
+      "type": "person",
+      "roles": [
+        "owner",
+        "admin"
+      ],
+      "familyIds": [
+        "famiglia_peppe"
+      ],
+      "organizationRoles": [
+        {
+          "organizationId": "eubios",
+          "role": "titolare"
+        }
+      ],
+      "active": true,
+      "appAccess": true,
+      "createdAt": "SERVER_TIMESTAMP",
+      "updatedAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "maria_virginia",
+      "fullName": "Maria Virginia",
+      "shortName": "Maria",
+      "type": "person",
+      "roles": [
+        "family_member"
+      ],
+      "familyIds": [
+        "famiglia_peppe"
+      ],
+      "organizationRoles": [],
+      "active": true,
+      "appAccess": false,
+      "createdAt": "SERVER_TIMESTAMP",
+      "updatedAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "caterina",
+      "fullName": "Caterina",
+      "shortName": "Caterina",
+      "type": "person",
+      "roles": [
+        "domain_approver"
+      ],
+      "familyIds": [
+        "famiglia_caterina"
+      ],
+      "organizationRoles": [
+        {
+          "organizationId": "eubios",
+          "role": "consulente"
+        },
+        {
+          "organizationId": "ortotek",
+          "role": "socia"
+        },
+        {
+          "organizationId": "eubiotech",
+          "role": "socia_50"
+        }
+      ],
+      "active": true,
+      "appAccess": true,
+      "createdAt": "SERVER_TIMESTAMP",
+      "updatedAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "mimmo",
+      "fullName": "Mimmo",
+      "shortName": "Mimmo",
+      "type": "person",
+      "roles": [
+        "family_member"
+      ],
+      "familyIds": [
+        "famiglia_caterina"
+      ],
+      "organizationRoles": [],
+      "active": true,
+      "appAccess": false,
+      "createdAt": "SERVER_TIMESTAMP",
+      "updatedAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "angelo",
+      "fullName": "Angelo",
+      "shortName": "Angelo",
+      "type": "person",
+      "roles": [
+        "family_member"
+      ],
+      "familyIds": [
+        "famiglia_caterina"
+      ],
+      "organizationRoles": [],
+      "active": true,
+      "appAccess": false,
+      "createdAt": "SERVER_TIMESTAMP",
+      "updatedAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "teresa",
+      "fullName": "Teresa",
+      "shortName": "Teresa",
+      "type": "person",
+      "roles": [
+        "employee",
+        "partner",
+        "manager",
+        "management_control"
+      ],
+      "familyIds": [
+        "famiglia_teresa"
+      ],
+      "organizationRoles": [
+        {
+          "organizationId": "eubios",
+          "role": "dipendente"
+        },
+        {
+          "organizationId": "anima_antiqua",
+          "role": "socia_gestore"
+        }
+      ],
+      "active": true,
+      "appAccess": true,
+      "createdAt": "SERVER_TIMESTAMP",
+      "updatedAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "davide",
+      "fullName": "Davide",
+      "shortName": "Davide",
+      "type": "person",
+      "roles": [
+        "family_member",
+        "management_control",
+        "admin_support",
+        "eubios_key_user"
+      ],
+      "familyIds": [
+        "famiglia_teresa"
+      ],
+      "organizationRoles": [
+        {
+          "organizationId": "eubios",
+          "role": "controllo_di_gestione"
+        }
+      ],
+      "active": true,
+      "appAccess": true,
+      "createdAt": "SERVER_TIMESTAMP",
+      "updatedAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "stefano",
+      "fullName": "Stefano",
+      "shortName": "Stefano",
+      "type": "person",
+      "roles": [
+        "domain_approver"
+      ],
+      "familyIds": [
+        "famiglia_stefano"
+      ],
+      "organizationRoles": [
+        {
+          "organizationId": "ortotek",
+          "role": "socio"
+        },
+        {
+          "organizationId": "anima_antiqua",
+          "role": "socio"
+        }
+      ],
+      "active": true,
+      "appAccess": true,
+      "createdAt": "SERVER_TIMESTAMP",
+      "updatedAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "angiolina",
+      "fullName": "Angiolina",
+      "shortName": "Angiolina",
+      "type": "person",
+      "roles": [
+        "family_member"
+      ],
+      "familyIds": [
+        "famiglia_stefano"
+      ],
+      "organizationRoles": [],
+      "active": true,
+      "appAccess": false,
+      "createdAt": "SERVER_TIMESTAMP",
+      "updatedAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "angelica",
+      "fullName": "Angelica",
+      "shortName": "Angelica",
+      "type": "person",
+      "roles": [
+        "family_member"
+      ],
+      "familyIds": [
+        "famiglia_stefano"
+      ],
+      "organizationRoles": [],
+      "active": true,
+      "appAccess": false,
+      "createdAt": "SERVER_TIMESTAMP",
+      "updatedAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "paolo",
+      "fullName": "Paolo",
+      "shortName": "Paolo",
+      "type": "person",
+      "roles": [
+        "technician",
+        "coordinator"
+      ],
+      "familyIds": [],
+      "organizationRoles": [],
+      "active": true,
+      "appAccess": true,
+      "createdAt": "SERVER_TIMESTAMP",
+      "updatedAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "luca",
+      "fullName": "Luca",
+      "shortName": "Luca",
+      "type": "person",
+      "roles": [
+        "technician"
+      ],
+      "familyIds": [],
+      "organizationRoles": [
+        {
+          "organizationId": "eubiotech",
+          "role": "tecnico"
+        },
+        {
+          "organizationId": "eubios",
+          "role": "tecnico"
+        }
+      ],
+      "active": true,
+      "appAccess": false,
+      "createdAt": "SERVER_TIMESTAMP",
+      "updatedAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "francesco",
+      "fullName": "Francesco",
+      "shortName": "Francesco",
+      "type": "person",
+      "roles": [
+        "partner"
+      ],
+      "familyIds": [],
+      "organizationRoles": [
+        {
+          "organizationId": "eubiotech",
+          "role": "socio_50"
+        }
+      ],
+      "active": true,
+      "appAccess": false,
+      "createdAt": "SERVER_TIMESTAMP",
+      "updatedAt": "SERVER_TIMESTAMP"
+    }
+  ],
+  "families": [
+    {
+      "id": "famiglia_peppe",
+      "name": "Famiglia Peppe",
+      "members": [
+        "giuseppe",
+        "maria_virginia"
+      ],
+      "active": true,
+      "createdAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "famiglia_stefano",
+      "name": "Famiglia Stefano",
+      "members": [
+        "stefano",
+        "angiolina",
+        "angelica"
+      ],
+      "active": true,
+      "createdAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "famiglia_teresa",
+      "name": "Famiglia Teresa",
+      "members": [
+        "teresa",
+        "davide"
+      ],
+      "active": true,
+      "createdAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "famiglia_caterina",
+      "name": "Famiglia Caterina",
+      "members": [
+        "caterina",
+        "mimmo",
+        "angelo"
+      ],
+      "active": true,
+      "createdAt": "SERVER_TIMESTAMP"
+    }
+  ],
+  "organizations": [
+    {
+      "id": "eubios",
+      "name": "Eubios",
+      "type": "business",
+      "members": [
+        "giuseppe",
+        "teresa",
+        "caterina",
+        "luca",
+        "davide"
+      ],
+      "notes": "Ventilatori polmonari, ossigeno, comunicatori, magnetoterapia Seqex",
+      "active": true,
+      "createdAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "ortotek",
+      "name": "Ortotek",
+      "type": "business",
+      "members": [
+        "stefano",
+        "caterina"
+      ],
+      "active": true,
+      "createdAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "anima_antiqua",
+      "name": "Anima Antiqua",
+      "type": "hospitality",
+      "members": [
+        "stefano",
+        "teresa"
+      ],
+      "active": true,
+      "createdAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "eubiotech",
+      "name": "Eubiotech",
+      "type": "consulting",
+      "members": [
+        "caterina",
+        "francesco",
+        "luca"
+      ],
+      "active": true,
+      "createdAt": "SERVER_TIMESTAMP"
+    }
+  ],
+  "locations": [
+    {
+      "id": "casa_peppe",
+      "name": "Casa Peppe",
+      "type": "house",
+      "ownerType": "family",
+      "ownerIds": [
+        "famiglia_peppe"
+      ],
+      "active": true,
+      "createdAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "casa_stefano",
+      "name": "Casa Stefano",
+      "type": "house",
+      "ownerType": "family",
+      "ownerIds": [
+        "famiglia_stefano"
+      ],
+      "active": true,
+      "createdAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "casa_caterina",
+      "name": "Casa Caterina",
+      "type": "house",
+      "ownerType": "family",
+      "ownerIds": [
+        "famiglia_caterina"
+      ],
+      "active": true,
+      "createdAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "casa_teresa",
+      "name": "Casa Teresa",
+      "type": "house",
+      "ownerType": "family",
+      "ownerIds": [
+        "famiglia_teresa"
+      ],
+      "active": true,
+      "createdAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "loc_eubios",
+      "name": "Eubios (Sede)",
+      "type": "office",
+      "ownerType": "organization",
+      "ownerIds": [
+        "eubios"
+      ],
+      "active": true,
+      "createdAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "loc_ortotek",
+      "name": "Ortotek (Sede)",
+      "type": "office",
+      "ownerType": "organization",
+      "ownerIds": [
+        "ortotek"
+      ],
+      "active": true,
+      "createdAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "loc_anima_antiqua",
+      "name": "Anima Antiqua (Sede)",
+      "type": "hospitality",
+      "ownerType": "organization",
+      "ownerIds": [
+        "anima_antiqua"
+      ],
+      "active": true,
+      "createdAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "loc_eubiotech",
+      "name": "Eubiotech (Sede)",
+      "type": "office",
+      "ownerType": "organization",
+      "ownerIds": [
+        "eubiotech"
+      ],
+      "active": true,
+      "createdAt": "SERVER_TIMESTAMP"
+    }
+  ],
+  "workers": [
+    {
+      "id": "worker_paolo",
+      "fullName": "Paolo",
+      "type": "internal",
+      "specialty": "manutenzione_multiservizi",
+      "active": true
+    },
+    {
+      "id": "worker_luca",
+      "fullName": "Luca",
+      "type": "internal",
+      "specialty": "tecnico",
+      "active": true
+    }
+  ],
+  "requests": [
+    {
+      "id": "request_001",
+      "title": "Installazione faro led solare su palo",
+      "description": "Installazione faro led solare su palo",
+      "requestedBy": "giuseppe",
+      "beneficiaryType": "family",
+      "beneficiaryIds": [
+        "famiglia_peppe"
+      ],
+      "locationId": "casa_peppe",
+      "priority": "media",
+      "category": "manutenzione",
+      "status": "approved",
+      "requestedDate": "2023-02-17",
+      "attachmentsCount": 0,
+      "createdAt": "SERVER_TIMESTAMP",
+      "updatedAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "request_002",
+      "title": "Smontaggio TV piccola e montaggio TV grande a parete",
+      "description": "Smontaggio TV piccola, montaggio TV grande e verifiche impianti",
+      "requestedBy": "stefano",
+      "beneficiaryType": "family",
+      "beneficiaryIds": [
+        "famiglia_stefano"
+      ],
+      "locationId": "casa_stefano",
+      "priority": "media",
+      "category": "elettronica",
+      "status": "approved",
+      "requestedDate": "2023-02-17",
+      "attachmentsCount": 0,
+      "createdAt": "SERVER_TIMESTAMP",
+      "updatedAt": "SERVER_TIMESTAMP"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task_001",
+      "requestId": "request_001",
+      "title": "Installazione faro led solare su palo",
+      "description": "Intervento presso Casa Peppe",
+      "assignedTo": "paolo",
+      "helpers": [],
+      "supportWorkers": [
+        "dino",
+        "antimo"
+      ],
+      "organizationIds": [],
+      "familyIds": [
+        "famiglia_peppe"
+      ],
+      "locationId": "casa_peppe",
+      "category": "manutenzione",
+      "status": "completed",
+      "scheduledStart": "2023-02-17T08:00:00",
+      "scheduledEnd": "2023-02-17T09:00:00",
+      "estimatedCost": 0,
+      "actualCost": 0,
+      "materialsNeeded": [],
+      "materialsUsed": [],
+      "photosCount": 0,
+      "createdAt": "SERVER_TIMESTAMP",
+      "updatedAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "task_002",
+      "requestId": "request_002",
+      "title": "TV, internet, luci, segnale TV, condizionatori, siliconatura doccia",
+      "description": "Intervento composito presso Casa Stefano",
+      "assignedTo": "paolo",
+      "helpers": [],
+      "supportWorkers": [
+        "dino",
+        "antimo"
+      ],
+      "organizationIds": [],
+      "familyIds": [
+        "famiglia_stefano"
+      ],
+      "locationId": "casa_stefano",
+      "category": "multiservizi",
+      "status": "completed",
+      "scheduledStart": "2023-02-17T09:30:00",
+      "scheduledEnd": "2023-02-17T13:00:00",
+      "estimatedCost": 0,
+      "actualCost": 0,
+      "materialsNeeded": [],
+      "materialsUsed": [],
+      "photosCount": 0,
+      "createdAt": "SERVER_TIMESTAMP",
+      "updatedAt": "SERVER_TIMESTAMP"
+    }
+  ],
+  "interventions": [
+    {
+      "id": "int_001",
+      "taskId": "task_001",
+      "technicianId": "paolo",
+      "startTime": "2023-02-17T08:00:00",
+      "endTime": "2023-02-17T09:00:00",
+      "outcome": "completed",
+      "summary": "Installazione completata",
+      "locationId": "casa_peppe",
+      "createdAt": "SERVER_TIMESTAMP"
+    },
+    {
+      "id": "int_002",
+      "taskId": "task_002",
+      "technicianId": "paolo",
+      "startTime": "2023-02-17T09:30:00",
+      "endTime": "2023-02-17T13:00:00",
+      "outcome": "completed",
+      "summary": "Attività multiple completate",
+      "locationId": "casa_stefano",
+      "createdAt": "SERVER_TIMESTAMP"
+    }
+  ],
+  "expenses": [],
+  "cash_movements": [],
+  "allocations": [],
+  "external_workers": [
+    {
+      "id": "dino",
+      "fullName": "Dino",
+      "type": "external",
+      "role": "support",
+      "dailyRate": 80,
+      "active": true
+    },
+    {
+      "id": "antimo",
+      "fullName": "Antimo",
+      "type": "external",
+      "role": "support",
+      "dailyRate": 80,
+      "active": true
+    }
+  ],
+  "relationships": [
+    {
+      "id": "rel_001",
+      "fromType": "person",
+      "fromId": "giuseppe",
+      "relation": "spouse_of",
+      "toType": "person",
+      "toId": "maria_virginia"
+    },
+    {
+      "id": "rel_002",
+      "fromType": "person",
+      "fromId": "stefano",
+      "relation": "spouse_of",
+      "toType": "person",
+      "toId": "angiolina"
+    },
+    {
+      "id": "rel_003",
+      "fromType": "person",
+      "fromId": "teresa",
+      "relation": "spouse_of",
+      "toType": "person",
+      "toId": "davide"
+    },
+    {
+      "id": "rel_004",
+      "fromType": "person",
+      "fromId": "caterina",
+      "relation": "spouse_of",
+      "toType": "person",
+      "toId": "mimmo"
+    },
+    {
+      "id": "rel_005",
+      "fromType": "person",
+      "fromId": "paolo",
+      "relation": "parent_of",
+      "toType": "person",
+      "toId": "luca"
+    }
+  ],
+  "ai_interactions": [],
+  "support_requests": [],
+  "ai_settings": [
+    {
+      "id": "global_config",
+      "provider": "google_ai_studio",
+      "model": "gemini-2.5-flash",
+      "apiEnabled": false,
+      "maxTokens": 800,
+      "temperature": 0.3,
+      "systemPrompt": "You are the operational AI assistant for Progetto Paolo...",
+      "enabledScreens": ["home", "task_detail", "finance", "approval"],
+      "createdAt": "SERVER_TIMESTAMP"
+    }
+  ],
+  "ai_feedback": []
+}
