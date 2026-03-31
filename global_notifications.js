@@ -54,16 +54,17 @@ if(db) {
                 badge.id = 'globalFloatingNotification';
             badge.style.cssText = `
                 position: fixed;
-                top: 20px;
-                left: 20px;
-                background-color: var(--orange);
+                top: 15px;
+                right: 15px;
+                background-color: #ef4444;
                 color: white;
-                padding: 15px 20px;
-                border-radius: 8px;
-                font-weight: bold;
-                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                padding: 6px 12px;
+                border-radius: 20px;
+                font-size: 0.8rem;
+                font-weight: 600;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.2);
                 z-index: 10000;
-                display: flex; align-items: center; gap: 10px; max-width: 300px; cursor: pointer; border: 2px solid white;`;
+                display: flex; align-items: center; gap: 8px; max-width: 250px; cursor: pointer; border: 1px solid white;`;
                 
                 badge.onclick = () => {
                     window.location.href = "index.html#messagesSection";
@@ -75,8 +76,8 @@ if(db) {
             if(activeNotes.length > 0) {
                 badge.style.display = 'flex';
                 badge.innerHTML = `
-                    <div style="font-size: 1.5rem; animation: pulse 2s infinite;">🔔</div>
-                    <div style="font-size: 0.85rem; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    <div style="font-size: 1.1rem; animation: pulse 2s infinite;">🔔</div>
+                    <div style="font-size: 0.8rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                         ${activeNotes.length > 1 ? `(${activeNotes.length}) ` : ''}${activeNotes[0]}
                     </div>
                 `;

@@ -382,8 +382,9 @@ function renderWaitingTable() {
             <td>${p.localita || p.destinazione || 'N/D'}</td>
             <td>${p.indirizzo || ''} <br><small style="color:gray;">${p.telefono || ''}</small></td>
             <td>
-                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                <div style="display: flex; gap: 5px; flex-wrap: wrap; align-items: center;">
                     <input type="date" id="date_${p.idFb}" style="padding: 5px; border-radius: 6px; border: 1px solid #ccc;">
+                    <input type="time" id="time_${p.idFb}" style="padding: 5px; border-radius: 6px; border: 1px solid #ccc; width: 100px;" title="Ora (Opzionale)">
                     <button class="btn btn-primary btn-sm" onclick="programmaAttesa('${p.idFb}')" style="padding: 5px 10px; font-size: 0.8rem; width: auto; text-transform: none;">Assegna</button>
                     <button class="btn btn-secondary btn-sm" onclick="editProgrammato('${p.idFb}')" style="padding: 5px 10px; font-size: 0.8rem; width: auto; text-transform: none;">Modifica</button>
                     <button class="btn btn-danger btn-sm" onclick="deleteProgrammato('${p.idFb}')" style="padding: 5px 10px; font-size: 0.8rem; width: auto; text-transform: none;">Elimina</button>
@@ -1089,7 +1090,9 @@ btnSaveWaiting.addEventListener('click', async () => {
 
 window.programmaAttesa = async function(idFb) {
     const dateInput = document.getElementById('date_' + idFb);
+    const timeInput = document.getElementById('time_' + idFb);
     const newDate = dateInput.value;
+    const newTime = timeInput ? timeInput.value : "";
     if(!newDate) {
         return alert('Seleziona una data per assegnare l\'intervento!');
     }
@@ -1098,6 +1101,7 @@ window.programmaAttesa = async function(idFb) {
         const docRef = doc(db, 'programmati', idFb);
         await updateDoc(docRef, {
             dataPrevista: newDate,
+            oraPrevista: newTime,
             status: 'planned'
         });
         await fetchProgrammati(); // ricarica tutto e aggiorna calendario / tabella

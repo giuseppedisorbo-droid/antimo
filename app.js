@@ -1795,7 +1795,17 @@ async function syncPlannedInterventions() {
             }
         });
         
-        // Ordiniamo per data teorica o per come arrivano
+        // Ordiniamo per data e ora
+        cloudPlanned.sort((a,b) => {
+            const da = a.dataPrevista ? new Date(a.dataPrevista).getTime() : 0;
+            const dbDate = b.dataPrevista ? new Date(b.dataPrevista).getTime() : 0;
+            if (da !== dbDate) return da - dbDate;
+            
+            const oraA = a.oraPrevista || "23:59";
+            const oraB = b.oraPrevista || "23:59";
+            return oraA.localeCompare(oraB);
+        });
+        
         plannedInterventions = cloudPlanned;
         saveState();
         updateInterventiCount();
@@ -2266,7 +2276,7 @@ function renderSpecialPlannedList(container, filteredData) {
                     <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${p.paziente} ${attachBadge}</div>
                     <div style="font-size:0.75rem; color:#64748b; margin-top:2px;">👤 Da: <strong>${p.programmatoDa || 'N/D'}</strong> &rarr; 👨‍🔧 <strong>${p.tecnicoAssegnato || 'Da Assegnare'}</strong></div>
                     <div style="font-size:0.85rem; color:#555;">📍 ${p.localita || p.destinazione} | 🔧 ${p.tipo}</div>
-                    <div style="font-size:0.80rem; color:var(--orange); font-weight:600; margin-top:4px;">🗓 Data Prevista: ${dateStr}</div>
+                    <div style="font-size:0.80rem; color:var(--orange); font-weight:600; margin-top:4px;">🗓 Data Prevista: ${dateStr}${p.oraPrevista ? ' - ⏰ ' + p.oraPrevista : ''}</div>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center; padding-left: 10px;">
                     <button class="btn btn-primary btn-orange btn-sm" style="padding:6px 10px; font-size:0.8rem; line-height:1; min-width:auto;" data-action="avvia" data-index="${index}">▶ AVVIA</button>
