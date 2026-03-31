@@ -2270,12 +2270,15 @@ function renderSpecialPlannedList(container, filteredData) {
             </div>`;
         }
 
+        const asgName = p.tecnicoAssegnato || 'Da Assegnare';
+        const asgColor = window.stringToColorData(asgName);
+
         div.innerHTML = `
             <div class="card-compact-view">
                 <div style="flex:1;">
                     <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${p.paziente} ${attachBadge}</div>
-                    <div style="font-size:0.75rem; color:#64748b; margin-top:2px;">👤 Da: <strong>${p.programmatoDa || 'N/D'}</strong> &rarr; 👨‍🔧 <strong>${p.tecnicoAssegnato || 'Da Assegnare'}</strong></div>
-                    <div style="font-size:0.85rem; color:#555;">📍 ${p.localita || p.destinazione} | 🔧 ${p.tipo}</div>
+                    <div style="font-size:0.75rem; color:#64748b; margin-top:2px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">👤 Da: <strong>${p.programmatoDa || 'N/D'}</strong> &rarr; <span style="background:${asgColor.bg}; color:${asgColor.text}; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 0.70rem; align-items: center; display: inline-flex; gap: 4px;">👨‍🔧 ${asgName}</span></div>
+                    <div style="font-size:0.85rem; color:#555; margin-top: 4px;">📍 ${p.localita || p.destinazione} | 🔧 ${p.tipo}</div>
                     <div style="font-size:0.80rem; color:var(--orange); font-weight:600; margin-top:4px;">🗓 Data Prevista: ${dateStr}${p.oraPrevista ? ' - ⏰ ' + p.oraPrevista : ''}</div>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center; padding-left: 10px;">
@@ -2373,12 +2376,15 @@ function renderNpInterventions(visibiliCustom) {
             </div>`;
         }
 
+        const asgName = p.tecnicoAssegnato || 'Da Assegnare';
+        const asgColor = window.stringToColorData(asgName);
+
         div.innerHTML = `
             <div class="card-compact-view">
                 <div style="flex:1;">
                     <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${p.paziente} ${attachBadge}</div>
-                    <div style="font-size:0.75rem; color:#64748b; margin-top:2px;">👤 Da: <strong>${p.programmatoDa || 'N/D'}</strong> &rarr; 👨‍🔧 <strong>${p.tecnicoAssegnato || 'Da Assegnare'}</strong></div>
-                    <div style="font-size:0.85rem; color:#555;">📍 ${p.localita || p.destinazione} | 🔧 ${p.tipo}</div>
+                    <div style="font-size:0.75rem; color:#64748b; margin-top:2px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">👤 Da: <strong>${p.programmatoDa || 'N/D'}</strong> &rarr; <span style="background:${asgColor.bg}; color:${asgColor.text}; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 0.70rem; align-items: center; display: inline-flex; gap: 4px;">👨‍🔧 ${asgName}</span></div>
+                    <div style="font-size:0.85rem; color:#555; margin-top: 4px;">📍 ${p.localita || p.destinazione} | 🔧 ${p.tipo}</div>
                     <div style="font-size:0.80rem; color:#ef4444; font-weight:600; margin-top:4px;">⏳ Da Programmare</div>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center; padding-left: 10px;">
@@ -3418,10 +3424,16 @@ function renderActivitiesList() {
             }
 
             const showOra = inv.oraPrevista ? ` ore ${inv.oraPrevista}` : '';
+            const asgName = inv.tecnicoAssegnato || 'Da Assegnare';
+            const asgColor = window.stringToColorData(asgName);
+
             div.innerHTML = `
                 <div class="card-compact-view">
                     <div style="flex:1;">
-                        <div style="font-size:0.80rem; color:red; margin-bottom:4px;"><strong>⏳ PROGRAMMATO${showOra}</strong></div>
+                        <div style="font-size:0.80rem; color:red; margin-bottom:4px; display: flex; justify-content: space-between; align-items: center;">
+                            <strong>⏳ PROGRAMMATO${showOra}</strong>
+                            <span style="background:${asgColor.bg}; color:${asgColor.text}; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 0.70rem; align-items: center; display: inline-flex; gap: 4px;">👨‍🔧 ${asgName}</span>
+                        </div>
                         <div style="font-weight:bold; color:var(--blue-dark); font-size:1.05rem;">${inv.paziente} ${fileBadget}</div>
                         <div style="font-size:0.85rem; color:#555;">📍 ${inv.localita || inv.destinazione} | 🔧 ${window.decodeCodeToLabel(inv.tipo, 'interventi')}</div>
                     </div>
