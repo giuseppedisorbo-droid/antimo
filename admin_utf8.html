@@ -197,15 +197,36 @@
             </table>
         </div>
 
-            <h2 id="toggleStoricoHeader" style="padding: 1rem 1.5rem; margin: 0; background: #f8fafc; color: var(--blue-dark); border-bottom: 1px solid #eee; cursor: pointer; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <h2 id="toggleStoricoHeader" style="padding: 1.5rem; margin: 0; margin-top: 15px; background: linear-gradient(to right, #e0f2fe, #bae6fd); color: var(--blue-dark); border-bottom: 2px solid #7dd3fc; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); flex-wrap: wrap; gap: 10px; transition: transform 0.2s;">
                 <div style="display: flex; align-items: center; gap: 15px;">
                     <span>âœ… Storico Interventi (Eseguiti)</span>
                     <button id="btnMassDeleteStorico" class="btn btn-danger btn-sm hidden" style="margin: 0; padding: 6px 12px; font-weight: bold; font-size: 0.8rem; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.4);">ðŸ—‘ï¸ Elimina Selezionati (<span id="countStorico">0</span>)</button>
                 </div>
                 <div>
+                    
+                    <div style="position: relative; display: inline-block; margin-right: 15px;">
+                        <button id="btnTechFilterToggle" style="padding: 5px 10px; border-radius: 6px; border: 1px solid #0284c7; font-size: 0.85rem; background: #0ea5e9; color: white; font-weight: bold; cursor: pointer;" onclick="event.stopPropagation(); document.getElementById('techFilterDropdown').classList.toggle('hidden')">👨‍🔧 Filtra Tecnici ▾</button>
+                        <div id="techFilterDropdown" class="hidden" style="position: absolute; top: 100%; right: 0; width: max-content; min-width: 250px; background: white; border: 1px solid #ccc; border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); z-index: 1000; padding: 10px; display: flex; flex-direction: column; gap: 5px; color: black; font-size: 0.9rem; text-align: left;" onclick="event.stopPropagation();">
+                            <!-- Generato da JS -->
+                        </div>
+                    </div>
+            <span style="font-size: 0.85rem; font-weight: bold; margin-right: 5px; color: var(--blue-dark);">Raggruppa per:</span>
+                    <select id="groupBySelector" style="padding: 5px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.85rem; margin-right: 15px; background: white; color: var(--blue-dark); font-weight: bold;" onclick="event.stopPropagation();">
+                        <option value="">Nessuno</option>
+                        <option value="giorno">Giorno</option>
+                        <option value="mese">Mese</option>
+                        <option value="trimestre">Trimestre</option>
+                        <option value="anno">Anno</option>
+                        <option value="tecnico">Tecnico Assegnatario</option>
+                        <option value="paziente">Paziente</option>
+                        <option value="localita">Località</option>
+                        <option value="tipo">Tipo Intervento</option>
+                        <option value="dispositivi">Dispositivi</option>
+                    </select>
+                    <button id="btnExpandAllGrouped" class="btn btn-secondary btn-sm hidden" style="margin:0; font-size:0.85rem; padding: 5px 10px; margin-right: 15px; background: #64748b; color: white; border: none;" onclick="event.stopPropagation();">Espandi Tutto 🔽</button>
                     <input type="text" id="quickSearchStorico" placeholder="Cerca al volo..." style="padding: 5px 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.85rem; margin-right: 10px;" onclick="event.stopPropagation();">
                     <button id="btnToggleFilters" class="btn btn-primary btn-sm" style="margin:0; font-size:0.85rem; padding: 5px 10px; background: #b45309; border: none; margin-right: 5px;">âš™ï¸ Filtri Avanzati</button>
-                    <button id="storicoToggleIcon" class="btn btn-secondary btn-sm" style="margin:0; font-size:0.85rem; padding: 5px 10px;">Apri Storico â¬‡ï¸</button>
+                    <span id="storicoToggleIcon" class="toggle-icon-bar" style="font-size: 1.2rem; font-weight: bold;">Apri ⬇️</span>
                 </div>
             </h2>
             <div id="storicoWrapper" class="hidden">
@@ -220,6 +241,7 @@
                             <th>Indirizzo (Tel)</th>
                             <th>Tipo Intervento</th>
                             <th>Dispositivi / Matricola</th>
+                            <th>Tecnico</th>
                             <th>Km</th>
                             <th>Allegato</th>
                         </tr>
@@ -385,7 +407,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-    <script type="module" src="admin.js?v=64"></script>
+    <script type="module" src="admin.js?v=68"></script>
     <script type="module" src="global_notifications.js?v=64"></script>
 </body>
 </html>

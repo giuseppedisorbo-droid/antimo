@@ -257,12 +257,11 @@ const badgeNonEseguitiHeader = document.getElementById('badgeNonEseguitiHeader')
 
 if (toggleNonEseguitiHeader && nonEseguitiWrapper && nonEseguitiToggleIcon) {
     toggleNonEseguitiHeader.addEventListener('click', () => {
+        nonEseguitiWrapper.classList.toggle('hidden');
         if (nonEseguitiWrapper.classList.contains('hidden')) {
-            nonEseguitiWrapper.classList.remove('hidden');
-            nonEseguitiToggleIcon.innerHTML = 'Chiudi ⬆️';
-        } else {
-            nonEseguitiWrapper.classList.add('hidden');
             nonEseguitiToggleIcon.innerHTML = 'Apri ⬇️';
+        } else {
+            nonEseguitiToggleIcon.innerHTML = 'Chiudi ⬆️';
         }
     });
 }
@@ -320,6 +319,7 @@ async function loadData() {
 
         // Ordina decrescente (più recenti prima)
         tuttiGliInterventi = rawData.sort((a, b) => b.startTime - a.startTime);
+        updateTechDropdown();
         applyFilters();
     } catch (e) {
         console.error("Errore download dati:", e);
@@ -360,97 +360,172 @@ async function loadNonEseguiti() {
 
 function renderTable(dataArray) {
     if (dataArray.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center;">Nessun intervento trovato per i filtri selezionati.</td></tr>`;
+        if (document.getElementById('badgeStoricoHeader')) document.getElementById('badgeStoricoHeader').innerText = dataArray.length;
+        tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center;">Nessun intervento trovato per i filtri selezionati.</td></tr>';
         return;
     }
 
+    if (document.getElementById('badgeStoricoHeader')) document.getElementById('badgeStoricoHeader').innerText = dataArray.length;
     tableBody.innerHTML = '';
-
-    dataArray.forEach(inv => {
-        const tr = document.createElement('tr');
-
-        const dStart = new Date(inv.startTime);
-        const dataStr = formatDateDMY(dStart);
-        const timeStr = `${formatTime(inv.startTime)} - ${formatTime(inv.endTime)}`;
-
-        let fileHtml = '<span style="color:#aaa;">-</span>';
-        if (inv.fileUrl) {
-            fileHtml = `<a href="${inv.fileUrl}" target="_blank" class="attachment-link">📎 Apri / Scarica</a>`;
-        } else if (inv.fileUrls && inv.fileUrls.length > 0) {
-            fileHtml = `<a href="${inv.fileUrls[0]}" target="_blank" class="attachment-link">📎 Apri / Scarica</a>`;
-        } else if (inv.haAllegato) {
-            fileHtml = `<span class="badge badge-warning">Caricamento fallito</span>`;
+    
+    let groupBy = document.getElementById('groupBySelector') ? document.getElementById('groupBySelector').value : '';
+    let groups = {};
+    
+    if (groupBy) {
+        dataArray.forEach(inv => {
+            let key = 'N/D';
+            if (groupBy === 'giorno') {
+                key = formatDateDMY(new Date(inv.startTime));
+            } else if (groupBy === 'mese') {
+                let d = new Date(inv.startTime);
+                key = d.toLocaleString('it-IT', { month: 'long', year: 'numeric' });
+                key = key.charAt(0).toUpperCase() + key.slice(1);
+            } else if (groupBy === 'trimestre') {
+                let d = new Date(inv.startTime);
+                let q = Math.floor(d.getMonth() / 3) + 1;
+                key = 'Q' + q + ' ' + d.getFullYear();
+            } else if (groupBy === 'anno') {
+                key = new Date(inv.startTime).getFullYear().toString();
+            } else if (groupBy === 'tecnico') {
+                key = inv.tecnicoAssegnato || inv.tecnico || inv.operatore || inv.inseritoDa || 'Da Assegnare';
+            } else if (groupBy === 'paziente') {
+                key = inv.paziente || 'N/D';
+            } else if (groupBy === 'localita') {
+                key = inv.localita || inv.destinazione || 'N/D';
+            } else if (groupBy === 'tipo') {
+                key = window.decodeCodeToLabel(inv.tipo, 'interventi');
+            } else if (groupBy === 'dispositivi') {
+                key = window.decodeCodeToLabel(inv.dispositivi, 'dispositivi');
+            }
+            if(!groups[key]) groups[key] = [];
+            groups[key].push(inv);
+        });
+    } else {
+        groups['All'] = dataArray;
+    }
+    
+    let btnExpandList = document.querySelectorAll('#btnExpandAllGrouped');
+    btnExpandList.forEach(btn => {
+        if (groupBy) {
+            btn.classList.remove('hidden');
+            btn.innerHTML = 'Espandi Tutto 🔽';
+        } else {
+            btn.classList.add('hidden');
         }
-
-        let adminActions = '';
-        if (isAdminLogged) {
-            adminActions = `
-                <br>
-                <div style="margin-top: 8px; display: flex; gap: 5px;">
-                    <button class="btn btn-primary btn-sm btn-edit" data-fbid="${inv.fbId}" style="padding: 4px 8px; font-size: 0.75rem;"><span class="btn-icon">✏️</span> Edit</button>
-                    <button class="btn btn-danger btn-sm btn-delete" data-fbid="${inv.fbId}" style="padding: 4px 8px; font-size: 0.75rem;"><span class="btn-icon">🗑️</span> Del</button>
-                </div>
-            `;
-        }
-
-        const badgeVal = (inv.operatoreValutazione || inv.esito || inv.statoValutazione) 
-            ? `<div style="margin-top: 4px; display:inline-block; padding: 2px 6px; background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; border-radius: 4px; font-size: 0.75rem;">
-                <strong>Valutazione:</strong> 
-                ${inv.operatoreValutazione ? `Op: ${inv.operatoreValutazione}` : ''} 
-                ${inv.esito ? `| Esito: ${inv.esito}` : ''}
-                ${inv.statoValutazione ? `| Stato: ${inv.statoValutazione}` : ''}
-               </div>` : '';
-
-        tr.innerHTML = `
-            <td style="text-align: center;"><input type="checkbox" class="int-checkbox" value="${inv.fbId}" style="transform: scale(1.3); cursor: pointer;"></td>
-            <td><strong>${dataStr}</strong></td>
-            <td>${timeStr}</td>
-            <td>${inv.paziente}</td>
-            <td>${inv.localita || inv.destinazione || "N/D"}</td>
-            <td>${inv.indirizzo || ""} <br><small style="color:gray;">${inv.telefono || ""}</small></td>
-            <td><span class="badge badge-success">${window.decodeCodeToLabel(inv.tipo, 'interventi')}</span><br><small style="color:gray;">${inv.note || ''}</small></td>
-            <td>
-                ${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi')}<br>
-                <small style="color:gray;">
-                    ${inv.accessoriStr ? 'Acc: ' + inv.accessoriStr + '<br>' : ''}
-                    ${inv.matricola ? 'SN: ' + inv.matricola : ''}
-                </small><br>${badgeVal}
-            </td>
-            <td>${inv.kmPercorsi ? inv.kmPercorsi + ' km' : '-'}</td>
-            <td>${fileHtml} ${adminActions}</td>
-        `;
-
-        if (isAdminLogged) {
-            let deleteBtn = tr.querySelector('.btn-delete');
-            if (deleteBtn) deleteBtn.addEventListener('click', async (e) => {
-                if (!confirm(`Sicuro di voler eliminare definitivamente questo intervento?\n\nPaziente: ${inv.paziente}\nData: ${dataStr}\nLocalità: ${inv.localita || inv.destinazione || "N/D"}`)) return;
-                const fbId = e.currentTarget.getAttribute('data-fbid');
-                try {
-                    await deleteDoc(doc(db, "interventi", fbId));
-                    alert("Intervento eliminato.");
-                    await loadData();
-                } catch (err) { alert("Errore eliminazione: " + err.message); }
-            });
-            let editBtn = tr.querySelector('.btn-edit');
-            if (editBtn) editBtn.addEventListener('click', (e) => {
-                const fbId = e.currentTarget.getAttribute('data-fbid');
-                const invToEdit = tuttiGliInterventi.find(i => i.fbId === fbId);
-                if (invToEdit) openEditModal(invToEdit, false);
-            });
-        }
-
-        tableBody.appendChild(tr);
     });
-}
+    
 
+    let groupIndex = 0;
+    for (let key in groups) {
+        let items = groups[key];
+        let isGrouped = !!groupBy;
+        let groupId = 'group-' + groupIndex++;
+        
+        if (isGrouped) {
+            let trHeader = document.createElement('tr');
+            trHeader.style.backgroundColor = '#f1f5f9';
+            trHeader.style.cursor = 'pointer';
+            trHeader.innerHTML = '<th colspan="10" style="padding: 12px; color: var(--blue-dark); text-align: left;"><span style="font-size:1.1rem;">📂 ' + key + '</span> <span style="font-weight:normal; color:#64748b; font-size:0.9rem;">(' + items.length + ' interventi)</span> - <span style="font-size:0.8rem; text-decoration:underline;">Tocca per espandere</span></th>';
+            trHeader.addEventListener('click', () => {
+                document.querySelectorAll('.' + groupId).forEach(r => r.classList.toggle('hidden'));
+            });
+            tableBody.appendChild(trHeader);
+        }
+
+        items.forEach(inv => {
+            const tr = document.createElement('tr');
+            if (isGrouped) {
+                tr.classList.add(groupId, 'hidden'); // Hidden by default as requested
+            }
+
+            const dStart = new Date(inv.startTime);
+            const dataStr = formatDateDMY(dStart);
+            const timeStr = `${formatTime(inv.startTime)} - ${formatTime(inv.endTime)}`;
+
+            let fileHtml = '<span style="color:#aaa;">-</span>';
+            if (inv.fileUrl) {
+                fileHtml = `<a href="${inv.fileUrl}" target="_blank" class="attachment-link">📎 Apri</a>`;
+            } else if (inv.fileUrls && inv.fileUrls.length > 0) {
+                fileHtml = `<a href="${inv.fileUrls[0]}" target="_blank" class="attachment-link">📎 Apri</a>`;
+            } else if (inv.haAllegato) {
+                fileHtml = `<span class="badge badge-warning">Err</span>`;
+            }
+
+            let adminActions = '';
+            if (isAdminLogged) {
+                adminActions = `
+                    <br>
+                    <div style="margin-top: 8px; display: flex; gap: 5px;">
+                        <button class="btn btn-primary btn-sm btn-edit" data-fbid="${inv.fbId}" style="padding: 4px 8px; font-size: 0.75rem;"><span class="btn-icon">✏️</span> Edit</button>
+                        <button class="btn btn-danger btn-sm btn-delete" data-fbid="${inv.fbId}" style="padding: 4px 8px; font-size: 0.75rem;"><span class="btn-icon">🗑️</span> Del</button>
+                    </div>
+                `;
+            }
+
+            const badgeVal = (inv.operatoreValutazione || inv.esito || inv.statoValutazione) 
+                ? `<div style="margin-top: 4px; display:inline-block; padding: 2px 6px; background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; border-radius: 4px; font-size: 0.75rem;">
+                    <strong>Valutazione:</strong> 
+                    ${inv.operatoreValutazione ? `Op: ${inv.operatoreValutazione}` : ''} 
+                    ${inv.esito ? `| Esito: ${inv.esito}` : ''}
+                    ${inv.statoValutazione ? `| Stato: ${inv.statoValutazione}` : ''}
+                   </div>` : '';
+            
+            let tecnico = inv.tecnicoAssegnato || inv.tecnico || inv.operatore || inv.inseritoDa || 'Da Assegnare';
+
+            tr.innerHTML = `
+                <td style="text-align: center;"><input type="checkbox" class="int-checkbox" value="${inv.fbId}" style="transform: scale(1.3); cursor: pointer;"></td>
+                <td><strong>${dataStr}</strong></td>
+                <td>${timeStr}</td>
+                <td>${inv.paziente}</td>
+                <td>${inv.localita || inv.destinazione || "N/D"}</td>
+                <td>${inv.indirizzo || ""} <br><small style="color:gray;">${inv.telefono || ""}</small></td>
+                <td><span class="badge badge-success">${window.decodeCodeToLabel(inv.tipo, 'interventi')}</span><br><small style="color:gray;">${inv.note || ''}</small></td>
+                <td>
+                    ${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi')}<br>
+                    <small style="color:gray;">
+                        ${inv.accessoriStr ? 'Acc: ' + inv.accessoriStr + '<br>' : ''}
+                        ${inv.matricola ? 'SN: ' + inv.matricola : ''}
+                    </small><br>${badgeVal}
+                </td>
+                <td><strong>${tecnico}</strong></td>
+                <td>${inv.kmPercorsi ? inv.kmPercorsi + ' km' : '-'}</td>
+                <td>${fileHtml} ${adminActions}</td>
+            `;
+
+            if (isAdminLogged) {
+                let deleteBtn = tr.querySelector('.btn-delete');
+                if (deleteBtn) deleteBtn.addEventListener('click', async (e) => {
+                    if (!confirm(`Sicuro di voler eliminare definitivamente questo intervento?\n\nPaziente: ${inv.paziente}\nData: ${dataStr}\nLocalità: ${inv.localita || inv.destinazione || "N/D"}`)) return;
+                    const fbId = e.currentTarget.getAttribute('data-fbid');
+                    try {
+                        
+                        await deleteDoc(doc(db, "interventi", fbId));
+                        alert("Intervento eliminato.");
+                        await loadData();
+                    } catch (err) { alert("Errore eliminazione: " + err.message); }
+                });
+                let editBtn = tr.querySelector('.btn-edit');
+                if (editBtn) editBtn.addEventListener('click', (e) => {
+                    const fbId = e.currentTarget.getAttribute('data-fbid');
+                    const invToEdit = tuttiGliInterventi.find(i => i.fbId === fbId);
+                    if (invToEdit) openEditModal(invToEdit, false);
+                });
+            }
+
+            tableBody.appendChild(tr);
+        });
+    }
+}
 function renderNonEseguitiTable(dataArray) {
-    if (badgeNonEseguitiHeader) badgeNonEseguitiHeader.textContent = dataArray.length;
+    
 
     if (dataArray.length === 0) {
+        if (document.getElementById('badgeNonEseguitiHeader')) document.getElementById('badgeNonEseguitiHeader').innerText = dataArray.length;
         nonEseguitiTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: #666;">🎉 Nessun intervento pendente da controllare.</td></tr>`;
         return;
     }
 
+    if (document.getElementById('badgeNonEseguitiHeader')) document.getElementById('badgeNonEseguitiHeader').innerText = dataArray.length;
     nonEseguitiTableBody.innerHTML = '';
 
     dataArray.forEach(inv => {
@@ -518,6 +593,84 @@ function renderNonEseguitiTable(dataArray) {
 }
 
 // Filtri
+
+function updateTechDropdown() {
+    const listDiv = document.getElementById('techFilterDropdown');
+    if (!listDiv) return;
+    
+    // Extract unique technicians
+    let techs = new Set();
+    tuttiGliInterventi.forEach(inv => {
+        let t = inv.tecnicoAssegnato || inv.tecnico || inv.operatore || inv.inseritoDa || 'Da Assegnare';
+        techs.add(t);
+    });
+    
+    // Sort array
+    let techArr = Array.from(techs).sort();
+    
+    // Load saved preferences
+    let saved = localStorage.getItem('antimo_admin_selected_technicians');
+    let savedSet = saved ? new Set(JSON.parse(saved)) : null;
+    
+    listDiv.innerHTML = '';
+    
+    // Select All checkbox
+    let selAllDiv = document.createElement('label');
+    selAllDiv.style.fontWeight = 'bold';
+    selAllDiv.style.borderBottom = '1px solid #eee';
+    selAllDiv.style.paddingBottom = '5px';
+    selAllDiv.style.cursor = 'pointer';
+    selAllDiv.style.display = 'block';
+    
+    let isAllChecked = !savedSet || savedSet.size === techArr.length;
+    
+    selAllDiv.innerHTML = `<input type="checkbox" id="chkTechAll" ${isAllChecked ? 'checked' : ''}> (Seleziona Tutti)`;
+    listDiv.appendChild(selAllDiv);
+    
+    let chkAll = selAllDiv.querySelector('input');
+    chkAll.addEventListener('change', (e) => {
+        let isC = e.target.checked;
+        listDiv.querySelectorAll('.chk-tech-item').forEach(c => c.checked = isC);
+        saveTechSelection();
+    });
+    
+    techArr.forEach(t => {
+        let lbl = document.createElement('label');
+        lbl.style.display = 'block';
+        lbl.style.cursor = 'pointer';
+        let isChecked = savedSet ? savedSet.has(t) : true;
+        lbl.innerHTML = `<input type="checkbox" class="chk-tech-item" value="${t.replace(/"/g, '&quot;')}" ${isChecked ? 'checked' : ''}> ${t}`;
+        
+        lbl.querySelector('input').addEventListener('change', () => {
+            // Uncheck "Select All" if not all are checked
+            let allCboxes = listDiv.querySelectorAll('.chk-tech-item');
+            let allChecked = Array.from(allCboxes).every(c => c.checked);
+            chkAll.checked = allChecked;
+            saveTechSelection();
+        });
+        
+        listDiv.appendChild(lbl);
+    });
+}
+
+function saveTechSelection() {
+    const listDiv = document.getElementById('techFilterDropdown');
+    if(!listDiv) return;
+    let selected = [];
+    listDiv.querySelectorAll('.chk-tech-item:checked').forEach(c => selected.push(c.value));
+    localStorage.setItem('antimo_admin_selected_technicians', JSON.stringify(selected));
+    applyFilters();
+}
+
+// close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    const box = document.getElementById('techFilterDropdown');
+    const btn = document.getElementById('btnTechFilterToggle');
+    if(box && !box.classList.contains('hidden') && !box.contains(e.target) && e.target !== btn) {
+        box.classList.add('hidden');
+    }
+});
+
 function applyFilters() {
     let filtrati = [...tuttiGliInterventi];
     let filtratiProgrammati = [...tuttiGliInterventiProgrammati];
@@ -726,22 +879,32 @@ function esporterCSV() {
         const de = new Date(filterDateEnd.value).setHours(23, 59, 59, 999);
         currentData = currentData.filter(i => i.startTime <= de);
     }
+    
+    let savedTech = localStorage.getItem('antimo_admin_selected_technicians');
+    if(savedTech) {
+        let allowed = new Set(JSON.parse(savedTech));
+        currentData = currentData.filter(i => {
+            let t = i.tecnicoAssegnato || i.tecnico || i.operatore || i.inseritoDa || 'Da Assegnare';
+            return allowed.has(t);
+        });
+    }
 
     if (currentData.length === 0) {
         return alert("Nessun dato da esportare con questi filtri.");
     }
 
-    let header = ["Data", "Orario Inizio", "Orario Fine", "Paziente / Ente", "Localita", "Indirizzo", "Telefono", "Tipo Intervento", "Dispositivi", "Accessori", "Matricola", "Km Extra", "Note", "Link Allegato"];
+    let header = ["Data", "Orario Inizio", "Orario Fine", "Paziente / Ente", "Localita", "Indirizzo", "Telefono", "Tipo Intervento", "Dispositivi", "Accessori", "Tecnico/Operatore", "Matricola", "Km Extra", "Note", "Link Allegato"];
     let csvContent = header.join(";") + "\n";
 
     currentData.forEach(inv => {
         let loc = inv.localita || inv.destinazione || "";
         let ind = inv.indirizzo || "";
+        let tecnico = inv.tecnicoAssegnato || inv.tecnico || inv.operatore || inv.inseritoDa || "Da Assegnare";
 
         let rs = [
             `"${formatDateDMY(new Date(inv.startTime))}"`, `"${formatTime(inv.startTime)}"`, `"${formatTime(inv.endTime)}"`,
             `"${inv.paziente.replace(/"/g, '""')}"`, `"${loc.replace(/"/g, '""')}"`, `"${ind.replace(/"/g, '""')}"`, `"${inv.telefono || ""}"`,
-            `"${window.decodeCodeToLabel(inv.tipo, 'interventi')}"`, `"${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi').replace(/"/g, '""')}"`, `"${inv.accessoriStr ? inv.accessoriStr.replace(/"/g, '""') : ''}"`, `"${inv.matricola ? inv.matricola.replace(/"/g, '""') : ''}"`, `"${inv.kmPercorsi}"`,
+            `"${window.decodeCodeToLabel(inv.tipo, 'interventi')}"`, `"${window.decodeCodeToLabel(inv.dispositivi, 'dispositivi').replace(/"/g, '""')}"`, `"${inv.accessoriStr ? inv.accessoriStr.replace(/"/g, '""') : ''}"`, `"${tecnico.replace(/"/g, '""')}"`, `"${inv.matricola ? inv.matricola.replace(/"/g, '""') : ''}"`, `"${inv.kmPercorsi}"`,
             `"${inv.note ? inv.note.replace(/"/g, '""') : ''}"`, `"${inv.fileUrl || ''}"`
         ];
         csvContent += rs.join(";") + "\n";
@@ -823,7 +986,7 @@ btnApplyFilters.addEventListener('click', () => {
     quickFilters.forEach(b => { b.classList.remove('btn-orange'); b.classList.add('btn-secondary'); }); // Reset stile bottoni rapidi se si cerca manuale
     applyFilters();
     if (storicoWrapper && storicoWrapper.classList.contains('hidden')) {
-        storicoWrapper.classList.remove('hidden');
+        // removed auto-open storicoWrapper
         if(storicoToggleIcon) storicoToggleIcon.textContent = "Chiudi Storico ⬆️";
     }
 });
@@ -836,7 +999,7 @@ btnResetFilters.addEventListener('click', () => {
     renderTable(tuttiGliInterventi);
     // Auto Collapse quando si fa Reset
     if (storicoWrapper && !storicoWrapper.classList.contains('hidden')) {
-        storicoWrapper.classList.add('hidden');
+        // removed auto-close storicoWrapper
         if(storicoToggleIcon) storicoToggleIcon.textContent = "Apri Storico ⬇️";
     }
 });
@@ -909,7 +1072,7 @@ quickFilters.forEach(btn => {
         applyFilters();
         
         if (storicoWrapper && storicoWrapper.classList.contains('hidden')) {
-            storicoWrapper.classList.remove('hidden');
+            // removed auto-open storicoWrapper
             if(storicoToggleIcon) storicoToggleIcon.textContent = "Chiudi Storico ⬆️";
         }
     });
@@ -941,6 +1104,21 @@ loadData();
 const selectAllStorico = document.getElementById('selectAllStorico');
 const selectAllNonEseguiti = document.getElementById('selectAllNonEseguiti');
 const btnMassDeleteStorico = document.getElementById('btnMassDeleteStorico');
+const groupBySelector = document.getElementById('groupBySelector');
+if (groupBySelector) { groupBySelector.addEventListener('change', () => applyFilters()); }
+const btnExpandAllGrouped = document.getElementById('btnExpandAllGrouped');
+if (btnExpandAllGrouped) {
+    btnExpandAllGrouped.addEventListener('click', (e) => {
+        let isExpanded = btnExpandAllGrouped.textContent.includes('Comprimi');
+        if (isExpanded) {
+            document.querySelectorAll('[class*="group-"]').forEach(r => r.classList.add('hidden'));
+            btnExpandAllGrouped.innerHTML = 'Espandi Tutto 🔽';
+        } else {
+            document.querySelectorAll('[class*="group-"]').forEach(r => r.classList.remove('hidden'));
+            btnExpandAllGrouped.innerHTML = 'Comprimi Tutto 🔼';
+        }
+    });
+}
 const btnMassDeleteNonEseguiti = document.getElementById('btnMassDeleteNonEseguiti');
 const countStorico = document.getElementById('countStorico');
 const countNonEseguiti = document.getElementById('countNonEseguiti');
