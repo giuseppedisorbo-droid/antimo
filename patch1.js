@@ -68,7 +68,7 @@ const modalsHtml = `
 
 if (!html.includes('id="settingsModal"')) {
     html = html.replace('</main>', modalsHtml + '\n    </main>');
-    html = html.replace('<script type="module" src="app.js?v=61"></script>', '<script type="module" src="guida.js?v=' + Date.now() + '"></script>\n    <script type="module" src="app.js?v=61"></script>');
+    html = html.replace('<script type="module" src="app.js?v=64"></script>', '<script type="module" src="guida.js?v=' + Date.now() + '"></script>\n    <script type="module" src="app.js?v=64"></script>');
     fs.writeFileSync(file, html, 'utf8');
     console.log('Injected successfully');
 } else {

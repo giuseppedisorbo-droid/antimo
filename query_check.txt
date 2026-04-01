@@ -1,0 +1,8 @@
+1739:                 const q = query(collection(db, "programmati"), where("id", "==", p.id));
+1788:         const snap = await getDocs(collection(db, "programmati"));
+2460:                 const q = query(collection(db, "programmati"), where("id", "==", interventionToJustify.id));
+2475:                      await addDoc(collection(db, "programmati"), interventionToJustify);
+2972:             await addDoc(collection(db, "programmati"), planned);
+3132:                     collection(db, "programmati"), 
+3839:             const collectionsToExport = ["interventi", "programmati", "messaggi", "anagrafiche"];
+4362:                 const progSnap = await getDocs(collection(db, "programmati"));
