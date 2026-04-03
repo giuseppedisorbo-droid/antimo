@@ -861,8 +861,9 @@ if (btnProgStartIntervention) {
                     } catch(e) { console.error("Errore rimozione programmato", e); }
                 }
 
-                // Nuova logica: se salvo un intervento per un paziente, chiudo in automatico i suoi vecchi N.ESEG.
+                // Nuova logica: se salvo un intervento per un paziente, chiudo in automatico i suoi vecchi N.ESEG e IN ATTESA.
                 try {
+                    // 1. Chiudi vecchi N.ESEG
                     const qNeseg = query(
                         collection(db, "programmati"), 
                         where("paziente", "==", invToSave.paziente),
@@ -872,7 +873,19 @@ if (btnProgStartIntervention) {
                     snapsNeseg.forEach(async (d) => {
                         await updateDoc(doc(db, "programmati", d.id), { status: "completed" });
                     });
-                } catch(e) { console.error("Errore pulizia vecchi N.ESEG", e); }
+
+                    // 2. Elimina vecchi In Attesa
+                    const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                    const qInAttesa = query(
+                        collection(db, "programmati"), 
+                        where("paziente", "==", invToSave.paziente),
+                        where("status", "==", "in_attesa")
+                    );
+                    const snapsInAttesa = await getDocs(qInAttesa);
+                    snapsInAttesa.forEach(async (d) => {
+                        await deleteDoc(doc(db, "programmati", d.id));
+                    });
+                } catch(e) { console.error("Errore pulizia vecchi N.ESEG o IN ATTESA", e); }
 
                 form.reset();
                 if (progFilePreviewContainer) {
@@ -1110,9 +1123,11 @@ window.programmaAttesa = async function(idFb) {
         alert('Errore di connessione o permessi aggiornando la data.');
     }
 };
-
 window.deleteProgrammato = async function(idFb) {
-    const p = plannedInterventions.find(x => x.idFb === idFb);
+    let p = plannedInterventions.find(x => x.idFb === idFb);
+    if(!p) {
+        p = waitingInterventions.find(x => x.idFb === idFb);
+    }
     if(!p) return;
     if(!confirm(`Sicuro di voler eliminare questa programmazione?\n\nPaziente: ${p.paziente}\nLocalità: ${p.localita||p.destinazione||''}`)) return;
     try {
