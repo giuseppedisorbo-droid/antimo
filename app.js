@@ -373,7 +373,8 @@ function updateHeaderFiltersUI() {
         { btn: btnMostraP, active: isPlannedVisible && !selectedCalendarDate },
         { btn: btnMostraNP, active: isNpVisible },
         { btn: btnMostraEseguiti, active: isEseguitiVisible },
-        { btn: btnCalendar, active: !!selectedCalendarDate }
+        { btn: btnCalendar, active: !!selectedCalendarDate },
+        { btn: btnMostraNeseguiti, active: isNesegVisible }
     ];
     list.forEach(item => {
         if (item.btn) {
@@ -382,7 +383,7 @@ function updateHeaderFiltersUI() {
         }
     });
     
-    const anyListVisible = isOggiVisible || isDomaniVisible || isPlannedVisible || isNpVisible || isEseguitiVisible;
+    const anyListVisible = isOggiVisible || isDomaniVisible || isPlannedVisible || isNpVisible || isEseguitiVisible || isNesegVisible;
     if (anyListVisible && globalToggleCardContainer) globalToggleCardContainer.classList.remove('hidden');
     else if (globalToggleCardContainer) globalToggleCardContainer.classList.add('hidden');
 }
@@ -3126,9 +3127,11 @@ newInterventionForm.addEventListener('submit', async (e) => {
                 activeProgItem = null;
             }
             
-            // Nuova logica: se salvo un intervento per un paziente, chiudo in automatico i suoi vecchi N.ESEG.
+            // Nuova logica: se salvo un intervento per un paziente, chiudo in automatico i suoi vecchi N.ESEG e IN ATTESA.
             try {
-                const { collection, query, where, getDocs, doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                const { collection, query, where, getDocs, doc, updateDoc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                
+                // 1. Chiudi vecchi N.ESEG
                 const qNeseg = query(
                     collection(db, "programmati"), 
                     where("paziente", "==", invToSave.paziente),
@@ -3139,8 +3142,21 @@ newInterventionForm.addEventListener('submit', async (e) => {
                     await updateDoc(doc(db, "programmati", d.id), { status: "completed" });
                     console.log(`Vecchio N.ESEG ${d.id} chiuso automaticamente per il paziente ${invToSave.paziente}`);
                 });
+                
+                // 2. Elimina vecchi In Attesa
+                const qInAttesa = query(
+                    collection(db, "programmati"), 
+                    where("paziente", "==", invToSave.paziente),
+                    where("status", "==", "in_attesa")
+                );
+                const snapsInAttesa = await getDocs(qInAttesa);
+                snapsInAttesa.forEach(async (d) => {
+                    await deleteDoc(doc(db, "programmati", d.id));
+                    console.log(`Vecchio IN ATTESA ${d.id} eliminato automaticamente per il paziente ${invToSave.paziente}`);
+                });
+                
             } catch(e) {
-                console.error("Errore pulizia vecchi N.ESEG", e);
+                console.error("Errore pulizia vecchi N.ESEG o IN ATTESA", e);
             }
             
             cloudSaveSuccess = true;

@@ -1124,16 +1124,23 @@ window.programmaAttesa = async function(idFb) {
     }
 };
 window.deleteProgrammato = async function(idFb) {
-    let p = plannedInterventions.find(x => x.idFb === idFb);
-    if(!p) {
-        p = waitingInterventions.find(x => x.idFb === idFb);
-    }
-    if(!p) return;
-    if(!confirm(`Sicuro di voler eliminare questa programmazione?\n\nPaziente: ${p.paziente}\nLocalità: ${p.localita||p.destinazione||''}`)) return;
     try {
+        let p = plannedInterventions.find(x => x.idFb === idFb);
+        if(!p) {
+            p = waitingInterventions.find(x => x.idFb === idFb);
+        }
+        if(!p) {
+            alert("ERRORE: Elemento non trovato in memoria! id: " + idFb + ". Ricarica la pagina.");
+            return;
+        }
+        if(!confirm(`Sicuro di voler eliminare questa programmazione?\n\nPaziente: ${p.paziente}\nLocalità: ${p.localita||p.destinazione||''}`)) return;
+        
         await deleteDoc(doc(db, "programmati", idFb));
         await fetchProgrammati();
-    } catch(e) { alert(e.message); }
+    } catch(e) { 
+        alert("ERRORE DURANTE ELIMINAZIONE:\n" + e.message);
+        console.error(e);
+    }
 };
 
 window.editProgrammato = function(idFb) {
